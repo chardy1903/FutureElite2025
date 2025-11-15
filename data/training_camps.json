@@ -1,0 +1,41 @@
+[
+  {
+    "id": "20251115_134233",
+    "camp_name": "Barca Academy Camp",
+    "organizer": "FC Barcelona",
+    "location": "Marbella, Spain",
+    "start_date": "04 Aug 2025",
+    "end_date": "08 Aug 2025",
+    "duration_days": 5,
+    "age_group": "U12",
+    "focus_area": "Technical Skills and Technical Awareness",
+    "achievements": "",
+    "notes": ""
+  },
+  {
+    "id": "20251115_134556",
+    "camp_name": "Profut Camp",
+    "organizer": "Profut Camp",
+    "location": "Malaga, Spain",
+    "start_date": "29 Jun 2025",
+    "end_date": "05 Jul 2025",
+    "duration_days": 7,
+    "age_group": "U12",
+    "focus_area": "Fitness, Technical Skills and Technical Awareness",
+    "achievements": "",
+    "notes": ""
+  },
+  {
+    "id": "20251115_134639",
+    "camp_name": "Profut Camp",
+    "organizer": "Profut Camp",
+    "location": "Malaga, Spain",
+    "start_date": "20 Jul 2025",
+    "end_date": "26 Jul 2025",
+    "duration_days": 7,
+    "age_group": "U12",
+    "focus_area": "Fitness, Technical Skills and Technical Awareness",
+    "achievements": "",
+    "notes": ""
+  }
+]

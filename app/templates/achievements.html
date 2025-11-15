@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+
+{% block title %}Achievements - FutureElite Tracker{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Key Achievements</h1>
+                <p class="mt-2 text-lg text-gray-600">{{ settings.club_name }} - {{ settings.player_name }}</p>
+            </div>
+            <button onclick="openAchievementModal()" class="bg-qadsiah-red text-white px-6 py-3 rounded-lg font-medium hover:bg-red-700 transition-colors">
+                Add Achievement
+            </button>
+        </div>
+    </div>
+
+    <!-- Achievements List -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            {% if achievements %}
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {% for achievement in achievements %}
+                    <div class="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex-1">
+                                <h3 class="text-lg font-semibold text-gray-900 mb-1">{{ achievement.title }}</h3>
+                                <span class="inline-block px-2 py-1 text-xs font-medium rounded-full bg-qadsiah-red text-white mb-2">
+                                    {{ achievement.category }}
+                                </span>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="editAchievement('{{ achievement.id }}')" class="text-qadsiah-red hover:text-red-700" title="Edit">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                    </svg>
+                                </button>
+                                <button onclick="deleteAchievement('{{ achievement.id }}')" class="text-red-600 hover:text-red-900" title="Delete">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                                <span>{{ achievement.date }}</span>
+                            </div>
+                            {% if achievement.season %}
+                            <div class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <span>{{ achievement.season }}</span>
+                            </div>
+                            {% endif %}
+                            {% if achievement.description %}
+                            <p class="text-sm text-gray-700 mt-3">{{ achievement.description }}</p>
+                            {% endif %}
+                            {% if achievement.notes %}
+                            <p class="text-xs text-gray-500 italic mt-2">{{ achievement.notes }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-12">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path>
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">No achievements yet</h3>
+                    <p class="mt-1 text-sm text-gray-500">Get started by adding your first achievement.</p>
+                    <div class="mt-6">
+                        <button onclick="openAchievementModal()" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-qadsiah-red hover:bg-red-700">
+                            Add Achievement
+                        </button>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Achievement Modal -->
+<div id="achievementModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <h3 id="achievementModalTitle" class="text-lg font-medium text-gray-900 mb-4">Add Achievement</h3>
+            <form id="achievementForm" onsubmit="saveAchievement(event)">
+                <div class="space-y-4">
+                    <div>
+                        <label for="title" class="block text-sm font-medium text-gray-700">Title *</label>
+                        <input type="text" name="title" id="title" required
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-qadsiah-red focus:ring-qadsiah-red sm:text-sm"
+                               placeholder="e.g., Player of the Year, Top Scorer">
+                    </div>
+                    
+                    <div>
+                        <label for="category" class="block text-sm font-medium text-gray-700">Category *</label>
+                        <select name="category" id="category" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-qadsiah-red focus:ring-qadsiah-red sm:text-sm">
+                            <option value="">Select category</option>
+                            <option value="Season">Season</option>
+                            <option value="Tournament">Tournament</option>
+                            <option value="Match">Match</option>
+                            <option value="League">League</option>
+                            <option value="Award">Award</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="date" class="block text-sm font-medium text-gray-700">Date *</label>
+                        <input type="date" name="date" id="date" required
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-qadsiah-red focus:ring-qadsiah-red sm:text-sm">
+                    </div>
+                    
+                    <div>
+                        <label for="season" class="block text-sm font-medium text-gray-700">Season</label>
+                        <input type="text" name="season" id="season"
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-qadsiah-red focus:ring-qadsiah-red sm:text-sm"
+                               placeholder="e.g., 2025/26" value="{{ settings.season_year }}">
+                    </div>
+                    
+                    <div>
+                        <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
+                        <textarea name="description" id="description" rows="3"
+                                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-qadsiah-red focus:ring-qadsiah-red sm:text-sm"
+                                  placeholder="Additional details about the achievement"></textarea>
+                    </div>
+                    
+                    <div>
+                        <label for="notes" class="block text-sm font-medium text-gray-700">Notes</label>
+                        <textarea name="notes" id="notes" rows="2"
+                                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-qadsiah-red focus:ring-qadsiah-red sm:text-sm"
+                                  placeholder="Optional notes"></textarea>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="closeAchievementModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-qadsiah-red rounded-md hover:bg-red-700">
+                        Save Achievement
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentAchievementId = null;
+
+function openAchievementModal(achievementId = null) {
+    currentAchievementId = achievementId;
+    const modal = document.getElementById('achievementModal');
+    const form = document.getElementById('achievementForm');
+    const title = document.getElementById('achievementModalTitle');
+    
+    if (achievementId) {
+        title.textContent = 'Edit Achievement';
+        loadAchievementData(achievementId);
+    } else {
+        title.textContent = 'Add Achievement';
+        form.reset();
+        // Set default season
+        document.getElementById('season').value = '{{ settings.season_year }}';
+    }
+    
+    modal.classList.remove('hidden');
+}
+
+function closeAchievementModal() {
+    document.getElementById('achievementModal').classList.add('hidden');
+    currentAchievementId = null;
+}
+
+async function loadAchievementData(achievementId) {
+    try {
+        const response = await fetch(`/api/achievements`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const achievement = data.achievements.find(a => a.id === achievementId);
+            if (achievement) {
+                document.getElementById('title').value = achievement.title;
+                document.getElementById('category').value = achievement.category;
+                document.getElementById('date').value = formatDateForInput(achievement.date);
+                document.getElementById('season').value = achievement.season || '';
+                document.getElementById('description').value = achievement.description || '';
+                document.getElementById('notes').value = achievement.notes || '';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading achievement data:', error);
+        showToast('Error loading achievement data', 'error');
+    }
+}
+
+async function saveAchievement(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const data = Object.fromEntries(formData.entries());
+    
+    // Remove empty optional fields
+    if (!data.season || data.season.trim() === '') {
+        delete data.season;
+    }
+    if (!data.description || data.description.trim() === '') {
+        delete data.description;
+    }
+    if (!data.notes || data.notes.trim() === '') {
+        delete data.notes;
+    }
+    
+    try {
+        showLoading('Saving achievement...');
+        
+        const url = currentAchievementId ? `/api/achievements/${currentAchievementId}` : '/api/achievements';
+        const method = currentAchievementId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            hideLoading();
+            showToast('Achievement saved successfully!');
+            closeAchievementModal();
+            
+            // Reload page to show updated data
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            hideLoading();
+            showToast(result.errors ? result.errors.join(', ') : 'Error saving achievement', 'error');
+        }
+        
+    } catch (error) {
+        hideLoading();
+        console.error('Error saving achievement:', error);
+        showToast('Error saving achievement', 'error');
+    }
+}
+
+async function deleteAchievement(achievementId) {
+    if (!confirm('Are you sure you want to delete this achievement?')) {
+        return;
+    }
+    
+    try {
+        showLoading('Deleting achievement...');
+        
+        const response = await fetch(`/api/achievements/${achievementId}`, { method: 'DELETE' });
+        const result = await response.json();
+        
+        if (result.success) {
+            hideLoading();
+            showToast('Achievement deleted successfully!');
+            
+            // Reload page to show updated data
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            hideLoading();
+            showToast(result.errors ? result.errors.join(', ') : 'Error deleting achievement', 'error');
+        }
+        
+    } catch (error) {
+        hideLoading();
+        console.error('Error deleting achievement:', error);
+        showToast('Error deleting achievement', 'error');
+    }
+}
+
+function editAchievement(achievementId) {
+    openAchievementModal(achievementId);
+}
+
+// Helper function to format date for input field (YYYY-MM-DD)
+function formatDateForInput(dateStr) {
+    // Date is in format "dd MMM yyyy" (e.g., "23 Oct 2025")
+    const months = {
+        'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+        'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+        'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+    };
+    
+    const parts = dateStr.split(' ');
+    if (parts.length === 3) {
+        const day = parts[0].padStart(2, '0');
+        const month = months[parts[1]];
+        const year = parts[2];
+        return `${year}-${month}-${day}`;
+    }
+    return '';
+}
+</script>
+{% endblock %}
+

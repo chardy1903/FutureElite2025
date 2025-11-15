@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+
+{% block title %}Physical Metrics - FutureElite Tracker{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Physical Performance Metrics</h1>
+                <p class="mt-2 text-lg text-gray-600">{{ settings.club_name }} - {{ settings.player_name }}</p>
+            </div>
+            <button onclick="openPhysicalMetricModal()" class="bg-qadsiah-red text-white px-6 py-3 rounded-lg font-medium hover:bg-red-700 transition-colors">
+                Add Metrics
+            </button>
+        </div>
+    </div>
+
+    <!-- Physical Metrics List -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            {% if metrics %}
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sprint Speed</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vertical Jump</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agility</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VO2 Max</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="physicalMetricsTableBody" class="bg-white divide-y divide-gray-200">
+                            {% for metric in metrics %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ metric.date }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {% if metric.sprint_speed_ms %}{{ "%.2f"|format(metric.sprint_speed_ms) }} m/s{% elif metric.sprint_speed_kmh %}{{ "%.1f"|format(metric.sprint_speed_kmh) }} km/h{% else %}-{% endif %}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ metric.vertical_jump_cm or '-' }}{% if metric.vertical_jump_cm %} cm{% endif %}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ metric.agility_time_sec or '-' }}{% if metric.agility_time_sec %} sec{% endif %}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ metric.vo2_max or '-' }}{% if metric.vo2_max %} ml/kg/min{% endif %}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button onclick="editPhysicalMetric('{{ metric.id }}')" class="text-qadsiah-red hover:text-red-700 mr-3">Edit</button>
+                                    <button onclick="deletePhysicalMetric('{{ metric.id }}')" class="text-red-600 hover:text-red-900">Delete</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-12">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">No physical metrics yet</h3>
+                    <p class="mt-1 text-sm text-gray-500">Get started by adding your first performance metrics.</p>
+                    <div class="mt-6">
+                        <button onclick="openPhysicalMetricModal()" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-qadsiah-red hover:bg-red-700">
+                            Add Metrics
+                        </button>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Physical Metric Modal -->
+<div id="physicalMetricModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
+        <div class="mt-3">
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="physicalMetricModalTitle" class="text-lg font-medium text-gray-900">Add Physical Metrics</h3>
+                <button onclick="closePhysicalMetricModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <form id="physicalMetricForm" onsubmit="savePhysicalMetric(event)">
+                <div class="space-y-6">
+                    <!-- Date -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Date *</label>
+                        <input type="text" name="date" placeholder="e.g., 15 Jul 2025 or 15-07-2025" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                        <p class="mt-1 text-xs text-gray-500">Accepted formats: DD MMM YYYY (e.g., 15 Jul 2025) or DD-MM-YYYY (e.g., 15-07-2025)</p>
+                    </div>
+                    
+                    <!-- Sprint Metrics -->
+                    <div class="border-t pt-4">
+                        <h4 class="text-md font-semibold text-gray-900 mb-3">Sprint Metrics</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Sprint Speed (m/s)</label>
+                                <input type="number" step="0.01" name="sprint_speed_ms" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Sprint Speed (km/h)</label>
+                                <input type="number" step="0.1" name="sprint_speed_kmh" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">10m Sprint (sec)</label>
+                                <input type="number" step="0.01" name="sprint_10m_sec" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">20m Sprint (sec)</label>
+                                <input type="number" step="0.01" name="sprint_20m_sec" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">30m Sprint (sec)</label>
+                                <input type="number" step="0.01" name="sprint_30m_sec" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Jump Metrics -->
+                    <div class="border-t pt-4">
+                        <h4 class="text-md font-semibold text-gray-900 mb-3">Jump Metrics</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Vertical Jump (cm)</label>
+                                <input type="number" step="0.1" name="vertical_jump_cm" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Standing Long Jump (cm)</label>
+                                <input type="number" step="0.1" name="standing_long_jump_cm" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Countermovement Jump (cm)</label>
+                                <input type="number" step="0.1" name="countermovement_jump_cm" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Agility & Endurance -->
+                    <div class="border-t pt-4">
+                        <h4 class="text-md font-semibold text-gray-900 mb-3">Agility & Endurance</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Agility Time (sec)</label>
+                                <input type="number" step="0.01" name="agility_time_sec" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Yo-Yo Test Level</label>
+                                <input type="number" step="0.1" name="yo_yo_test_level" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Beep Test Level</label>
+                                <input type="number" step="0.1" name="beep_test_level" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Strength Metrics -->
+                    <div class="border-t pt-4">
+                        <h4 class="text-md font-semibold text-gray-900 mb-3">Strength Metrics</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Bench Press (kg)</label>
+                                <input type="number" step="0.1" name="bench_press_kg" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Squat (kg)</label>
+                                <input type="number" step="0.1" name="squat_kg" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Deadlift (kg)</label>
+                                <input type="number" step="0.1" name="deadlift_kg" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Endurance & Heart Rate -->
+                    <div class="border-t pt-4">
+                        <h4 class="text-md font-semibold text-gray-900 mb-3">Endurance & Heart Rate</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">VO2 Max (ml/kg/min)</label>
+                                <input type="number" step="0.1" name="vo2_max" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Max Heart Rate (bpm)</label>
+                                <input type="number" name="max_heart_rate" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Resting Heart Rate (bpm)</label>
+                                <input type="number" name="resting_heart_rate" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Flexibility -->
+                    <div class="border-t pt-4">
+                        <h4 class="text-md font-semibold text-gray-900 mb-3">Flexibility</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Sit and Reach (cm)</label>
+                                <input type="number" step="0.1" name="sit_and_reach_cm" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Notes -->
+                    <div class="border-t pt-4">
+                        <label class="block text-sm font-medium text-gray-700">Notes</label>
+                        <textarea name="notes" rows="3" placeholder="Additional notes about the test/measurement" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red"></textarea>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="closePhysicalMetricModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-qadsiah-red rounded-md hover:bg-red-700">
+                        Save
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPhysicalMetricId = null;
+
+function openPhysicalMetricModal(metricId = null) {
+    currentPhysicalMetricId = metricId;
+    const modal = document.getElementById('physicalMetricModal');
+    const form = document.getElementById('physicalMetricForm');
+    const title = document.getElementById('physicalMetricModalTitle');
+    
+    if (metricId) {
+        title.textContent = 'Edit Physical Metrics';
+        loadPhysicalMetricData(metricId);
+    } else {
+        title.textContent = 'Add Physical Metrics';
+        form.reset();
+    }
+    
+    modal.classList.remove('hidden');
+}
+
+function closePhysicalMetricModal() {
+    document.getElementById('physicalMetricModal').classList.add('hidden');
+    currentPhysicalMetricId = null;
+}
+
+async function loadPhysicalMetricData(metricId) {
+    try {
+        const response = await apiCall(`/api/physical-metrics/${metricId}`);
+        const metric = response.metric;
+        
+        document.querySelector('input[name="date"]').value = metric.date || '';
+        document.querySelector('input[name="sprint_speed_ms"]').value = metric.sprint_speed_ms || '';
+        document.querySelector('input[name="sprint_speed_kmh"]').value = metric.sprint_speed_kmh || '';
+        document.querySelector('input[name="sprint_10m_sec"]').value = metric.sprint_10m_sec || '';
+        document.querySelector('input[name="sprint_20m_sec"]').value = metric.sprint_20m_sec || '';
+        document.querySelector('input[name="sprint_30m_sec"]').value = metric.sprint_30m_sec || '';
+        document.querySelector('input[name="vertical_jump_cm"]').value = metric.vertical_jump_cm || '';
+        document.querySelector('input[name="standing_long_jump_cm"]').value = metric.standing_long_jump_cm || '';
+        document.querySelector('input[name="countermovement_jump_cm"]').value = metric.countermovement_jump_cm || '';
+        document.querySelector('input[name="agility_time_sec"]').value = metric.agility_time_sec || '';
+        document.querySelector('input[name="yo_yo_test_level"]').value = metric.yo_yo_test_level || '';
+        document.querySelector('input[name="beep_test_level"]').value = metric.beep_test_level || '';
+        document.querySelector('input[name="bench_press_kg"]').value = metric.bench_press_kg || '';
+        document.querySelector('input[name="squat_kg"]').value = metric.squat_kg || '';
+        document.querySelector('input[name="deadlift_kg"]').value = metric.deadlift_kg || '';
+        document.querySelector('input[name="vo2_max"]').value = metric.vo2_max || '';
+        document.querySelector('input[name="max_heart_rate"]').value = metric.max_heart_rate || '';
+        document.querySelector('input[name="resting_heart_rate"]').value = metric.resting_heart_rate || '';
+        document.querySelector('input[name="sit_and_reach_cm"]').value = metric.sit_and_reach_cm || '';
+        document.querySelector('textarea[name="notes"]').value = metric.notes || '';
+    } catch (error) {
+        console.error('Error loading physical metric data:', error);
+    }
+}
+
+async function savePhysicalMetric(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const data = Object.fromEntries(formData.entries());
+    
+    try {
+        showLoading('Saving physical metrics...');
+        
+        const url = currentPhysicalMetricId ? `/api/physical-metrics/${currentPhysicalMetricId}` : '/api/physical-metrics';
+        const method = currentPhysicalMetricId ? 'PUT' : 'POST';
+        
+        await apiCall(url, {
+            method: method,
+            body: JSON.stringify(data)
+        });
+        
+        hideLoading();
+        showToast('Physical metrics saved successfully!');
+        closePhysicalMetricModal();
+        
+        // Reload page to show updated data
+        setTimeout(() => window.location.reload(), 1000);
+        
+    } catch (error) {
+        hideLoading();
+        console.error('Error saving physical metrics:', error);
+    }
+}
+
+async function deletePhysicalMetric(metricId) {
+    if (!confirm('Are you sure you want to delete this physical metric entry?')) {
+        return;
+    }
+    
+    try {
+        showLoading('Deleting physical metric...');
+        
+        await apiCall(`/api/physical-metrics/${metricId}`, { method: 'DELETE' });
+        
+        hideLoading();
+        showToast('Physical metric deleted successfully!');
+        
+        // Reload page to show updated data
+        setTimeout(() => window.location.reload(), 1000);
+        
+    } catch (error) {
+        hideLoading();
+        console.error('Error deleting physical metric:', error);
+    }
+}
+
+function editPhysicalMetric(metricId) {
+    openPhysicalMetricModal(metricId);
+}
+</script>
+{% endblock %}
+

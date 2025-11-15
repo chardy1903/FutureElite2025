@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}Training Camps - FutureElite Tracker{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Training Camps</h1>
+                <p class="mt-2 text-lg text-gray-600">{{ settings.club_name }} - {{ settings.player_name }}</p>
+            </div>
+            <button onclick="openTrainingCampModal()" class="bg-qadsiah-red text-white px-6 py-3 rounded-lg font-medium hover:bg-red-700 transition-colors">
+                Add Training Camp
+            </button>
+        </div>
+    </div>
+
+    <!-- Training Camps List -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+            {% if training_camps %}
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Camp Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organizer</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Age Group</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Focus Area</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trainingCampsTableBody" class="bg-white divide-y divide-gray-200">
+                            {% for camp in training_camps %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ camp.camp_name }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ camp.organizer }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ camp.location }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {{ camp.start_date }}
+                                    {% if camp.end_date %} - {{ camp.end_date }}{% endif %}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ camp.age_group or '-' }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-500">{{ camp.focus_area or '-' }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button onclick="editTrainingCamp('{{ camp.id }}')" class="text-qadsiah-red hover:text-red-700 mr-3">Edit</button>
+                                    <button onclick="deleteTrainingCamp('{{ camp.id }}')" class="text-red-600 hover:text-red-900">Delete</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-12">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">No training camps yet</h3>
+                    <p class="mt-1 text-sm text-gray-500">Get started by adding your first training camp.</p>
+                    <div class="mt-6">
+                        <button onclick="openTrainingCampModal()" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-qadsiah-red hover:bg-red-700">
+                            Add Training Camp
+                        </button>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Training Camp Modal -->
+<div id="trainingCampModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
+        <div class="mt-3">
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="trainingCampModalTitle" class="text-lg font-medium text-gray-900">Add Training Camp</h3>
+                <button onclick="closeTrainingCampModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <form id="trainingCampForm" onsubmit="saveTrainingCamp(event)">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Camp Name *</label>
+                        <input type="text" name="camp_name" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Organizer *</label>
+                        <input type="text" name="organizer" placeholder="e.g., Manchester United, Barcelona Academy" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Location *</label>
+                        <input type="text" name="location" placeholder="e.g., Manchester, UK" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Start Date *</label>
+                        <input type="text" name="start_date" placeholder="e.g., 15 Jul 2025 or 15-07-2025" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                        <p class="mt-1 text-xs text-gray-500">Accepted formats: DD MMM YYYY (e.g., 15 Jul 2025) or DD-MM-YYYY (e.g., 15-07-2025)</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">End Date</label>
+                        <input type="text" name="end_date" placeholder="e.g., 20 Jul 2025 or 20-07-2025" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                        <p class="mt-1 text-xs text-gray-500">Accepted formats: DD MMM YYYY (e.g., 20 Jul 2025) or DD-MM-YYYY (e.g., 20-07-2025)</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Duration (Days)</label>
+                        <input type="number" name="duration_days" min="1" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Age Group</label>
+                        <input type="text" name="age_group" placeholder="e.g., U10, U12, U14" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Focus Area</label>
+                        <input type="text" name="focus_area" placeholder="e.g., Technical Skills, Tactical Awareness" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Achievements</label>
+                        <textarea name="achievements" rows="3" placeholder="Key achievements or recognition at the camp" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red"></textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Notes</label>
+                        <textarea name="notes" rows="2" placeholder="Additional notes about the experience" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red"></textarea>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="closeTrainingCampModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-qadsiah-red rounded-md hover:bg-red-700">
+                        Save
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentTrainingCampId = null;
+
+function openTrainingCampModal(campId = null) {
+    currentTrainingCampId = campId;
+    const modal = document.getElementById('trainingCampModal');
+    const form = document.getElementById('trainingCampForm');
+    const title = document.getElementById('trainingCampModalTitle');
+    
+    if (campId) {
+        title.textContent = 'Edit Training Camp';
+        loadTrainingCampData(campId);
+    } else {
+        title.textContent = 'Add Training Camp';
+        form.reset();
+    }
+    
+    modal.classList.remove('hidden');
+}
+
+function closeTrainingCampModal() {
+    document.getElementById('trainingCampModal').classList.add('hidden');
+    currentTrainingCampId = null;
+}
+
+async function loadTrainingCampData(campId) {
+    try {
+        const response = await apiCall(`/api/training-camps/${campId}`);
+        const camp = response.training_camp;
+        
+        document.querySelector('input[name="camp_name"]').value = camp.camp_name || '';
+        document.querySelector('input[name="organizer"]').value = camp.organizer || '';
+        document.querySelector('input[name="location"]').value = camp.location || '';
+        document.querySelector('input[name="start_date"]').value = camp.start_date || '';
+        document.querySelector('input[name="end_date"]').value = camp.end_date || '';
+        document.querySelector('input[name="duration_days"]').value = camp.duration_days || '';
+        document.querySelector('input[name="age_group"]').value = camp.age_group || '';
+        document.querySelector('input[name="focus_area"]').value = camp.focus_area || '';
+        document.querySelector('textarea[name="achievements"]').value = camp.achievements || '';
+        document.querySelector('textarea[name="notes"]').value = camp.notes || '';
+    } catch (error) {
+        console.error('Error loading training camp data:', error);
+    }
+}
+
+async function saveTrainingCamp(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const data = Object.fromEntries(formData.entries());
+    
+    // Convert duration_days to integer if provided
+    if (data.duration_days) {
+        data.duration_days = parseInt(data.duration_days);
+    } else {
+        delete data.duration_days;
+    }
+    
+    try {
+        showLoading('Saving training camp...');
+        
+        const url = currentTrainingCampId ? `/api/training-camps/${currentTrainingCampId}` : '/api/training-camps';
+        const method = currentTrainingCampId ? 'PUT' : 'POST';
+        
+        await apiCall(url, {
+            method: method,
+            body: JSON.stringify(data)
+        });
+        
+        hideLoading();
+        showToast('Training camp saved successfully!');
+        closeTrainingCampModal();
+        
+        // Reload page to show updated data
+        setTimeout(() => window.location.reload(), 1000);
+        
+    } catch (error) {
+        hideLoading();
+        console.error('Error saving training camp:', error);
+    }
+}
+
+async function deleteTrainingCamp(campId) {
+    if (!confirm('Are you sure you want to delete this training camp?')) {
+        return;
+    }
+    
+    try {
+        showLoading('Deleting training camp...');
+        
+        await apiCall(`/api/training-camps/${campId}`, { method: 'DELETE' });
+        
+        hideLoading();
+        showToast('Training camp deleted successfully!');
+        
+        // Reload page to show updated data
+        setTimeout(() => window.location.reload(), 1000);
+        
+    } catch (error) {
+        hideLoading();
+        console.error('Error deleting training camp:', error);
+    }
+}
+
+function editTrainingCamp(campId) {
+    openTrainingCampModal(campId);
+}
+</script>
+{% endblock %}
+

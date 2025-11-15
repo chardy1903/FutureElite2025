@@ -1,0 +1,651 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - FutureElite Tracker{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Settings</h1>
+        <p class="mt-2 text-lg text-gray-600">Configure app settings and player physical data</p>
+    </div>
+
+    <form id="settingsForm" onsubmit="saveSettings(event)" class="space-y-8">
+        <!-- Basic Information -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Basic Information</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Season Year</label>
+                    <input type="text" name="season_year" value="{{ settings.season_year }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red" placeholder="2025/26">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Club Name</label>
+                    <input type="text" name="club_name" value="{{ settings.club_name }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Player Name</label>
+                    <input type="text" name="player_name" value="{{ settings.player_name }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">League Name</label>
+                    <input type="text" name="league_name" value="{{ settings.league_name }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                </div>
+            </div>
+        </div>
+
+        <!-- Physical Data -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Physical Data</h2>
+            <p class="text-sm text-gray-600 mb-4">Physical metrics and data that scouts and agents find valuable</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+                    <input type="date" id="date_of_birth" name="date_of_birth" value="" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                    <p class="mt-1 text-xs text-gray-500">Used for calculating age and PHV</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Height (cm)</label>
+                    <input type="number" step="0.1" name="height_cm" value="{{ settings.height_cm or '' }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red" placeholder="e.g., 165.5">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Weight (kg)</label>
+                    <input type="number" step="0.1" name="weight_kg" value="{{ settings.weight_kg or '' }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red" placeholder="e.g., 55.5">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Peak Height Velocity (PHV) Date</label>
+                    <input type="date" id="phv_date" name="phv_date" value="" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                    <p class="mt-1 text-xs text-gray-500">Date when peak height velocity occurred</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">PHV Age (years)</label>
+                    <input type="number" step="0.1" name="phv_age" value="{{ settings.phv_age | round(1) if settings.phv_age else '' }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red" placeholder="e.g., 13.5">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Sprint Speed (m/s)</label>
+                    <input type="number" step="0.01" name="sprint_speed_ms" value="{{ settings.sprint_speed_ms or '' }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red" placeholder="e.g., 8.5">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Sprint Speed (km/h)</label>
+                    <input type="number" step="0.1" name="sprint_speed_kmh" value="{{ settings.sprint_speed_kmh or '' }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red" placeholder="e.g., 30.6">
+                    <p class="mt-1 text-xs text-gray-500">Alternative to m/s</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Vertical Jump (cm)</label>
+                    <input type="number" step="0.1" name="vertical_jump_cm" value="{{ settings.vertical_jump_cm or '' }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red" placeholder="e.g., 45.0">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Agility Time (seconds)</label>
+                    <input type="number" step="0.01" name="agility_time_sec" value="{{ settings.agility_time_sec or '' }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red" placeholder="e.g., 12.5">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Position</label>
+                    <select name="position" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                        <option value="">Select position</option>
+                        <option value="Goalkeeper" {% if settings.position == 'Goalkeeper' %}selected{% endif %}>Goalkeeper</option>
+                        <option value="Defender" {% if settings.position == 'Defender' %}selected{% endif %}>Defender</option>
+                        <option value="Midfielder" {% if settings.position == 'Midfielder' %}selected{% endif %}>Midfielder</option>
+                        <option value="Forward" {% if settings.position == 'Forward' %}selected{% endif %}>Forward</option>
+                        <option value="Winger" {% if settings.position == 'Winger' %}selected{% endif %}>Winger</option>
+                        <option value="Attacking Midfielder" {% if settings.position == 'Attacking Midfielder' %}selected{% endif %}>Attacking Midfielder</option>
+                        <option value="Defensive Midfielder" {% if settings.position == 'Defensive Midfielder' %}selected{% endif %}>Defensive Midfielder</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Dominant Foot</label>
+                    <select name="dominant_foot" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                        <option value="">Select foot</option>
+                        <option value="Left" {% if settings.dominant_foot == 'Left' %}selected{% endif %}>Left</option>
+                        <option value="Right" {% if settings.dominant_foot == 'Right' %}selected{% endif %}>Right</option>
+                        <option value="Both" {% if settings.dominant_foot == 'Both' %}selected{% endif %}>Both</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- PHV Calculation Status -->
+            <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg" id="phvStatus">
+                <h3 class="text-sm font-semibold text-blue-900 mb-2">PHV Calculation Status</h3>
+                <p class="text-xs text-blue-700" id="phvStatusText">Loading...</p>
+                <button type="button" onclick="calculatePHV()" class="mt-2 text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
+                    Calculate PHV Now
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <!-- Historical Physical Data (separate from settings form) -->
+    <div class="bg-white shadow rounded-lg p-6 mt-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Historical Physical Data</h2>
+            <p class="text-sm text-gray-600 mb-4">Add historical height and weight measurements to enable accurate PHV calculation</p>
+            
+            <!-- Add New Measurement Form -->
+            <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                <h3 class="text-lg font-medium text-gray-900 mb-3">Add New Measurement</h3>
+                <form id="measurementForm" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                        <input type="text" id="measurementDate" name="date" required 
+                               pattern="\d{4}-\d{2}-\d{2}" 
+                               placeholder="YYYY-MM-DD (e.g., 2024-01-15)"
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                        <p class="mt-1 text-xs text-gray-500">Format: YYYY-MM-DD</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Height (cm)</label>
+                        <input type="number" step="0.1" id="measurementHeight" name="height_cm" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red" placeholder="e.g., 165.5">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Weight (kg)</label>
+                        <input type="number" step="0.1" id="measurementWeight" name="weight_kg" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red" placeholder="e.g., 55.5">
+                    </div>
+                    <div class="flex items-end">
+                        <button type="button" id="addMeasurementBtn" class="w-full bg-qadsiah-red text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors">
+                            Add Measurement
+                        </button>
+                    </div>
+                    <div class="md:col-span-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+                        <input type="text" id="measurementNotes" name="notes" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red" placeholder="e.g., Pre-season assessment">
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Measurements Table -->
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200" id="measurementsTable">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Height (cm)</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weight (kg)</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200" id="measurementsTableBody">
+                        <tr>
+                            <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">Loading measurements...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    <!-- Appearance Settings (back inside settings form) -->
+    <form id="settingsForm2" onsubmit="saveSettings(event)" class="space-y-8 mt-8">
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Appearance Settings</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Primary Color</label>
+                    <input type="color" name="primary_color" value="{{ settings.primary_color }}" class="mt-1 block w-full h-10 border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Header Color</label>
+                    <input type="color" name="header_color" value="{{ settings.header_color }}" class="mt-1 block w-full h-10 border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Footer Text</label>
+                    <input type="text" name="footer_text" value="{{ settings.footer_text }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                </div>
+            </div>
+        </div>
+
+        <!-- Save Button -->
+        <div class="flex justify-end">
+            <button type="submit" class="bg-qadsiah-red text-white px-6 py-3 rounded-lg font-medium hover:bg-red-700 transition-colors">
+                Save Settings
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Load date fields on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const dobInput = document.getElementById('date_of_birth');
+    const phvInput = document.getElementById('phv_date');
+    
+    {% if settings.date_of_birth and settings.date_of_birth != 'None' %}
+    if (dobInput) {
+        try {
+            const dobValue = formatDateForInput('{{ settings.date_of_birth }}');
+            if (dobValue) {
+                dobInput.value = dobValue;
+            }
+        } catch (e) {
+            console.error('Error formatting date of birth:', e);
+        }
+    }
+    {% endif %}
+    
+    {% if settings.phv_date and settings.phv_date != 'None' %}
+    if (phvInput) {
+        try {
+            const phvValue = formatDateForInput('{{ settings.phv_date }}');
+            if (phvValue) {
+                phvInput.value = phvValue;
+            }
+        } catch (e) {
+            console.error('Error formatting PHV date:', e);
+        }
+    }
+    {% endif %}
+    
+    // Load measurements and PHV status on page load
+    loadMeasurements();
+    updatePHVStatus();
+    
+    // Add form submission handler
+    const measurementForm = document.getElementById('measurementForm');
+    if (measurementForm) {
+        measurementForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            addMeasurement(event);
+        });
+    }
+    
+    // Add button click handler as backup
+    const addMeasurementBtn = document.getElementById('addMeasurementBtn');
+    if (addMeasurementBtn) {
+        addMeasurementBtn.addEventListener('click', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            const form = document.getElementById('measurementForm');
+            if (form) {
+                const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+                form.dispatchEvent(submitEvent);
+            }
+        });
+    }
+    
+    // Add date validation and formatting for Safari compatibility
+    const measurementDateInput = document.getElementById('measurementDate');
+    if (measurementDateInput) {
+        // Format date input on blur
+        measurementDateInput.addEventListener('blur', function() {
+            let value = this.value.trim();
+            if (value) {
+                // Try to parse and reformat various date formats
+                const date = new Date(value);
+                if (!isNaN(date.getTime())) {
+                    // Format as YYYY-MM-DD
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    this.value = `${year}-${month}-${day}`;
+                }
+            }
+        });
+        
+        // Add input mask for date format
+        measurementDateInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+            if (value.length >= 4) {
+                value = value.substring(0, 4) + '-' + value.substring(4);
+            }
+            if (value.length >= 7) {
+                value = value.substring(0, 7) + '-' + value.substring(7, 9);
+            }
+            if (value.length > 10) {
+                value = value.substring(0, 10);
+            }
+            e.target.value = value;
+        });
+    }
+});
+
+// Load measurements table
+async function loadMeasurements() {
+    try {
+        const data = await apiCall('/api/physical-measurements');
+        
+        if (data.success) {
+            const measurements = data.measurements || [];
+            const tbody = document.getElementById('measurementsTableBody');
+            
+            if (measurements.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">No measurements yet. Add your first measurement above.</td></tr>';
+                return;
+            }
+            
+            // Sort by date (newest first)
+            measurements.sort((a, b) => {
+                try {
+                    const dateA = new Date(a.date.split(' ').reverse().join('-'));
+                    const dateB = new Date(b.date.split(' ').reverse().join('-'));
+                    return dateB - dateA;
+                } catch {
+                    return 0;
+                }
+            });
+            
+            tbody.innerHTML = measurements.map(m => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${m.date}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${m.height_cm ? m.height_cm.toFixed(1) : '-'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${m.weight_kg ? m.weight_kg.toFixed(1) : '-'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">${m.notes || '-'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button onclick="deleteMeasurement('${m.id}')" class="text-red-600 hover:text-red-900">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('Error loading measurements:', error);
+        const tbody = document.getElementById('measurementsTableBody');
+        tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-sm text-red-500">Error loading measurements</td></tr>';
+    }
+}
+
+// Add new measurement
+async function addMeasurement(event) {
+    event.preventDefault();
+    event.stopPropagation(); // Prevent parent form submission
+    
+    console.log('addMeasurement called');
+    
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    // Get and validate date
+    let dateValue = formData.get('date');
+    if (!dateValue || dateValue.trim() === '') {
+        showToast('Please enter a date', 'error');
+        return;
+    }
+    
+    // Validate date format (YYYY-MM-DD)
+    dateValue = dateValue.trim();
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (!datePattern.test(dateValue)) {
+        showToast('Please enter date in YYYY-MM-DD format (e.g., 2024-01-15)', 'error');
+        return;
+    }
+    
+    // Validate it's a real date
+    const dateObj = new Date(dateValue);
+    if (isNaN(dateObj.getTime())) {
+        showToast('Please enter a valid date', 'error');
+        return;
+    }
+    
+    // Get height and weight, convert to numbers
+    const heightValue = formData.get('height_cm');
+    const weightValue = formData.get('weight_kg');
+    const notesValue = formData.get('notes');
+    
+    // Convert to numbers or null
+    const height_cm = heightValue && heightValue.trim() !== '' ? parseFloat(heightValue) : null;
+    const weight_kg = weightValue && weightValue.trim() !== '' ? parseFloat(weightValue) : null;
+    
+    // Validate that at least one measurement is provided
+    if (!height_cm && !weight_kg) {
+        showToast('Please enter at least height or weight', 'error');
+        return;
+    }
+    
+    // Validate height is a valid number if provided
+    if (height_cm !== null && (isNaN(height_cm) || height_cm <= 0)) {
+        showToast('Please enter a valid height (positive number)', 'error');
+        return;
+    }
+    
+    // Validate weight is a valid number if provided
+    if (weight_kg !== null && (isNaN(weight_kg) || weight_kg <= 0)) {
+        showToast('Please enter a valid weight (positive number)', 'error');
+        return;
+    }
+    
+    const data = {
+        date: dateValue.trim(),
+        height_cm: height_cm,
+        weight_kg: weight_kg,
+        notes: notesValue && notesValue.trim() !== '' ? notesValue.trim() : null
+    };
+    
+    console.log('Sending measurement data:', data);
+    
+    try {
+        showLoading('Adding measurement...');
+        
+        const result = await apiCall('/api/physical-measurements', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        
+        console.log('Measurement result:', result);
+        
+        if (result.success) {
+            hideLoading();
+            showToast('Measurement added successfully!', 'success');
+            
+            // Clear form
+            form.reset();
+            
+            // Reset date input type if it was changed
+            const dateInput = document.getElementById('measurementDate');
+            if (dateInput && dateInput.type === 'text') {
+                dateInput.type = 'date';
+            }
+            
+            // Reload measurements and PHV status
+            await loadMeasurements();
+            await updatePHVStatus();
+            
+            // If PHV was calculated, update settings display
+            if (result.phv_calculated && result.phv) {
+                showToast(`PHV calculated: ${result.phv.phv_age?.toFixed(1)} years on ${result.phv.phv_date}`, 'success');
+                // Reload page to update PHV fields
+                setTimeout(() => window.location.reload(), 1500);
+            }
+        } else {
+            hideLoading();
+            const errorMsg = result.errors?.[0] || 'Error adding measurement';
+            console.error('Error from server:', errorMsg);
+            showToast(errorMsg, 'error');
+        }
+    } catch (error) {
+        hideLoading();
+        console.error('Error adding measurement:', error);
+        showToast(`Error adding measurement: ${error.message || 'Unknown error'}`, 'error');
+    }
+}
+
+// Delete measurement
+async function deleteMeasurement(id) {
+    if (!confirm('Are you sure you want to delete this measurement?')) {
+        return;
+    }
+    
+    try {
+        showLoading('Deleting measurement...');
+        
+        const result = await apiCall(`/api/physical-measurements/${id}`, {
+            method: 'DELETE'
+        });
+        
+        if (result.success) {
+            hideLoading();
+            showToast('Measurement deleted successfully!');
+            
+            // Reload measurements and PHV status
+            loadMeasurements();
+            updatePHVStatus();
+            
+            // If PHV was recalculated, reload page
+            if (result.phv_calculated !== undefined) {
+                setTimeout(() => window.location.reload(), 1500);
+            }
+        } else {
+            hideLoading();
+            showToast(result.errors?.[0] || 'Error deleting measurement', 'error');
+        }
+    } catch (error) {
+        hideLoading();
+        console.error('Error deleting measurement:', error);
+        showToast('Error deleting measurement', 'error');
+    }
+}
+
+// Update PHV status
+async function updatePHVStatus() {
+    try {
+        const data = await apiCall('/api/phv/calculate');
+        
+        const statusText = document.getElementById('phvStatusText');
+        const statusDiv = document.getElementById('phvStatus');
+        
+        if (data.success) {
+            const phv = data.phv;
+            const validation = data.validation;
+            
+            if (phv) {
+                statusText.innerHTML = `
+                    <strong>PHV Calculated:</strong><br>
+                    Date: ${phv.phv_date}<br>
+                    Age: ${phv.phv_age?.toFixed(1)} years<br>
+                    Velocity: ${phv.phv_velocity_cm_per_year?.toFixed(1)} cm/year<br>
+                    <span class="text-xs">Based on ${phv.calculation_based_on_measurements} measurements</span>
+                `;
+                statusDiv.className = 'mt-6 p-4 bg-green-50 border border-green-200 rounded-lg';
+            } else {
+                // PHV couldn't be calculated but validation passed (rare case)
+                const message = validation?.message || 'Need at least 2 height measurements to calculate PHV. Add historical measurements above.';
+                statusText.innerHTML = `<strong>PHV Status:</strong><br>${message}`;
+                if (validation?.recommendation) {
+                    statusText.innerHTML += `<br><span class="text-xs text-yellow-700">${validation.recommendation}</span>`;
+                }
+                statusDiv.className = 'mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg';
+            }
+            
+            if (validation?.warning) {
+                statusText.innerHTML += `<br><span class="text-xs text-yellow-700">⚠️ ${validation.recommendation || ''}</span>`;
+            }
+        } else {
+            // Error occurred
+            const errorMessage = data.errors?.[0] || data.validation?.message || 'Unable to calculate PHV';
+            statusText.innerHTML = `<strong>PHV Calculation Error:</strong><br>${errorMessage}`;
+            if (data.validation?.recommendation) {
+                statusText.innerHTML += `<br><span class="text-xs text-red-700">💡 ${data.validation.recommendation}</span>`;
+            }
+            statusDiv.className = 'mt-6 p-4 bg-red-50 border border-red-200 rounded-lg';
+        }
+    } catch (error) {
+        console.error('Error updating PHV status:', error);
+        const statusText = document.getElementById('phvStatusText');
+        const statusDiv = document.getElementById('phvStatus');
+        statusText.innerHTML = `<strong>Error:</strong><br>${error.message || 'Error loading PHV status'}`;
+        statusDiv.className = 'mt-6 p-4 bg-red-50 border border-red-200 rounded-lg';
+    }
+}
+
+// Calculate PHV manually
+async function calculatePHV() {
+    try {
+        showLoading('Calculating PHV...');
+        
+        const data = await apiCall('/api/phv/calculate');
+        
+        if (data.success) {
+            hideLoading();
+            updatePHVStatus();
+            
+            if (data.phv) {
+                showToast(`PHV calculated: ${data.phv.phv_age?.toFixed(1)} years on ${data.phv.phv_date}`, 'success');
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                showToast(data.validation?.message || 'Unable to calculate PHV. Add more measurements.', 'warning');
+            }
+        } else {
+            hideLoading();
+            showToast(data.errors?.[0] || 'Error calculating PHV', 'error');
+        }
+    } catch (error) {
+        hideLoading();
+        console.error('Error calculating PHV:', error);
+        showToast('Error calculating PHV', 'error');
+    }
+}
+
+async function saveSettings(event) {
+    event.preventDefault();
+    
+    // Get data from both forms (settingsForm and settingsForm2)
+    const form1 = document.getElementById('settingsForm');
+    const form2 = document.getElementById('settingsForm2');
+    
+    const formData = new FormData();
+    
+    // Collect data from first form
+    if (form1) {
+        const form1Data = new FormData(form1);
+        for (let [key, value] of form1Data.entries()) {
+            formData.append(key, value);
+        }
+    }
+    
+    // Collect data from second form (overwrites any duplicates)
+    if (form2) {
+        const form2Data = new FormData(form2);
+        for (let [key, value] of form2Data.entries()) {
+            formData.append(key, value);
+        }
+    }
+    
+    const data = Object.fromEntries(formData.entries());
+    
+    // Handle empty date fields as null
+    if (data.date_of_birth === '') {
+        data.date_of_birth = null;
+    }
+    if (data.phv_date === '') {
+        data.phv_date = null;
+    }
+    // Note: Date fields are sent in YYYY-MM-DD format and converted by backend
+    
+    // Convert numeric fields (handle empty strings as null)
+    const numericFields = ['height_cm', 'weight_kg', 'phv_age', 'sprint_speed_ms', 'sprint_speed_kmh', 'vertical_jump_cm', 'agility_time_sec'];
+    numericFields.forEach(field => {
+        if (data[field] === '' || data[field] === null) {
+            data[field] = null;
+        } else {
+            data[field] = parseFloat(data[field]);
+        }
+    });
+    
+    // Handle empty strings as null for optional fields
+    const optionalFields = ['position', 'dominant_foot'];
+    optionalFields.forEach(field => {
+        if (data[field] === '') {
+            data[field] = null;
+        }
+    });
+    
+    try {
+        showLoading('Saving settings...');
+        
+        await apiCall('/settings', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        
+        hideLoading();
+        showToast('Settings saved successfully!');
+        
+        // Reload page after a short delay
+        setTimeout(() => window.location.reload(), 1000);
+        
+    } catch (error) {
+        hideLoading();
+        console.error('Error saving settings:', error);
+    }
+}
+</script>
+{% endblock %}
+
