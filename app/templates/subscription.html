@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}Subscription - FutureElite{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Subscription Management</h1>
+        <p class="mt-2 text-lg text-gray-600">Manage your FutureElite subscription</p>
+    </div>
+
+    <!-- Current Subscription Status -->
+    <div id="subscriptionStatus" class="bg-white shadow rounded-lg mb-8 p-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Current Subscription</h2>
+        <div id="statusContent">
+            <p class="text-gray-500">Loading...</p>
+        </div>
+    </div>
+
+    <!-- Subscription Plans -->
+    <div id="subscriptionPlans" class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <!-- Monthly Plan -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-2xl font-bold text-gray-900 mb-2">Monthly</h3>
+            <div class="mb-4">
+                <span class="text-4xl font-bold text-qadsiah-red">$9.99</span>
+                <span class="text-gray-600">/month</span>
+            </div>
+            <ul class="mb-6 space-y-2 text-sm text-gray-600">
+                <li class="flex items-center">
+                    <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Unlimited match tracking
+                </li>
+                <li class="flex items-center">
+                    <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Advanced analytics & reports
+                </li>
+                <li class="flex items-center">
+                    <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    PDF report generation
+                </li>
+                <li class="flex items-center">
+                    <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Physical performance tracking
+                </li>
+            </ul>
+            <button onclick="subscribe('monthly')" id="monthlyBtn" class="w-full bg-qadsiah-red text-white px-6 py-3 rounded-lg font-medium hover:bg-red-700 transition-colors">
+                Subscribe Monthly
+            </button>
+        </div>
+
+        <!-- Annual Plan -->
+        <div class="bg-white shadow rounded-lg p-6 border-2 border-qadsiah-red relative">
+            <div class="absolute top-0 right-0 bg-qadsiah-red text-white px-3 py-1 text-xs font-bold rounded-bl-lg">
+                BEST VALUE
+            </div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-2">Annual</h3>
+            <div class="mb-4">
+                <span class="text-4xl font-bold text-qadsiah-red">$99.99</span>
+                <span class="text-gray-600">/year</span>
+            </div>
+            <div class="mb-2">
+                <span class="text-sm text-gray-500 line-through">$119.88</span>
+                <span class="text-sm text-green-600 font-semibold ml-2">Save 17%</span>
+            </div>
+            <ul class="mb-6 space-y-2 text-sm text-gray-600">
+                <li class="flex items-center">
+                    <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Everything in Monthly
+                </li>
+                <li class="flex items-center">
+                    <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Priority support
+                </li>
+                <li class="flex items-center">
+                    <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Early access to new features
+                </li>
+            </ul>
+            <button onclick="subscribe('annual')" id="annualBtn" class="w-full bg-qadsiah-red text-white px-6 py-3 rounded-lg font-medium hover:bg-red-700 transition-colors">
+                Subscribe Annual
+            </button>
+        </div>
+    </div>
+
+    <!-- Manage Subscription -->
+    <div id="manageSubscription" class="bg-white shadow rounded-lg p-6 hidden">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Manage Subscription</h2>
+        <button onclick="openCustomerPortal()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+            Manage Subscription
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://js.stripe.com/v3/"></script>
+<script>
+// Initialize Stripe
+const stripePublishableKey = '{{ stripe_publishable_key }}';
+let stripe = null;
+if (stripePublishableKey) {
+    stripe = Stripe(stripePublishableKey);
+}
+
+// Load subscription status
+async function loadSubscriptionStatus() {
+    try {
+        await ensureStorageReady();
+        
+        if (!clientAuth.isAuthenticated()) {
+            window.location.href = '/login';
+            return;
+        }
+        
+        const userId = clientStorage.getCurrentUserId();
+        const subscription = await clientStorage.getSubscription(userId);
+        
+        const statusContent = document.getElementById('statusContent');
+        const manageDiv = document.getElementById('manageSubscription');
+        
+        if (subscription && subscription.status === 'active') {
+            statusContent.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-lg font-semibold text-green-600">Active Subscription</p>
+                        <p class="text-sm text-gray-600 mt-1">Plan: ${subscription.plan_name || 'Premium'}</p>
+                        ${subscription.current_period_end ? `
+                            <p class="text-sm text-gray-600">Renews: ${new Date(subscription.current_period_end).toLocaleDateString()}</p>
+                        ` : ''}
+                        ${subscription.cancel_at_period_end ? `
+                            <p class="text-sm text-amber-600 mt-2">⚠️ Subscription will cancel at period end</p>
+                        ` : ''}
+                    </div>
+                    <div class="text-right">
+                        <span class="inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                            Active
+                        </span>
+                    </div>
+                </div>
+            `;
+            manageDiv.classList.remove('hidden');
+        } else {
+            statusContent.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-lg font-semibold text-gray-600">No Active Subscription</p>
+                        <p class="text-sm text-gray-500 mt-1">Subscribe to unlock premium features</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="inline-block px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium">
+                            Free
+                        </span>
+                    </div>
+                </div>
+            `;
+            manageDiv.classList.add('hidden');
+        }
+        
+    } catch (error) {
+        console.error('Error loading subscription status:', error);
+        document.getElementById('statusContent').innerHTML = `
+            <p class="text-red-600">Error loading subscription status</p>
+        `;
+    }
+}
+
+// Subscribe to a plan
+async function subscribe(planType) {
+    try {
+        await ensureStorageReady();
+        
+        if (!clientAuth.isAuthenticated()) {
+            showToast('Please log in to subscribe', 'error');
+            window.location.href = '/login';
+            return;
+        }
+        
+        const userId = clientStorage.getCurrentUserId();
+        const username = clientAuth.getCurrentUsername();
+        
+        showLoading('Creating checkout session...');
+        
+        const response = await fetch('/api/subscription/create-checkout', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                plan_type: planType,
+                email: null // You can get email from settings if available
+            })
+        });
+        
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success && result.checkout_url) {
+            hideLoading();
+            // Redirect to Stripe Checkout
+            window.location.href = result.checkout_url;
+        } else {
+            throw new Error(result.errors?.join(', ') || 'Failed to create checkout session');
+        }
+        
+    } catch (error) {
+        hideLoading();
+        console.error('Error subscribing:', error);
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+// Open customer portal
+async function openCustomerPortal() {
+    try {
+        await ensureStorageReady();
+        
+        const userId = clientStorage.getCurrentUserId();
+        const subscription = await clientStorage.getSubscription(userId);
+        
+        if (!subscription || !subscription.stripe_customer_id) {
+            showToast('No active subscription found', 'error');
+            return;
+        }
+        
+        showLoading('Opening customer portal...');
+        
+        const response = await fetch('/api/subscription/create-portal', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                customer_id: subscription.stripe_customer_id
+            })
+        });
+        
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success && result.portal_url) {
+            hideLoading();
+            // Redirect to Stripe Customer Portal
+            window.location.href = result.portal_url;
+        } else {
+            throw new Error(result.errors?.join(', ') || 'Failed to open customer portal');
+        }
+        
+    } catch (error) {
+        hideLoading();
+        console.error('Error opening portal:', error);
+        showToast('Error: ' + error.message, 'error');
+    }
+}
+
+// Load status on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadSubscriptionStatus();
+    
+    // Check for success/cancel parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success') === 'true') {
+        showToast('Subscription activated successfully!', 'success');
+        loadSubscriptionStatus();
+    } else if (urlParams.get('canceled') === 'true') {
+        showToast('Subscription canceled', 'info');
+    }
+});
+</script>
+{% endblock %}
+

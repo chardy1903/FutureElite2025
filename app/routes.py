@@ -1,10 +1,12 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, send_file, current_app
+from flask_login import login_required, current_user
 from datetime import datetime
 import os
 import zipfile
 import tempfile
 import json
 from typing import Dict, Any, List
+from werkzeug.utils import secure_filename
 try:
     import openpyxl
     EXCEL_SUPPORT = True
@@ -25,46 +27,66 @@ bp = Blueprint('main', __name__)
 storage = StorageManager()
 
 
+@bp.route('/test')
+def test():
+    """Test page to verify app is running"""
+    return render_template('test.html')
+
+
 @bp.route('/')
+def homepage():
+    """Homepage - Public landing page - data loaded client-side"""
+    # Return empty/default data - actual data will be loaded client-side
+    default_settings = {
+        'club_name': '',
+        'player_name': '',
+        'season_year': ''
+    }
+    return render_template('homepage.html', 
+                         is_authenticated=False,  # Will be determined client-side
+                         settings=default_settings,
+                         matches=[],
+                         achievements=[],
+                         season_stats={'total_matches': 0, 'wins': 0, 'draws': 0, 'losses': 0, 'goals': 0, 'assists': 0, 'minutes': 0},
+                         total_achievements=0)
+
+
+@bp.route('/dashboard')
 def dashboard():
-    """Main dashboard page"""
-    settings = storage.load_settings()
-    matches = storage.get_all_matches()
-    season_stats = storage.get_season_stats()
-    
-    # Get recent matches (last 5)
-    recent_matches = sorted(matches, key=lambda x: x.date, reverse=True)[:5]
-    
-    # Get recent achievements (last 5)
-    achievements = storage.get_all_achievements()
-    recent_achievements = sorted(achievements, key=lambda x: datetime.strptime(x.date, "%d %b %Y"), reverse=True)[:5]
-    
+    """Main dashboard page - data loaded client-side"""
+    # Return empty/default data - actual data will be loaded client-side
+    default_settings = {
+        'club_name': '',
+        'player_name': '',
+        'season_year': ''
+    }
     return render_template('index.html', 
-                         settings=settings,
-                         matches=recent_matches,
-                         achievements=recent_achievements,
-                         season_stats=season_stats)
+                         settings=default_settings,
+                         matches=[],
+                         achievements=[],
+                         season_stats={'total_matches': 0, 'wins': 0, 'draws': 0, 'losses': 0, 'goals': 0, 'assists': 0, 'minutes': 0})
 
 
 @bp.route('/matches')
 def matches():
-    """Matches list page"""
-    settings = storage.load_settings()
-    matches = storage.get_all_matches()
-    
-    # Separate completed matches and fixtures
-    completed_matches = [m for m in matches if not m.is_fixture]
-    fixtures = [m for m in matches if m.is_fixture]
-    
+    """Matches list page - data loaded client-side"""
+    # Return empty/default data - actual data will be loaded client-side
+    default_settings = {
+        'club_name': '',
+        'player_name': '',
+        'season_year': ''
+    }
     return render_template('matches.html',
-                         settings=settings,
-                         completed_matches=completed_matches,
-                         fixtures=fixtures)
+                     settings=default_settings,
+                     completed_matches=[],
+                     fixtures=[])
 
 
 @bp.route('/matches', methods=['POST'])
+@login_required
 def create_match():
     """Create a new match"""
+    user_id = current_user.id
     data = request.get_json()
     
     # Validate data
@@ -93,7 +115,7 @@ def create_match():
         )
         
         # Save match
-        match_id = storage.save_match(match)
+        match_id = storage.save_match(match, user_id)
         
         return jsonify({'success': True, 'match_id': match_id})
         
@@ -104,8 +126,10 @@ def create_match():
 
 
 @bp.route('/matches/<match_id>', methods=['PUT'])
+@login_required
 def update_match(match_id):
     """Update an existing match"""
+    user_id = current_user.id
     data = request.get_json()
     
     # Validate data
@@ -115,7 +139,7 @@ def update_match(match_id):
     
     try:
         # Get existing match
-        existing_match = storage.get_match(match_id)
+        existing_match = storage.get_match(match_id, user_id)
         if not existing_match:
             return jsonify({'success': False, 'errors': ['Match not found']}), 404
         
@@ -140,7 +164,7 @@ def update_match(match_id):
         )
         
         # Save updated match
-        storage.save_match(updated_match)
+        storage.save_match(updated_match, user_id)
         
         return jsonify({'success': True})
         
@@ -151,9 +175,11 @@ def update_match(match_id):
 
 
 @bp.route('/matches/<match_id>', methods=['DELETE'])
+@login_required
 def delete_match(match_id):
     """Delete a match"""
-    success = storage.delete_match(match_id)
+    user_id = current_user.id
+    success = storage.delete_match(match_id, user_id)
     if success:
         return jsonify({'success': True})
     else:
@@ -161,9 +187,11 @@ def delete_match(match_id):
 
 
 @bp.route('/matches/<match_id>')
+@login_required
 def get_match(match_id):
     """Get a specific match"""
-    match = storage.get_match(match_id)
+    user_id = current_user.id
+    match = storage.get_match(match_id, user_id)
     if match:
         return jsonify({'success': True, 'match': match.model_dump()})
     else:
@@ -171,26 +199,46 @@ def get_match(match_id):
 
 
 @bp.route('/fixtures')
+@login_required
 def fixtures():
     """Get upcoming fixtures"""
-    fixtures = storage.get_fixtures()
+    user_id = current_user.id
+    fixtures = storage.get_fixtures(user_id)
     return jsonify({'success': True, 'fixtures': [f.model_dump() for f in fixtures]})
 
 
 @bp.route('/pdf', methods=['POST'])
 def generate_pdf():
-    """Generate PDF report"""
+    """Generate PDF report - accepts data from client"""
     try:
-        settings = storage.load_settings()
-        matches = storage.get_all_matches()
-        physical_measurements = storage.get_all_physical_measurements()
+        data = request.get_json() if request.is_json else {}
+        
+        # Get data from request (client-side storage)
+        matches_data = data.get('matches', [])
+        settings_data = data.get('settings', {})
+        physical_measurements_data = data.get('physical_measurements', [])
+        physical_metrics_data = data.get('physical_metrics', [])
+        period = data.get('period', 'all_time')
+        
+        # Validate period
+        valid_periods = ['all_time', 'season', '12_months', '6_months', '3_months', 'last_month']
+        if period not in valid_periods:
+            period = 'all_time'
+        
+        # Convert data to model objects
+        from .models import Match, AppSettings, PhysicalMeasurement, PhysicalMetrics
+        
+        matches = [Match(**m) for m in matches_data]
+        settings = AppSettings(**settings_data) if settings_data else AppSettings()
+        physical_measurements = [PhysicalMeasurement(**pm) for pm in physical_measurements_data]
+        physical_metrics = [PhysicalMetrics(**pm) for pm in physical_metrics_data]
         
         # Create output directory
         output_dir = os.path.join(current_app.root_path, '..', 'output')
         os.makedirs(output_dir, exist_ok=True)
         
-        # Generate PDF
-        pdf_path = generate_season_pdf(matches, settings, output_dir, physical_measurements)
+        # Generate PDF with period filter
+        pdf_path = generate_season_pdf(matches, settings, output_dir, physical_measurements, physical_metrics, period=period)
         
         # Return the PDF file directly
         return send_file(
@@ -205,12 +253,14 @@ def generate_pdf():
 
 
 @bp.route('/export')
+@login_required
 def export_data():
     """Export all data as ZIP file"""
     temp_file = None
     try:
-        # Get all data
-        data = storage.export_data()
+        user_id = current_user.id
+        # Get all data for this user
+        data = storage.export_data(user_id)
         
         # Create temporary ZIP file
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
@@ -256,10 +306,12 @@ def export_data():
 
 
 @bp.route('/import', methods=['POST'])
+@login_required
 def import_data():
     """Import data from ZIP file"""
     temp_file = None
     try:
+        user_id = current_user.id
         if 'file' not in request.files:
             return jsonify({'success': False, 'errors': ['No file provided']}), 400
         
@@ -322,7 +374,7 @@ def import_data():
                 # Old backup format without club history
                 pass
         
-        # Import data
+        # Import data - assign user_id to all imported data
         import_data = {
             'matches': matches_data,
             'settings': settings_data,
@@ -332,7 +384,7 @@ def import_data():
             'physical_metrics': physical_metrics_data
         }
         
-        success = storage.import_data(import_data)
+        success = storage.import_data(import_data, user_id)
         
         # Clean up
         if temp_file and os.path.exists(temp_file.name):
@@ -454,7 +506,7 @@ def download_excel_template():
 
 @bp.route('/import-excel', methods=['POST'])
 def import_excel():
-    """Import matches from Excel file"""
+    """Import matches from Excel file - returns matches to client for saving"""
     if not EXCEL_SUPPORT:
         return jsonify({'success': False, 'errors': ['Excel support not available. Please install openpyxl: pip install openpyxl']}), 400
     
@@ -813,30 +865,14 @@ def import_excel():
                 error_msg += f' Found {len(errors)} error(s).'
             return jsonify({'success': False, 'errors': [error_msg] + errors[:20]}), 400
         
-        # Import matches - batch save for better performance and to avoid ID conflicts
-        if import_mode == 'replace':
-            # Replace mode: save all imported matches at once
-            matches_data = [m.model_dump() for m in imported_matches]
-            storage._save_matches(matches_data)
-        else:
-            # Append mode: load existing matches and add new ones
-            existing_matches = storage.load_matches()
-            existing_ids = {m.get('id') for m in existing_matches if m.get('id')}
-            
-            # Add imported matches, ensuring unique IDs
-            for match in imported_matches:
-                match_dict = match.model_dump()
-                # If ID already exists, generate a new one with microseconds
-                if match_dict.get('id') in existing_ids:
-                    match_dict['id'] = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-                existing_matches.append(match_dict)
-                existing_ids.add(match_dict['id'])
-            
-            storage._save_matches(existing_matches)
+        # Convert matches to dictionaries for JSON response
+        matches_data = [m.model_dump() for m in imported_matches]
         
         response = {
             'success': True,
             'imported': len(imported_matches),
+            'matches': matches_data,  # Return matches to client
+            'import_mode': import_mode,  # Return mode so client knows what to do
             'rows_checked': rows_checked,
             'errors': errors[:20] if errors else []  # Show up to 20 errors
         }
@@ -860,25 +896,52 @@ def import_excel():
 
 @bp.route('/settings')
 def settings_page():
-    """Settings page"""
-    settings = storage.load_settings()
-    return render_template('settings.html', settings=settings)
+    """Settings page - data loaded client-side"""
+    # Return empty/default data - actual data will be loaded client-side
+    default_settings = {
+        'club_name': '',
+        'player_name': '',
+        'season_year': '',
+        'league_name': '',
+        'contact_email': '',
+        'date_of_birth': None,
+        'height_cm': None,
+        'weight_kg': None,
+        'phv_date': None,
+        'phv_age': None,
+        'position': '',
+        'dominant_foot': '',
+        'highlight_reel_urls': []
+    }
+    return render_template('settings.html', settings=default_settings)
 
 
 @bp.route('/api/settings')
+@login_required
 def get_settings():
     """Get current settings (API endpoint)"""
-    settings = storage.load_settings()
+    user_id = current_user.id
+    settings = storage.load_settings(user_id)
     return jsonify({'success': True, 'settings': settings.model_dump()})
 
 
 @bp.route('/settings', methods=['POST'])
+@login_required
 def update_settings():
     """Update settings"""
     try:
+        user_id = current_user.id
         data = request.get_json()
         
-        # Parse date fields if they're in HTML format (YYYY-MM-DD)
+        # Load existing settings to preserve fields that might not be in the form
+        existing_settings = storage.load_settings(user_id)
+        existing_dict = existing_settings.model_dump()
+        
+        # Start with existing settings, but we'll handle special fields separately
+        merged_data = {**existing_dict}
+        
+        # Parse date fields from incoming data if they're in HTML format (YYYY-MM-DD)
+        # This must happen BEFORE merging to avoid validation errors
         date_fields = ['date_of_birth', 'phv_date']
         for field in date_fields:
             if field in data and data[field] is not None and data[field] != '':
@@ -886,28 +949,69 @@ def update_settings():
                 # Check if it's in HTML format (YYYY-MM-DD)
                 if '-' in date_value and len(date_value) == 10:
                     try:
+                        # Validate it's a valid date
                         datetime.strptime(date_value, "%Y-%m-%d")
+                        # Convert to our format
                         data[field] = parse_input_date(date_value)
                     except ValueError:
-                        pass  # Already in correct format or invalid
-                # If it's already in our format (dd MMM yyyy), keep it as is
+                        # Invalid date format, set to None
+                        data[field] = None
+                # If it's already in our format (dd MMM yyyy), validate and keep it
                 elif len(date_value) > 10:
                     try:
                         datetime.strptime(date_value, "%d %b %Y")
-                        # Already in correct format
+                        # Already in correct format, keep as is
                         pass
                     except ValueError:
                         # Invalid format, set to None
                         data[field] = None
-            else:
+            elif field in data and (data[field] == '' or data[field] is None):
                 # Empty string or None, set to None
                 data[field] = None
         
+        # Handle special fields that need explicit handling
+        # First, merge all regular fields from data (dates are now converted)
+        # Treat social_media_links like any other field - simple merge
+        for key, value in data.items():
+            if key not in ['highlight_reel_urls', 'player_photo_path']:
+                # For all regular fields including social_media_links and contact_email
+                # Just merge directly - same logic as contact_email, position, etc.
+                merged_data[key] = value
+        
+        # Handle highlight_reel_urls - always update if provided
+        if 'highlight_reel_urls' in data:
+            if isinstance(data['highlight_reel_urls'], str):
+                try:
+                    parsed = json.loads(data['highlight_reel_urls']) if data['highlight_reel_urls'] else []
+                    merged_data['highlight_reel_urls'] = parsed if isinstance(parsed, list) else []
+                except:
+                    merged_data['highlight_reel_urls'] = existing_dict.get('highlight_reel_urls', [])
+            elif isinstance(data['highlight_reel_urls'], list):
+                merged_data['highlight_reel_urls'] = data['highlight_reel_urls']
+            else:
+                merged_data['highlight_reel_urls'] = existing_dict.get('highlight_reel_urls', [])
+        else:
+            merged_data['highlight_reel_urls'] = existing_dict.get('highlight_reel_urls', [])
+        
+        # Ensure social_media_links is always a dict (same as how other fields are handled)
+        if 'social_media_links' not in merged_data or merged_data['social_media_links'] is None:
+            merged_data['social_media_links'] = {}
+        elif not isinstance(merged_data['social_media_links'], dict):
+            # If it's not a dict, try to convert or default to empty dict
+            merged_data['social_media_links'] = {}
+        
+        # Always preserve player_photo_path - it's managed separately via upload endpoint
+        # Only update if explicitly provided and non-empty
+        if 'player_photo_path' in data and data.get('player_photo_path'):
+            merged_data['player_photo_path'] = data['player_photo_path']
+        else:
+            merged_data['player_photo_path'] = existing_dict.get('player_photo_path')
+        
         # Create settings object
-        settings = AppSettings(**data)
+        settings = AppSettings(**merged_data)
         
         # Save settings
-        storage.save_settings(settings)
+        storage.save_settings(settings, user_id)
         
         return jsonify({'success': True})
         
@@ -917,13 +1021,98 @@ def update_settings():
         return jsonify({'success': False, 'errors': [str(e)]}), 400
 
 
-@bp.route('/stats')
-def get_stats():
-    """Get season statistics"""
+@bp.route('/api/upload-photo', methods=['POST'])
+@login_required
+def upload_photo():
+    """Upload player photo"""
     try:
-        season_stats = storage.get_season_stats()
-        pre_season_stats = storage.get_category_stats("Pre-Season Friendly")
-        league_stats = storage.get_category_stats("League")
+        user_id = current_user.id
+        if 'photo' not in request.files:
+            return jsonify({'success': False, 'errors': ['No file provided']}), 400
+        
+        file = request.files['photo']
+        if file.filename == '':
+            return jsonify({'success': False, 'errors': ['No file selected']}), 400
+        
+        # Validate file type
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+        filename = secure_filename(file.filename)
+        if '.' not in filename or filename.rsplit('.', 1)[1].lower() not in allowed_extensions:
+            return jsonify({'success': False, 'errors': ['Invalid file type. Allowed: PNG, JPG, JPEG, GIF, WEBP']}), 400
+        
+        # Create photos directory if it doesn't exist
+        photos_dir = os.path.join(current_app.root_path, '..', 'data', 'photos')
+        os.makedirs(photos_dir, exist_ok=True)
+        
+        # Generate unique filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        ext = filename.rsplit('.', 1)[1].lower()
+        new_filename = f"player_photo_{timestamp}.{ext}"
+        filepath = os.path.join(photos_dir, new_filename)
+        
+        # Save file
+        file.save(filepath)
+        
+        # Update settings with relative path
+        settings = storage.load_settings(user_id)
+        # Store relative path from project root
+        relative_path = os.path.join('data', 'photos', new_filename)
+        settings.player_photo_path = relative_path
+        storage.save_settings(settings, user_id)
+        
+        return jsonify({
+            'success': True,
+            'photo_path': relative_path,
+            'message': 'Photo uploaded successfully'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'errors': [str(e)]}), 500
+
+
+@bp.route('/stats')
+@login_required
+def get_stats():
+    """Get season statistics with optional time period filter"""
+    try:
+        user_id = current_user.id
+        period = request.args.get('period', 'all_time')  # Default to all_time
+        
+        # Validate period
+        valid_periods = ['all_time', 'season', '12_months', '6_months', '3_months', 'last_month']
+        if period not in valid_periods:
+            period = 'all_time'
+        
+        season_stats = storage.get_season_stats(user_id, period=period)
+        
+        # For category stats, we need to filter matches first
+        from .utils import filter_matches_by_period
+        settings = storage.load_settings(user_id)
+        all_matches = storage.get_all_matches(user_id)
+        completed_matches = [m for m in all_matches if not m.is_fixture]
+        
+        if period and period != 'all_time':
+            filtered_matches = filter_matches_by_period(completed_matches, period, settings.season_year)
+        else:
+            filtered_matches = completed_matches
+        
+        pre_season_matches = [m for m in filtered_matches if m.category.value == "Pre-Season Friendly"]
+        league_matches = [m for m in filtered_matches if m.category.value == "League"]
+        
+        pre_season_stats = storage.get_category_stats("Pre-Season Friendly", user_id)
+        league_stats = storage.get_category_stats("League", user_id)
+        
+        # Recalculate category stats from filtered matches
+        def calc_stats_from_matches(match_list):
+            return {
+                "matches": len(match_list),
+                "goals": sum(m.brodie_goals for m in match_list),
+                "assists": sum(m.brodie_assists for m in match_list),
+                "minutes": sum(m.minutes_played for m in match_list)
+            }
+        
+        pre_season_stats = calc_stats_from_matches(pre_season_matches)
+        league_stats = calc_stats_from_matches(league_matches)
         
         return jsonify({
             'success': True,
@@ -931,7 +1120,8 @@ def get_stats():
                 'season': season_stats,
                 'pre_season': pre_season_stats,
                 'league': league_stats
-            }
+            },
+            'period': period
         })
         
     except Exception as e:
@@ -939,10 +1129,12 @@ def get_stats():
 
 
 @bp.route('/api/physical-measurements')
+@login_required
 def get_physical_measurements():
     """Get all physical measurements"""
     try:
-        measurements = storage.get_all_physical_measurements()
+        user_id = current_user.id
+        measurements = storage.get_all_physical_measurements(user_id)
         return jsonify({
             'success': True,
             'measurements': [m.model_dump() for m in measurements]
@@ -952,9 +1144,11 @@ def get_physical_measurements():
 
 
 @bp.route('/api/physical-measurements', methods=['POST'])
+@login_required
 def create_physical_measurement():
     """Create a new physical measurement"""
     try:
+        user_id = current_user.id
         data = request.get_json()
         
         # Validate required fields
@@ -981,11 +1175,11 @@ def create_physical_measurement():
         )
         
         # Save measurement
-        measurement_id = storage.save_physical_measurement(measurement)
+        measurement_id = storage.save_physical_measurement(measurement, user_id)
         
         # Calculate PHV if possible
-        settings = storage.load_settings()
-        measurements = storage.get_all_physical_measurements()
+        settings = storage.load_settings(user_id)
+        measurements = storage.get_all_physical_measurements(user_id)
         phv_result = None
         if len(measurements) >= 2 and settings.date_of_birth:
             phv_result = calculate_phv(measurements, settings.date_of_birth)
@@ -994,7 +1188,7 @@ def create_physical_measurement():
             if phv_result:
                 settings.phv_date = phv_result.get('phv_date')
                 settings.phv_age = phv_result.get('phv_age')
-                storage.save_settings(settings)
+                storage.save_settings(settings, user_id)
         
         return jsonify({
             'success': True,
@@ -1010,11 +1204,13 @@ def create_physical_measurement():
 
 
 @bp.route('/api/physical-measurements/<measurement_id>', methods=['PUT'])
+@login_required
 def update_physical_measurement(measurement_id):
     """Update an existing physical measurement"""
     try:
+        user_id = current_user.id
         # Get existing measurement
-        existing_measurement = storage.get_physical_measurement(measurement_id)
+        existing_measurement = storage.get_physical_measurement(measurement_id, user_id)
         if not existing_measurement:
             return jsonify({'success': False, 'errors': ['Measurement not found']}), 404
         
@@ -1034,11 +1230,11 @@ def update_physical_measurement(measurement_id):
         )
         
         # Save updated measurement
-        storage.save_physical_measurement(updated_measurement)
+        storage.save_physical_measurement(updated_measurement, user_id)
         
         # Recalculate PHV if possible
-        settings = storage.load_settings()
-        measurements = storage.get_all_physical_measurements()
+        settings = storage.load_settings(user_id)
+        measurements = storage.get_all_physical_measurements(user_id)
         phv_result = None
         if len(measurements) >= 2 and settings.date_of_birth:
             phv_result = calculate_phv(measurements, settings.date_of_birth)
@@ -1047,7 +1243,7 @@ def update_physical_measurement(measurement_id):
             if phv_result:
                 settings.phv_date = phv_result.get('phv_date')
                 settings.phv_age = phv_result.get('phv_age')
-                storage.save_settings(settings)
+                storage.save_settings(settings, user_id)
         
         return jsonify({
             'success': True,
@@ -1062,13 +1258,15 @@ def update_physical_measurement(measurement_id):
 
 
 @bp.route('/api/physical-measurements/<measurement_id>', methods=['DELETE'])
+@login_required
 def delete_physical_measurement(measurement_id):
     """Delete a physical measurement"""
-    success = storage.delete_physical_measurement(measurement_id)
+    user_id = current_user.id
+    success = storage.delete_physical_measurement(measurement_id, user_id)
     if success:
         # Recalculate PHV after deletion
-        settings = storage.load_settings()
-        measurements = storage.get_all_physical_measurements()
+        settings = storage.load_settings(user_id)
+        measurements = storage.get_all_physical_measurements(user_id)
         phv_result = None
         if len(measurements) >= 2 and settings.date_of_birth:
             phv_result = calculate_phv(measurements, settings.date_of_birth)
@@ -1081,7 +1279,7 @@ def delete_physical_measurement(measurement_id):
                 # Clear PHV if not enough data
                 settings.phv_date = None
                 settings.phv_age = None
-            storage.save_settings(settings)
+            storage.save_settings(settings, user_id)
         
         return jsonify({
             'success': True,
@@ -1093,11 +1291,13 @@ def delete_physical_measurement(measurement_id):
 
 
 @bp.route('/api/phv/calculate')
+@login_required
 def calculate_phv_endpoint():
     """Calculate PHV from all measurements"""
     try:
-        settings = storage.load_settings()
-        measurements = storage.get_all_physical_measurements()
+        user_id = current_user.id
+        settings = storage.load_settings(user_id)
+        measurements = storage.get_all_physical_measurements(user_id)
         
         if not settings.date_of_birth:
             return jsonify({
@@ -1123,7 +1323,7 @@ def calculate_phv_endpoint():
             # Update settings with calculated PHV
             settings.phv_date = phv_result.get('phv_date')
             settings.phv_age = phv_result.get('phv_age')
-            storage.save_settings(settings)
+            storage.save_settings(settings, user_id)
         elif not phv_result and len([m for m in measurements if m.height_cm is not None]) >= 2:
             # Have enough measurements but calculation failed - likely date format issue
             return jsonify({
@@ -1151,18 +1351,32 @@ def calculate_phv_endpoint():
 
 @bp.route('/physical-data')
 def physical_data():
-    """Physical Data page"""
-    settings = storage.load_settings()
-    measurements = storage.get_all_physical_measurements()
-    return render_template('physical_data.html', settings=settings, measurements=measurements)
+    """Physical Data page - data loaded client-side"""
+    # Return empty/default data - actual data will be loaded client-side
+    default_settings = {
+        'club_name': '',
+        'player_name': '',
+        'season_year': ''
+    }
+    return render_template('physical_data.html', settings=default_settings, measurements=[])
 
 
-@bp.route('/api/physical-data/analysis')
+@bp.route('/api/physical-data/analysis', methods=['POST'])
 def physical_data_analysis():
-    """Get comprehensive physical data analysis including PHV, predicted height, and elite comparisons"""
+    """Get comprehensive physical data analysis including PHV, predicted height, and elite comparisons - accepts data from client"""
     try:
-        settings = storage.load_settings()
-        measurements = storage.get_all_physical_measurements()
+        # Get data from request (client-side storage)
+        data = request.get_json() if request.is_json else {}
+        settings_data = data.get('settings', {})
+        measurements_data = data.get('measurements', [])
+        physical_metrics_data = data.get('physical_metrics', [])
+        
+        # Convert to model objects
+        from .models import AppSettings, PhysicalMeasurement, PhysicalMetrics
+        
+        settings = AppSettings(**settings_data) if settings_data else AppSettings()
+        measurements = [PhysicalMeasurement(**m) for m in measurements_data]
+        physical_metrics = [PhysicalMetrics(**pm) for pm in physical_metrics_data]
         
         if not settings.date_of_birth:
             return jsonify({
@@ -1198,55 +1412,77 @@ def physical_data_analysis():
         # Compare player metrics to elite benchmarks
         comparisons = {}
         
-        # Height comparison
-        if settings.height_cm:
+        # Height comparison - use settings (current snapshot) or latest measurement
+        height_for_comparison = settings.height_cm
+        if not height_for_comparison and measurements:
+            valid_measurements = [m for m in measurements if m.height_cm is not None]
+            if valid_measurements:
+                latest_measurement = max(valid_measurements, key=lambda m: datetime.strptime(m.date, "%d %b %Y"))
+                height_for_comparison = latest_measurement.height_cm
+        
+        if height_for_comparison:
             comparisons['height'] = compare_to_elite(
-                settings.height_cm,
+                height_for_comparison,
                 benchmarks['metrics']['height'],
                 'higher_is_better'
             )
         
-        # Speed comparison
-        if settings.sprint_speed_ms:
-            comparisons['speed_ms'] = compare_to_elite(
-                settings.sprint_speed_ms,
-                benchmarks['metrics']['speed'],
-                'higher_is_better'
-            )
-        elif settings.sprint_speed_kmh:
-            # Convert km/h to m/s for comparison
-            speed_ms = settings.sprint_speed_kmh / 3.6
-            comparisons['speed_ms'] = compare_to_elite(
-                speed_ms,
-                benchmarks['metrics']['speed'],
-                'higher_is_better'
-            )
-            comparisons['speed_kmh'] = compare_to_elite(
-                settings.sprint_speed_kmh,
-                benchmarks['metrics']['speed'],
-                'higher_is_better'
-            )
+        # Get latest physical metrics for performance comparisons
+        latest_metric = None
+        if physical_metrics:
+            # Sort by date and get the most recent one
+            sorted_metrics = sorted(physical_metrics, key=lambda x: datetime.strptime(x.date, "%d %b %Y"), reverse=True)
+            latest_metric = sorted_metrics[0] if sorted_metrics else None
         
-        # Vertical jump comparison
-        if settings.vertical_jump_cm:
+        # Speed comparison - use latest physical metric
+        if latest_metric:
+            if latest_metric.sprint_speed_ms:
+                comparisons['speed_ms'] = compare_to_elite(
+                    latest_metric.sprint_speed_ms,
+                    benchmarks['metrics']['speed'],
+                    'higher_is_better'
+                )
+            elif latest_metric.sprint_speed_kmh:
+                # Convert km/h to m/s for comparison
+                speed_ms = latest_metric.sprint_speed_kmh / 3.6
+                comparisons['speed_ms'] = compare_to_elite(
+                    speed_ms,
+                    benchmarks['metrics']['speed'],
+                    'higher_is_better'
+                )
+                comparisons['speed_kmh'] = compare_to_elite(
+                    latest_metric.sprint_speed_kmh,
+                    benchmarks['metrics']['speed'],
+                    'higher_is_better'
+                )
+        
+        # Vertical jump comparison - use latest physical metric
+        if latest_metric and latest_metric.vertical_jump_cm:
             comparisons['vertical_jump'] = compare_to_elite(
-                settings.vertical_jump_cm,
+                latest_metric.vertical_jump_cm,
                 benchmarks['metrics']['vertical_jump'],
                 'higher_is_better'
             )
         
-        # Agility comparison
-        if settings.agility_time_sec:
+        # Agility comparison - use latest physical metric
+        if latest_metric and latest_metric.agility_time_sec:
             comparisons['agility'] = compare_to_elite(
-                settings.agility_time_sec,
+                latest_metric.agility_time_sec,
                 benchmarks['metrics']['agility'],
                 'lower_is_better'
             )
         
-        # BMI calculation and comparison
+        # BMI calculation and comparison - use settings or latest measurement
         bmi = None
-        if settings.height_cm and settings.weight_kg:
-            bmi = settings.weight_kg / ((settings.height_cm / 100) ** 2)
+        weight_for_bmi = settings.weight_kg
+        if not weight_for_bmi and measurements:
+            valid_measurements = [m for m in measurements if m.weight_kg is not None]
+            if valid_measurements:
+                latest_measurement = max(valid_measurements, key=lambda m: datetime.strptime(m.date, "%d %b %Y"))
+                weight_for_bmi = latest_measurement.weight_kg
+        
+        if height_for_comparison and weight_for_bmi:
+            bmi = weight_for_bmi / ((height_for_comparison / 100) ** 2)
             bmi_benchmark = benchmarks['metrics']['body_composition']
             if bmi:
                 comparisons['bmi'] = {
@@ -1280,19 +1516,23 @@ def physical_data_analysis():
 
 @bp.route('/achievements')
 def achievements():
-    """Achievements page"""
-    settings = storage.load_settings()
-    achievements_list = storage.get_all_achievements()
-    # Sort by date descending (most recent first)
-    achievements_list.sort(key=lambda x: datetime.strptime(x.date, "%d %b %Y"), reverse=True)
-    return render_template('achievements.html', settings=settings, achievements=achievements_list)
+    """Achievements page - data loaded client-side"""
+    # Return empty/default data - actual data will be loaded client-side
+    default_settings = {
+        'club_name': '',
+        'player_name': '',
+        'season_year': ''
+    }
+    return render_template('achievements.html', settings=default_settings, achievements=[])
 
 
 @bp.route('/api/achievements')
+@login_required
 def get_achievements():
     """Get all achievements"""
     try:
-        achievements_list = storage.get_all_achievements()
+        user_id = current_user.id
+        achievements_list = storage.get_all_achievements(user_id)
         # Sort by date descending
         achievements_list.sort(key=lambda x: datetime.strptime(x.date, "%d %b %Y"), reverse=True)
         return jsonify({
@@ -1304,9 +1544,11 @@ def get_achievements():
 
 
 @bp.route('/api/achievements', methods=['POST'])
+@login_required
 def create_achievement():
     """Create a new achievement"""
     try:
+        user_id = current_user.id
         data = request.get_json()
         
         # Validate required fields
@@ -1338,7 +1580,7 @@ def create_achievement():
         )
         
         # Save achievement
-        achievement_id = storage.save_achievement(achievement)
+        achievement_id = storage.save_achievement(achievement, user_id)
         
         return jsonify({
             'success': True,
@@ -1352,11 +1594,13 @@ def create_achievement():
 
 
 @bp.route('/api/achievements/<achievement_id>', methods=['PUT'])
+@login_required
 def update_achievement(achievement_id):
     """Update an existing achievement"""
     try:
+        user_id = current_user.id
         # Get existing achievement
-        existing_achievement = storage.get_achievement(achievement_id)
+        existing_achievement = storage.get_achievement(achievement_id, user_id)
         if not existing_achievement:
             return jsonify({'success': False, 'errors': ['Achievement not found']}), 404
         
@@ -1378,7 +1622,7 @@ def update_achievement(achievement_id):
         )
         
         # Save updated achievement
-        storage.save_achievement(updated_achievement)
+        storage.save_achievement(updated_achievement, user_id)
         
         return jsonify({
             'success': True
@@ -1391,9 +1635,11 @@ def update_achievement(achievement_id):
 
 
 @bp.route('/api/achievements/<achievement_id>', methods=['DELETE'])
+@login_required
 def delete_achievement(achievement_id):
     """Delete an achievement"""
-    success = storage.delete_achievement(achievement_id)
+    user_id = current_user.id
+    success = storage.delete_achievement(achievement_id, user_id)
     if success:
         return jsonify({'success': True})
     else:
@@ -1402,21 +1648,41 @@ def delete_achievement(achievement_id):
 
 @bp.route('/scout-pdf', methods=['POST'])
 def generate_scout_pdf_route():
-    """Generate scout-friendly PDF report"""
+    """Generate scout-friendly PDF report - accepts data from client"""
     try:
-        settings = storage.load_settings()
-        matches = storage.get_all_matches()
-        physical_measurements = storage.get_all_physical_measurements()
-        achievements = storage.get_all_achievements()
-        club_history = storage.get_all_club_history()
-        training_camps = storage.get_all_training_camps()
-        physical_metrics = storage.get_all_physical_metrics()
+        data = request.get_json() if request.is_json else {}
+        
+        # Get data from request (client-side storage)
+        matches_data = data.get('matches', [])
+        settings_data = data.get('settings', {})
+        physical_measurements_data = data.get('physical_measurements', [])
+        achievements_data = data.get('achievements', [])
+        club_history_data = data.get('club_history', [])
+        training_camps_data = data.get('training_camps', [])
+        physical_metrics_data = data.get('physical_metrics', [])
+        period = data.get('period', 'all_time')
+        
+        # Validate period
+        valid_periods = ['all_time', 'season', '12_months', '6_months', '3_months', 'last_month']
+        if period not in valid_periods:
+            period = 'all_time'
+        
+        # Convert data to model objects
+        from .models import Match, AppSettings, PhysicalMeasurement, PhysicalMetrics, Achievement, ClubHistory, TrainingCamp
+        
+        matches = [Match(**m) for m in matches_data]
+        settings = AppSettings(**settings_data) if settings_data else AppSettings()
+        physical_measurements = [PhysicalMeasurement(**pm) for pm in physical_measurements_data]
+        achievements = [Achievement(**a) for a in achievements_data]
+        club_history = [ClubHistory(**ch) for ch in club_history_data]
+        training_camps = [TrainingCamp(**tc) for tc in training_camps_data]
+        physical_metrics = [PhysicalMetrics(**pm) for pm in physical_metrics_data]
         
         # Create output directory
         output_dir = os.path.join(current_app.root_path, '..', 'output')
         os.makedirs(output_dir, exist_ok=True)
         
-        # Generate PDF
+        # Generate PDF with period filter
         pdf_path = generate_scout_pdf(
             matches, 
             settings, 
@@ -1425,7 +1691,8 @@ def generate_scout_pdf_route():
             physical_measurements,
             training_camps,
             physical_metrics,
-            output_dir
+            output_dir,
+            period=period
         )
         
         # Return the PDF file directly
@@ -1688,19 +1955,23 @@ def delete_training_camp(camp_id):
 
 @bp.route('/physical-metrics')
 def physical_metrics_page():
-    """Physical metrics management page"""
-    settings = storage.load_settings()
-    metrics = storage.get_all_physical_metrics()
-    # Sort by date (most recent first)
-    metrics.sort(key=lambda x: datetime.strptime(x.date, "%d %b %Y"), reverse=True)
-    return render_template('physical_metrics.html', settings=settings, metrics=metrics)
+    """Physical metrics management page - data loaded client-side"""
+    # Return empty/default data - actual data will be loaded client-side
+    default_settings = {
+        'club_name': '',
+        'player_name': '',
+        'season_year': ''
+    }
+    return render_template('physical_metrics.html', settings=default_settings, metrics=[])
 
 
 @bp.route('/api/physical-metrics')
+@login_required
 def get_physical_metrics():
     """Get all physical metric entries"""
     try:
-        metrics = storage.get_all_physical_metrics()
+        user_id = current_user.id
+        metrics = storage.get_all_physical_metrics(user_id)
         # Sort by date descending
         metrics.sort(key=lambda x: datetime.strptime(x.date, "%d %b %Y"), reverse=True)
         return jsonify({
@@ -1712,9 +1983,11 @@ def get_physical_metrics():
 
 
 @bp.route('/api/physical-metrics/<metric_id>')
+@login_required
 def get_physical_metric(metric_id):
     """Get a specific physical metric entry"""
-    metric = storage.get_physical_metric(metric_id)
+    user_id = current_user.id
+    metric = storage.get_physical_metric(metric_id, user_id)
     if metric:
         return jsonify({'success': True, 'metric': metric.model_dump()})
     else:
@@ -1722,9 +1995,11 @@ def get_physical_metric(metric_id):
 
 
 @bp.route('/api/physical-metrics', methods=['POST'])
+@login_required
 def create_physical_metric():
     """Create a new physical metric entry"""
     try:
+        user_id = current_user.id
         data = request.get_json()
         
         # Validate required fields
@@ -1781,7 +2056,7 @@ def create_physical_metric():
         )
         
         # Save metric entry
-        metric_id = storage.save_physical_metric(metric)
+        metric_id = storage.save_physical_metric(metric, user_id)
         
         return jsonify({
             'success': True,
@@ -1795,13 +2070,15 @@ def create_physical_metric():
 
 
 @bp.route('/api/physical-metrics/<metric_id>', methods=['PUT'])
+@login_required
 def update_physical_metric(metric_id):
     """Update an existing physical metric entry"""
     try:
+        user_id = current_user.id
         data = request.get_json()
         
         # Get existing metric
-        existing_metric = storage.get_physical_metric(metric_id)
+        existing_metric = storage.get_physical_metric(metric_id, user_id)
         if not existing_metric:
             return jsonify({'success': False, 'errors': ['Physical metric not found']}), 404
         
@@ -1856,7 +2133,7 @@ def update_physical_metric(metric_id):
         )
         
         # Save updated metric
-        storage.save_physical_metric(metric)
+        storage.save_physical_metric(metric, user_id)
         
         return jsonify({'success': True})
         
@@ -1867,9 +2144,11 @@ def update_physical_metric(metric_id):
 
 
 @bp.route('/api/physical-metrics/<metric_id>', methods=['DELETE'])
+@login_required
 def delete_physical_metric(metric_id):
     """Delete a physical metric entry"""
-    success = storage.delete_physical_metric(metric_id)
+    user_id = current_user.id
+    success = storage.delete_physical_metric(metric_id, user_id)
     if success:
         return jsonify({'success': True})
     else:

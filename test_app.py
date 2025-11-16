@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple test script to verify FutureElite Tracker functionality
+Simple test script to verify FutureElite functionality
 """
 
 import sys
@@ -136,7 +136,7 @@ def test_pdf_generation():
 
 def main():
     """Run all tests"""
-    print("FutureElite Tracker - Functionality Test")
+    print("FutureElite - Functionality Test")
     print("=" * 50)
     
     try:
@@ -145,7 +145,7 @@ def main():
         test_pdf_generation()
         
         print("\n" + "=" * 50)
-        print("🎉 All tests passed! FutureElite Tracker is working correctly.")
+        print("🎉 All tests passed! FutureElite is working correctly.")
         print("\nTo run the application:")
         print("  python run.py")
         print("\nTo build executables:")
@@ -162,6 +162,7 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
 
 
 

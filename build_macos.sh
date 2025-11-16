@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# FutureElite Tracker - macOS Build Script
+# FutureElite - macOS Build Script
 # This script builds a macOS app bundle
 
-echo "Building FutureElite Tracker for macOS..." | grep --color=always "Building FutureElite Tracker for macOS..."
+echo "Building FutureElite for macOS..." | grep --color=always "Building FutureElite for macOS..."
 
 # Check if Python is installed
 if ! command -v python3 &> /dev/null; then
@@ -41,15 +41,15 @@ fi
 
 # Build app bundle
 echo "Building app bundle..." | grep --color=always "Building app bundle..."
-pyinstaller --noconfirm --windowed --name "FutureEliteTracker" --add-data "app:app" --add-data "app/templates:templates" --add-data "app/static:static" --add-data "app/data:data" app/main.py
+pyinstaller --noconfirm --windowed --name "FutureElite" --add-data "app:app" --add-data "app/templates:templates" --add-data "app/static:static" --add-data "app/data:data" app/main.py
 
 # Check if build was successful
-if [ -d "dist/FutureEliteTracker.app" ]; then
+if [ -d "dist/FutureElite.app" ]; then
     echo "Build successful!" | grep --color=always "Build successful!"
-    echo "App bundle created: dist/FutureEliteTracker.app" | grep --color=always "App bundle created:"
+    echo "App bundle created: dist/FutureElite.app" | grep --color=always "App bundle created:"
     echo ""
     echo "To install the app:" | grep --color=always "To install the app:"
-    echo "1. Drag FutureEliteTracker.app to your Applications folder" | grep --color=always "1. Drag FutureEliteTracker.app to your Applications folder"
+    echo "1. Drag FutureElite.app to your Applications folder" | grep --color=always "1. Drag FutureElite.app to your Applications folder"
     echo "2. Double-click the app in Applications to run it" | grep --color=always "2. Double-click the app in Applications to run it"
     echo ""
     echo "Note: You may need to right-click and select 'Open' the first time due to macOS security" | grep --color=always "Note:"
@@ -59,7 +59,8 @@ else
 fi
 
 echo ""
-echo "Build complete! You can now run FutureEliteTracker.app" | grep --color=always "Build complete! You can now run FutureEliteTracker.app"
+echo "Build complete! You can now run FutureElite.app" | grep --color=always "Build complete! You can now run FutureElite.app"
+
 
 
 

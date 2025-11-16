@@ -1,5 +1,5 @@
-from datetime import datetime
-from typing import List, Dict, Any
+from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional
 import re
 
 
@@ -200,4 +200,56 @@ def get_category_badge_color(category: str) -> str:
         return "bg-green-100 text-green-800"
     else:
         return "bg-gray-100 text-gray-800"
+
+
+def filter_matches_by_period(matches: List[Any], period: str, season_year: Optional[str] = None) -> List[Any]:
+    """Filter matches by time period
+    
+    Args:
+        matches: List of match objects
+        period: One of 'all_time', 'season', '12_months', '6_months', '3_months', 'last_month'
+        season_year: Season year in format 'YYYY/YY' (e.g., '2025/26') - required for 'season' period
+    
+    Returns:
+        Filtered list of matches
+    """
+    if not matches:
+        return []
+    
+    today = datetime.now()
+    cutoff_date = None
+    
+    if period == 'all_time':
+        return matches
+    elif period == 'season':
+        if not season_year:
+            return matches
+        # Extract start year from season (e.g., '2025/26' -> 2025)
+        try:
+            start_year = int(season_year.split('/')[0])
+            cutoff_date = datetime(start_year, 7, 1)  # Season typically starts July 1
+        except (ValueError, IndexError):
+            return matches
+    elif period == '12_months':
+        cutoff_date = today - timedelta(days=365)
+    elif period == '6_months':
+        cutoff_date = today - timedelta(days=180)
+    elif period == '3_months':
+        cutoff_date = today - timedelta(days=90)
+    elif period == 'last_month':
+        cutoff_date = today - timedelta(days=30)
+    else:
+        return matches  # Unknown period, return all
+    
+    filtered = []
+    for match in matches:
+        try:
+            match_date = datetime.strptime(match.date, "%d %b %Y")
+            if cutoff_date and match_date >= cutoff_date:
+                filtered.append(match)
+        except (ValueError, AttributeError):
+            # Skip matches with invalid dates
+            continue
+    
+    return filtered
 

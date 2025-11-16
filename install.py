@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Installation script for FutureElite Tracker
+Installation script for FutureElite
 """
 
 import subprocess
@@ -9,7 +9,7 @@ import os
 
 def install_requirements():
     """Install required packages"""
-    print("Installing FutureElite Tracker dependencies...")
+    print("Installing FutureElite dependencies...")
     print("=" * 50)
     
     try:
@@ -23,7 +23,7 @@ def install_requirements():
 
 def main():
     """Main installation function"""
-    print("FutureElite Tracker - Installation")
+    print("FutureElite - Installation")
     print("=" * 50)
     
     # Check Python version
@@ -51,6 +51,7 @@ def main():
 
 if __name__ == '__main__':
     sys.exit(main())
+
 
 
 

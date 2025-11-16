@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}FutureElite - Professional Performance Tracking for Youth Football Players{% endblock %}
+
+{% block content %}
+<div class="min-h-screen">
+    <!-- Hero Section -->
+    <div class="bg-gradient-to-r from-qadsiah-red to-red-700 text-white py-20 md:py-28">
+        <div class="max-w-6xl mx-auto px-4 text-center">
+            <h1 class="text-5xl md:text-6xl lg:text-7xl font-bold mb-6">
+                FutureElite
+            </h1>
+            <p class="text-xl md:text-2xl lg:text-3xl mb-8 opacity-95 font-light">
+                Professional Performance Tracking for Youth Football Players
+            </p>
+            <p class="text-lg md:text-xl opacity-90 max-w-3xl mx-auto mb-10">
+                Track your matches, achievements, and physical development. Build comprehensive performance reports that showcase your journey to scouts, coaches, and academies.
+            </p>
+            {% if not is_authenticated %}
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="{{ url_for('auth.register') }}" class="bg-white text-qadsiah-red px-8 py-4 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-colors shadow-lg">
+                    Start Free Trial
+                </a>
+                <a href="{{ url_for('auth.login') }}" class="bg-transparent border-2 border-white text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-white hover:text-qadsiah-red transition-colors">
+                    Sign In
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Features Section -->
+    <div class="max-w-6xl mx-auto px-4 py-20">
+        <div class="text-center mb-16">
+            <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Everything You Need to Track Your Journey</h2>
+            <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+                Comprehensive tools designed specifically for youth football players who are serious about their development.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-20">
+            <div class="bg-white rounded-lg shadow-md p-8 hover:shadow-lg transition-shadow">
+                <div class="text-5xl mb-4 text-center">⚽</div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-3 text-center">Match Tracking</h3>
+                <p class="text-gray-600 text-center">
+                    Record every match with detailed statistics including goals, assists, minutes played, and performance notes. Track results, opponents, and match categories.
+                </p>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-8 hover:shadow-lg transition-shadow">
+                <div class="text-5xl mb-4 text-center">📊</div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-3 text-center">Performance Analytics</h3>
+                <p class="text-gray-600 text-center">
+                    Monitor your physical development with height, weight, and fitness metrics. Compare your performance against elite benchmarks for your age group.
+                </p>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-8 hover:shadow-lg transition-shadow">
+                <div class="text-5xl mb-4 text-center">🏆</div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-3 text-center">Achievement Tracking</h3>
+                <p class="text-gray-600 text-center">
+                    Document your achievements, awards, and milestones. Build a comprehensive record of your accomplishments throughout your career.
+                </p>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-8 hover:shadow-lg transition-shadow">
+                <div class="text-5xl mb-4 text-center">📄</div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-3 text-center">Professional Reports</h3>
+                <p class="text-gray-600 text-center">
+                    Generate comprehensive PDF reports perfect for scouts, coaches, and academies. Export your complete performance history in a professional format.
+                </p>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-8 hover:shadow-lg transition-shadow">
+                <div class="text-5xl mb-4 text-center">📈</div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-3 text-center">Growth Tracking</h3>
+                <p class="text-gray-600 text-center">
+                    Track your physical development over time with PHV calculations, predicted adult height, and growth velocity analysis.
+                </p>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-8 hover:shadow-lg transition-shadow">
+                <div class="text-5xl mb-4 text-center">🔒</div>
+                <h3 class="text-xl font-semibold text-gray-900 mb-3 text-center">Privacy First</h3>
+                <p class="text-gray-600 text-center">
+                    Your data is stored securely and privately. Export or backup your data anytime. Full control over your information.
+                </p>
+            </div>
+        </div>
+
+        <!-- For Logged In Users - Quick Stats -->
+        {% if is_authenticated %}
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-12">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6 text-center">Your Performance Overview</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+                <div class="text-center">
+                    <div class="text-4xl font-bold text-qadsiah-red mb-2">{{ season_stats.total_matches }}</div>
+                    <div class="text-sm text-gray-600">Matches</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-4xl font-bold text-green-600 mb-2">{{ season_stats.goals }}</div>
+                    <div class="text-sm text-gray-600">Goals</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-4xl font-bold text-purple-600 mb-2">{{ season_stats.assists }}</div>
+                    <div class="text-sm text-gray-600">Assists</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-4xl font-bold text-blue-600 mb-2">{{ total_achievements }}</div>
+                    <div class="text-sm text-gray-600">Achievements</div>
+                </div>
+            </div>
+            <div class="flex flex-wrap justify-center gap-4">
+                <a href="/dashboard" class="bg-qadsiah-red text-white px-6 py-3 rounded-lg font-medium hover:bg-red-700 transition-colors">
+                    View Full Dashboard
+                </a>
+                <a href="/matches" class="bg-gray-100 text-gray-900 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition-colors">
+                    Manage Matches
+                </a>
+                <a href="/settings" class="bg-gray-100 text-gray-900 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition-colors">
+                    Update Settings
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Call to Action -->
+        {% if not is_authenticated %}
+        <div class="bg-gradient-to-r from-gray-800 to-gray-900 rounded-lg shadow-xl p-12 text-center text-white">
+            <h2 class="text-3xl md:text-4xl font-bold mb-4">Ready to Elevate Your Game?</h2>
+            <p class="text-xl mb-8 opacity-90">
+                Join players who are taking control of their performance tracking and career development.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="{{ url_for('auth.register') }}" class="bg-qadsiah-red text-white px-10 py-4 rounded-lg font-semibold text-lg hover:bg-red-700 transition-colors shadow-lg">
+                    Create Free Account
+                </a>
+                <a href="{{ url_for('auth.login') }}" class="bg-transparent border-2 border-white text-white px-10 py-4 rounded-lg font-semibold text-lg hover:bg-white hover:text-gray-900 transition-colors">
+                    Sign In to Your Account
+                </a>
+            </div>
+            <p class="mt-6 text-sm opacity-75">
+                No credit card required • Start tracking immediately • Export your data anytime
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

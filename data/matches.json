@@ -1,6 +1,6 @@
 [
   {
-    "id": "20251115_132240_0001",
+    "id": "20251116_212414_0001",
     "category": "Pre-Season Friendly",
     "date": "28 Aug 2025",
     "opponent": "Altrajz",
@@ -11,10 +11,11 @@
     "brodie_assists": 0,
     "minutes_played": 15,
     "notes": "",
-    "is_fixture": false
+    "is_fixture": false,
+    "user_id": "20251115_221430"
   },
   {
-    "id": "20251115_132240_0002",
+    "id": "20251116_212414_0002",
     "category": "Pre-Season Friendly",
     "date": "04 Sep 2025",
     "opponent": "Faith Academy",
@@ -25,10 +26,11 @@
     "brodie_assists": 0,
     "minutes_played": 20,
     "notes": "",
-    "is_fixture": false
+    "is_fixture": false,
+    "user_id": "20251115_221430"
   },
   {
-    "id": "20251115_132240_0003",
+    "id": "20251116_212414_0003",
     "category": "Pre-Season Friendly",
     "date": "11 Sep 2025",
     "opponent": "Ole Academy",
@@ -39,10 +41,11 @@
     "brodie_assists": 0,
     "minutes_played": 20,
     "notes": "",
-    "is_fixture": false
+    "is_fixture": false,
+    "user_id": "20251115_221430"
   },
   {
-    "id": "20251115_132240_0004",
+    "id": "20251116_212414_0004",
     "category": "Pre-Season Friendly",
     "date": "18 Sep 2025",
     "opponent": "Aspire",
@@ -53,10 +56,11 @@
     "brodie_assists": 0,
     "minutes_played": 20,
     "notes": "",
-    "is_fixture": false
+    "is_fixture": false,
+    "user_id": "20251115_221430"
   },
   {
-    "id": "20251115_132240_0005",
+    "id": "20251116_212414_0005",
     "category": "Pre-Season Friendly",
     "date": "25 Sep 2025",
     "opponent": "Stars",
@@ -67,10 +71,11 @@
     "brodie_assists": 0,
     "minutes_played": 20,
     "notes": "",
-    "is_fixture": false
+    "is_fixture": false,
+    "user_id": "20251115_221430"
   },
   {
-    "id": "20251115_132240_0006",
+    "id": "20251116_212414_0006",
     "category": "Pre-Season Friendly",
     "date": "02 Oct 2025",
     "opponent": "Altraji",
@@ -81,10 +86,11 @@
     "brodie_assists": 0,
     "minutes_played": 25,
     "notes": "Penalty",
-    "is_fixture": false
+    "is_fixture": false,
+    "user_id": "20251115_221430"
   },
   {
-    "id": "20251115_132240_0007",
+    "id": "20251116_212414_0007",
     "category": "Pre-Season Friendly",
     "date": "09 Oct 2025",
     "opponent": "Al Etifaq",
@@ -95,10 +101,11 @@
     "brodie_assists": 0,
     "minutes_played": 35,
     "notes": "1st penalty, 2nd Long pass; beat two defenders;\nfinished bottom-left.",
-    "is_fixture": false
+    "is_fixture": false,
+    "user_id": "20251115_221430"
   },
   {
-    "id": "20251115_132240_0008",
+    "id": "20251116_212414_0008",
     "category": "Pre-Season Friendly",
     "date": "16 Oct 2025",
     "opponent": "Al Hilal",
@@ -109,10 +116,11 @@
     "brodie_assists": 0,
     "minutes_played": 25,
     "notes": "",
-    "is_fixture": false
+    "is_fixture": false,
+    "user_id": "20251115_221430"
   },
   {
-    "id": "20251115_132240_0009",
+    "id": "20251116_212414_0009",
     "category": "Pre-Season Friendly",
     "date": "17 Oct 2025",
     "opponent": "Al Fatah",
@@ -123,10 +131,11 @@
     "brodie_assists": 0,
     "minutes_played": 35,
     "notes": "Received outside\nbox; dribbled inside\ndefenders; top-right\nfinish.",
-    "is_fixture": false
+    "is_fixture": false,
+    "user_id": "20251115_221430"
   },
   {
-    "id": "20251115_132240_0010",
+    "id": "20251116_212414_0010",
     "category": "Pre-Season Friendly",
     "date": "23 Oct 2025",
     "opponent": "Dhahran",
@@ -137,10 +146,11 @@
     "brodie_assists": 1,
     "minutes_played": 30,
     "notes": "Scored from edge of\nbox after dribbling\nand losing\ndefenders. Also\nprovided 1 assist.",
-    "is_fixture": false
+    "is_fixture": false,
+    "user_id": "20251115_221430"
   },
   {
-    "id": "20251115_132240_0011",
+    "id": "20251116_212414_0011",
     "category": "Pre-Season Friendly",
     "date": "28 Oct 2025",
     "opponent": "Bahrain",
@@ -151,10 +161,11 @@
     "brodie_assists": 1,
     "minutes_played": 40,
     "notes": "1st poachers close range finish, 2nd penalty",
-    "is_fixture": false
+    "is_fixture": false,
+    "user_id": "20251115_221430"
   },
   {
-    "id": "20251115_132240_0012",
+    "id": "20251116_212414_0012",
     "category": "Pre-Season Friendly",
     "date": "30 Oct 2025",
     "opponent": "Winners",
@@ -165,10 +176,11 @@
     "brodie_assists": 0,
     "minutes_played": 30,
     "notes": "",
-    "is_fixture": false
+    "is_fixture": false,
+    "user_id": "20251115_221430"
   },
   {
-    "id": "20251115_132240_0013",
+    "id": "20251116_212414_0013",
     "category": "Pre-Season Friendly",
     "date": "12 Nov 2025",
     "opponent": "Safa",
@@ -179,10 +191,11 @@
     "brodie_assists": 1,
     "minutes_played": 30,
     "notes": "Assist - Keeper saved the shot, and winger finished the rebound",
-    "is_fixture": false
+    "is_fixture": false,
+    "user_id": "20251115_221430"
   },
   {
-    "id": "20251115_132240_0014",
+    "id": "20251116_212414_0014",
     "category": "Pre-Season Friendly",
     "date": "13 Nov 2025",
     "opponent": "Qadsiah Academy",
@@ -193,6 +206,7 @@
     "brodie_assists": 0,
     "minutes_played": 40,
     "notes": "Both goals reactive finish in crowded box",
-    "is_fixture": false
+    "is_fixture": false,
+    "user_id": "20251115_221430"
   }
 ]

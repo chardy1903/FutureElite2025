@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Physical Data - FutureElite Tracker{% endblock %}
+{% block title %}Physical Data - FutureElite{% endblock %}
 
 {% block content %}
 <div class="px-4 py-6 sm:px-0">
@@ -137,11 +137,32 @@ document.addEventListener('DOMContentLoaded', function() {
 // Load comprehensive analysis
 async function loadAnalysis() {
     try {
+        await ensureStorageReady();
+        
+        // Check authentication
+        if (!clientAuth.isAuthenticated()) {
+            window.location.href = '/login';
+            return;
+        }
+        
         document.getElementById('loadingState').classList.remove('hidden');
         document.getElementById('mainContent').classList.add('hidden');
         document.getElementById('errorState').classList.add('hidden');
         
-        const data = await apiCall('/api/physical-data/analysis');
+        // Get data from client storage
+        const settings = await clientStorage.loadSettings();
+        const measurements = await clientStorage.getAllPhysicalMeasurements();
+        const physical_metrics = await clientStorage.getAllPhysicalMetrics();
+        
+        // Send data to server for analysis
+        const data = await apiCall('/api/physical-data/analysis', {
+            method: 'POST',
+            body: JSON.stringify({
+                settings: settings,
+                measurements: measurements,
+                physical_metrics: physical_metrics
+            })
+        });
         
         if (data.success) {
             renderPHVSection(data.phv);
@@ -262,7 +283,7 @@ function renderEliteComparisons(comparisons, benchmarks, bmi) {
         section.innerHTML = `
             <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
                 <p class="text-gray-600">
-                    Add physical metrics in Settings to compare against elite benchmarks.
+                    Add physical performance metrics on the <a href="/physical-metrics" class="text-qadsiah-red underline">Physical Metrics</a> page to compare against elite benchmarks.
                 </p>
             </div>
         `;
@@ -444,40 +465,45 @@ function renderComparisonCard(title, comparison, unit, type) {
 // Load measurements table
 async function loadMeasurements() {
     try {
-        const data = await apiCall('/api/physical-measurements');
+        await ensureStorageReady();
         
-        if (data.success) {
-            const measurements = data.measurements || [];
-            const tbody = document.getElementById('measurementsTableBody');
-            
-            if (measurements.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">No measurements yet. Add your first measurement above.</td></tr>';
-                return;
-            }
-            
-            // Sort by date (newest first)
-            measurements.sort((a, b) => {
-                try {
-                    const dateA = new Date(a.date.split(' ').reverse().join('-'));
-                    const dateB = new Date(b.date.split(' ').reverse().join('-'));
-                    return dateB - dateA;
-                } catch {
-                    return 0;
-                }
-            });
-            
-            tbody.innerHTML = measurements.map(m => `
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${m.date}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${m.height_cm ? m.height_cm.toFixed(1) : '-'}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${m.weight_kg ? m.weight_kg.toFixed(1) : '-'}</td>
-                    <td class="px-6 py-4 text-sm text-gray-500">${m.notes || '-'}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button onclick="deleteMeasurement('${m.id}')" class="text-red-600 hover:text-red-900">Delete</button>
-                    </td>
-                </tr>
-            `).join('');
+        // Check authentication
+        if (!clientAuth.isAuthenticated()) {
+            window.location.href = '/login';
+            return;
         }
+        
+        // Load measurements from client storage
+        const measurements = await clientStorage.getAllPhysicalMeasurements();
+        const tbody = document.getElementById('measurementsTableBody');
+        
+        if (measurements.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">No measurements yet. Add your first measurement above.</td></tr>';
+            return;
+        }
+        
+        // Sort by date (newest first)
+        measurements.sort((a, b) => {
+            try {
+                const dateA = new Date(a.date.split(' ').reverse().join('-'));
+                const dateB = new Date(b.date.split(' ').reverse().join('-'));
+                return dateB - dateA;
+            } catch {
+                return 0;
+            }
+        });
+        
+        tbody.innerHTML = measurements.map(m => `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${m.date || ''}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${m.height_cm ? parseFloat(m.height_cm).toFixed(1) : '-'}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${m.weight_kg ? parseFloat(m.weight_kg).toFixed(1) : '-'}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">${m.notes || '-'}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button onclick="deleteMeasurement('${m.id}')" class="text-red-600 hover:text-red-900">Delete</button>
+                </td>
+            </tr>
+        `).join('');
     } catch (error) {
         console.error('Error loading measurements:', error);
         const tbody = document.getElementById('measurementsTableBody');

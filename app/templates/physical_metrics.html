@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Physical Metrics - FutureElite Tracker{% endblock %}
+{% block title %}Physical Metrics - FutureElite{% endblock %}
 
 {% block content %}
 <div class="px-4 py-6 sm:px-0">
@@ -9,7 +9,7 @@
         <div class="flex justify-between items-center">
             <div>
                 <h1 class="text-3xl font-bold text-gray-900">Physical Performance Metrics</h1>
-                <p class="mt-2 text-lg text-gray-600">{{ settings.club_name }} - {{ settings.player_name }}</p>
+                <p id="physicalMetricsHeader" class="mt-2 text-lg text-gray-600">Loading...</p>
             </div>
             <button onclick="openPhysicalMetricModal()" class="bg-qadsiah-red text-white px-6 py-3 rounded-lg font-medium hover:bg-red-700 transition-colors">
                 Add Metrics
@@ -20,52 +20,9 @@
     <!-- Physical Metrics List -->
     <div class="bg-white shadow rounded-lg">
         <div class="px-4 py-5 sm:p-6">
-            {% if metrics %}
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sprint Speed</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vertical Jump</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agility</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VO2 Max</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="physicalMetricsTableBody" class="bg-white divide-y divide-gray-200">
-                            {% for metric in metrics %}
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ metric.date }}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {% if metric.sprint_speed_ms %}{{ "%.2f"|format(metric.sprint_speed_ms) }} m/s{% elif metric.sprint_speed_kmh %}{{ "%.1f"|format(metric.sprint_speed_kmh) }} km/h{% else %}-{% endif %}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ metric.vertical_jump_cm or '-' }}{% if metric.vertical_jump_cm %} cm{% endif %}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ metric.agility_time_sec or '-' }}{% if metric.agility_time_sec %} sec{% endif %}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ metric.vo2_max or '-' }}{% if metric.vo2_max %} ml/kg/min{% endif %}</td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                    <button onclick="editPhysicalMetric('{{ metric.id }}')" class="text-qadsiah-red hover:text-red-700 mr-3">Edit</button>
-                                    <button onclick="deletePhysicalMetric('{{ metric.id }}')" class="text-red-600 hover:text-red-900">Delete</button>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <div class="text-center py-12">
-                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                    </svg>
-                    <h3 class="mt-2 text-sm font-medium text-gray-900">No physical metrics yet</h3>
-                    <p class="mt-1 text-sm text-gray-500">Get started by adding your first performance metrics.</p>
-                    <div class="mt-6">
-                        <button onclick="openPhysicalMetricModal()" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-qadsiah-red hover:bg-red-700">
-                            Add Metrics
-                        </button>
-                    </div>
-                </div>
-            {% endif %}
+            <div id="physicalMetricsContainer">
+                <p class="text-gray-500 text-center py-12">Loading...</p>
+            </div>
         </div>
     </div>
 </div>
@@ -304,8 +261,8 @@ async function savePhysicalMetric(event) {
         showToast('Physical metrics saved successfully!');
         closePhysicalMetricModal();
         
-        // Reload page to show updated data
-        setTimeout(() => window.location.reload(), 1000);
+        // Reload data to show updated metrics
+        await loadPhysicalMetricsData();
         
     } catch (error) {
         hideLoading();
@@ -326,8 +283,8 @@ async function deletePhysicalMetric(metricId) {
         hideLoading();
         showToast('Physical metric deleted successfully!');
         
-        // Reload page to show updated data
-        setTimeout(() => window.location.reload(), 1000);
+        // Reload data to show updated metrics
+        await loadPhysicalMetricsData();
         
     } catch (error) {
         hideLoading();
@@ -338,6 +295,112 @@ async function deletePhysicalMetric(metricId) {
 function editPhysicalMetric(metricId) {
     openPhysicalMetricModal(metricId);
 }
+
+// Load physical metrics data on page load
+async function loadPhysicalMetricsData() {
+    try {
+        await ensureStorageReady();
+        
+        // Check authentication
+        if (!clientAuth.isAuthenticated()) {
+            window.location.href = '/login';
+            return;
+        }
+        
+        // Load settings
+        const settings = await clientStorage.loadSettings();
+        document.getElementById('physicalMetricsHeader').textContent = 
+            `${settings.club_name || 'Club'} - ${settings.player_name || 'Player'}`;
+        
+        // Load physical metrics
+        const metrics = await clientStorage.getAllPhysicalMetrics();
+        
+        // Sort by date (most recent first)
+        metrics.sort((a, b) => {
+            try {
+                const dateA = new Date(a.date.split(' ').reverse().join('-'));
+                const dateB = new Date(b.date.split(' ').reverse().join('-'));
+                return dateB - dateA;
+            } catch {
+                return 0;
+            }
+        });
+        
+        // Render metrics
+        const container = document.getElementById('physicalMetricsContainer');
+        if (metrics.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-12">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">No physical metrics yet</h3>
+                    <p class="mt-1 text-sm text-gray-500">Get started by adding your first performance metrics.</p>
+                    <div class="mt-6">
+                        <button onclick="openPhysicalMetricModal()" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-qadsiah-red hover:bg-red-700">
+                            Add Metrics
+                        </button>
+                    </div>
+                </div>
+            `;
+        } else {
+            container.innerHTML = `
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sprint Speed</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vertical Jump</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Standing Long Jump</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agility</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Beep Test</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VO2 Max</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="physicalMetricsTableBody" class="bg-white divide-y divide-gray-200">
+                            ${metrics.map(metric => {
+                                let sprintSpeed = '-';
+                                if (metric.sprint_speed_ms) {
+                                    sprintSpeed = `${parseFloat(metric.sprint_speed_ms).toFixed(2)} m/s`;
+                                } else if (metric.sprint_speed_kmh) {
+                                    sprintSpeed = `${parseFloat(metric.sprint_speed_kmh).toFixed(1)} km/h`;
+                                }
+                                
+                                return `
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${metric.date || ''}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${sprintSpeed}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${metric.vertical_jump_cm || '-'}${metric.vertical_jump_cm ? ' cm' : ''}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${metric.standing_long_jump_cm || '-'}${metric.standing_long_jump_cm ? ' cm' : ''}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${metric.agility_time_sec || '-'}${metric.agility_time_sec ? ' sec' : ''}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${metric.beep_test_level || '-'}${metric.beep_test_level ? ' level' : ''}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${metric.vo2_max || '-'}${metric.vo2_max ? ' ml/kg/min' : ''}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                            <button onclick="editPhysicalMetric('${metric.id}')" class="text-qadsiah-red hover:text-red-700 mr-3">Edit</button>
+                                            <button onclick="deletePhysicalMetric('${metric.id}')" class="text-red-600 hover:text-red-900">Delete</button>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+        
+    } catch (error) {
+        console.error('Error loading physical metrics data:', error);
+        showToast('Error loading physical metrics: ' + error.message, 'error');
+    }
+}
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadPhysicalMetricsData();
+});
 </script>
 {% endblock %}
+
 

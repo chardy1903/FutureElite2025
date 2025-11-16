@@ -1,8 +1,8 @@
-# FutureElite Tracker - Delivery Summary
+# FutureElite - Delivery Summary
 
 ## ✅ Project Complete
 
-I have successfully built the **FutureElite Tracker** - a privacy-first, offline desktop application for tracking youth football matches for Brodie Hardy (Al Qadsiah U12).
+I have successfully built **FutureElite** - a privacy-first, offline desktop application for tracking youth football matches for Brodie Hardy (Al Qadsiah U12).
 
 ## 🎯 All Requirements Met
 
@@ -68,7 +68,7 @@ All 7 specified pre-season friendlies are included:
 - **macOS**: `./build_macos.sh`
 
 ### Desktop Shortcuts
-- **Windows**: Create .lnk file pointing to FutureEliteTracker.exe
+- **Windows**: Create .lnk file pointing to FutureElite.exe
 - **macOS**: Drag .app to Applications folder
 
 ## 📁 Project Structure
@@ -117,7 +117,7 @@ All functionality tests pass:
 
 ## 🎉 Ready for Use
 
-The FutureElite Tracker is complete and ready for Brodie's football journey! The application provides a professional, privacy-first solution for tracking youth football matches with beautiful PDF reports.
+FutureElite is complete and ready for Brodie's football journey! The application provides a professional, privacy-first solution for tracking youth football matches with beautiful PDF reports.
 
 **Key Features:**
 - One-click desktop execution
@@ -128,6 +128,7 @@ The FutureElite Tracker is complete and ready for Brodie's football journey! The
 - Pre-loaded sample data
 
 The app is now ready to track Brodie's progress with Al Qadsiah U12! ⚽🏆
+
 
 
 

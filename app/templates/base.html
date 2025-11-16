@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}FutureElite Tracker{% endblock %}</title>
+    <title>{% block title %}FutureElite{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -37,21 +37,27 @@
     <!-- Navigation -->
     <nav class="bg-white shadow-sm border-b">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center flex-1 min-w-0">
                     <div class="flex-shrink-0">
-                        <h1 class="text-xl font-bold text-qadsiah-red">FutureElite Tracker</h1>
+                        <h1 class="text-xl font-bold text-qadsiah-red">FutureElite</h1>
                     </div>
-                    <div class="ml-10 flex space-x-8">
-                        <a href="/" class="text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium">Dashboard</a>
-                        <a href="/matches" class="text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium">Matches</a>
-                        <a href="/achievements" class="text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium">Achievements</a>
-            <a href="/club-history" class="text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium">Club History</a>
-            <a href="/training-camps" class="text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium">Training Camps</a>
-            <a href="/physical-data" class="text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium">Physical Data</a>
-            <a href="/physical-metrics" class="text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium">Performance Metrics</a>
-                        <a href="/settings" class="text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium">Settings</a>
+                    <div id="navLinks" class="ml-6 flex space-x-1 overflow-x-auto" style="display: none;">
+                        <a href="/" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Home</a>
+                        <a href="/dashboard" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Dashboard</a>
+                        <a href="/matches" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Matches</a>
+                        <a href="/achievements" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Achievements</a>
+                        <a href="/physical-data" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Physical</a>
+                        <a href="/physical-metrics" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Performance</a>
+                        <a href="/settings" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Settings</a>
+                        <a href="/subscription" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Subscription</a>
                     </div>
+                </div>
+                <div class="flex items-center flex-shrink-0 ml-4">
+                    <span id="userInfo" class="text-gray-600 px-2 py-2 text-xs sm:text-sm truncate max-w-[120px]" style="display: none;"></span>
+                    <a id="logoutLink" href="#" class="text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap" style="display: none;">Logout</a>
+                    <a href="{{ url_for('auth.login') }}" id="loginLink" class="text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium">Login</a>
+                    <a href="{{ url_for('auth.register') }}" id="registerLink" class="bg-qadsiah-red text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-red-700 whitespace-nowrap">Register</a>
                 </div>
             </div>
         </div>
@@ -217,8 +223,44 @@
                 default: return 'bg-gray-100 text-gray-800';
             }
         }
+
+        // Check authentication on page load
+        document.addEventListener('DOMContentLoaded', async function() {
+            await ensureStorageReady();
+            const isAuth = clientAuth.isAuthenticated();
+            const username = clientAuth.getCurrentUsername();
+            
+            if (isAuth && username) {
+                // Show authenticated UI
+                document.getElementById('navLinks').style.display = 'flex';
+                document.getElementById('userInfo').textContent = username;
+                document.getElementById('userInfo').style.display = 'block';
+                document.getElementById('logoutLink').style.display = 'block';
+                document.getElementById('loginLink').style.display = 'none';
+                document.getElementById('registerLink').style.display = 'none';
+                
+                // Handle logout
+                document.getElementById('logoutLink').addEventListener('click', function(e) {
+                    e.preventDefault();
+                    clientAuth.logout();
+                    window.location.href = '/login';
+                });
+            } else {
+                // Show unauthenticated UI
+                document.getElementById('navLinks').style.display = 'none';
+                document.getElementById('userInfo').style.display = 'none';
+                document.getElementById('logoutLink').style.display = 'none';
+                document.getElementById('loginLink').style.display = 'block';
+                document.getElementById('registerLink').style.display = 'block';
+            }
+        });
     </script>
 
+    <!-- Client-side storage and API -->
+    <script src="{{ url_for('static', filename='js/storage.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+    
     {% block scripts %}{% endblock %}
 </body>
 </html>

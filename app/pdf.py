@@ -2,7 +2,7 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch, mm
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, KeepTogether, Image
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.pdfgen import canvas
 from datetime import datetime
@@ -10,7 +10,7 @@ from typing import List, Dict, Any
 import os
 
 from .models import Match, AppSettings, PhysicalMeasurement, Achievement, ClubHistory, TrainingCamp, PhysicalMetrics
-from .utils import sort_matches_by_date
+from .utils import sort_matches_by_date, filter_matches_by_period
 
 
 class PDFGenerator:
@@ -29,6 +29,21 @@ class PDFGenerator:
         # Create styles
         self.styles = getSampleStyleSheet()
         self._create_custom_styles()
+        
+        # Period tracking
+        self.period = 'all_time'
+    
+    def _get_period_label(self) -> str:
+        """Get human-readable label for the current period"""
+        period_labels = {
+            'all_time': 'All Time',
+            'season': f'Season {self.settings.season_year}',
+            '12_months': 'Last 12 Months',
+            '6_months': 'Last 6 Months',
+            '3_months': 'Last 3 Months',
+            'last_month': 'Last Month'
+        }
+        return period_labels.get(self.period, 'All Time')
 
     def _create_custom_styles(self):
         """Create custom paragraph styles"""
@@ -123,8 +138,22 @@ class PDFGenerator:
             fontName='Helvetica'
         ))
 
-    def generate_pdf(self, matches: List[Match], output_path: str, physical_measurements: List[PhysicalMeasurement] = None) -> str:
-        """Generate the complete PDF report"""
+    def generate_pdf(self, matches: List[Match], output_path: str, physical_measurements: List[PhysicalMeasurement] = None, physical_metrics: List[PhysicalMetrics] = None, period: str = 'all_time') -> str:
+        """Generate the complete PDF report
+        
+        Args:
+            matches: List of all matches
+            output_path: Path to save the PDF
+            physical_measurements: List of physical measurements
+            physical_metrics: List of physical metrics
+            period: Time period filter ('all_time', 'season', '12_months', '6_months', '3_months', 'last_month')
+        """
+        # Filter matches by period if specified
+        if period and period != 'all_time':
+            matches = filter_matches_by_period(matches, period, self.settings.season_year)
+        
+        self.period = period  # Store period for use in sections
+        
         doc = SimpleDocTemplate(
             output_path,
             pagesize=landscape(A4),
@@ -136,48 +165,26 @@ class PDFGenerator:
         
         story = []
         
-        # Add cover page
+        # PAGE 1: Cover page
         story.extend(self._create_cover_page(matches))
         story.append(PageBreak())
         
-        # Add title
-        title = f"{self.settings.club_name} | {self.settings.player_name} Season Tracker {self.settings.season_year}"
-        story.append(Paragraph(title, self.styles['CustomTitle']))
-        story.append(Spacer(1, 12))
+        # PAGE 2: Player profile (simplified) + performance metrics
+        page2_elements = []
+        page2_elements.extend(self._create_player_profile_simplified(physical_metrics or []))
+        page2_elements.append(Spacer(1, 12))
+        page2_elements.extend(self._create_advanced_metrics(matches))
+        story.append(KeepTogether(page2_elements))
+        story.append(PageBreak())
         
-        # Add player profile section
-        story.extend(self._create_player_profile(physical_measurements or []))
-        story.append(Spacer(1, 16))
-        
-        # Add advanced performance metrics
-        story.extend(self._create_advanced_metrics(matches))
-        story.append(Spacer(1, 16))
-        
-        # Add summary table
-        story.extend(self._create_summary_table(matches))
-        story.append(Spacer(1, 16))
-        
-        # Add performance highlights
+        # PAGE 3: Performance highlights
         story.extend(self._create_performance_highlights(matches))
-        story.append(Spacer(1, 16))
+        story.append(PageBreak())
         
-        # Add pre-season friendlies header and table
-        pre_season_matches = [m for m in matches if m.category.value == "Pre-Season Friendly" and not m.is_fixture]
-        if pre_season_matches:
-            story.append(Paragraph("Pre-Season Friendlies", self.styles['SectionHeader']))
-            story.append(Spacer(1, 8))
-            story.extend(self._create_pre_season_table(pre_season_matches))
-            story.append(Spacer(1, 20))
-
-        # Add league matches table
-        league_matches = [m for m in matches if m.category.value == "League" and not m.is_fixture]
-        if league_matches:
-            story.extend(self._create_league_matches_table(league_matches))
-            story.append(Spacer(1, 20))
-
-        # Add league section
-        story.extend(self._create_league_section())
-        story.append(Spacer(1, 20))
+        # PAGE 4: Season match data (all matches combined)
+        all_matches = [m for m in matches if not m.is_fixture]
+        if all_matches:
+            story.extend(self._create_season_matches_table(all_matches))
         
         # Add footer
         story.append(self._create_footer(matches))
@@ -336,12 +343,12 @@ class PDFGenerator:
         
         return elements
 
-    def _create_league_matches_table(self, matches: List[Match]) -> List:
-        """Create the league matches table"""
+    def _create_season_matches_table(self, matches: List[Match]) -> List:
+        """Create the season matches table with header repeating on each page"""
         elements = []
         
         # Section header
-        elements.append(Paragraph("League Matches", self.styles['SectionHeader']))
+        elements.append(Paragraph("Season Match Data", self.styles['SectionHeader']))
         elements.append(Spacer(1, 8))
         
         # Sort matches by date
@@ -395,7 +402,8 @@ class PDFGenerator:
                         wrapped_row.append(Paragraph(str(cell), self.styles['TableCellCenter']))
             wrapped_data.append(wrapped_row)
         
-        table = Table(wrapped_data, colWidths=col_widths)
+        # Use repeatRows=1 to repeat header on each page
+        table = Table(wrapped_data, colWidths=col_widths, repeatRows=1)
         table_style = TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -419,6 +427,10 @@ class PDFGenerator:
         table.setStyle(table_style)
         elements.append(table)
         return elements
+    
+    def _create_league_matches_table(self, matches: List[Match]) -> List:
+        """Create the league matches table (legacy - kept for compatibility)"""
+        return self._create_season_matches_table(matches)
 
     def _create_league_section(self) -> List:
         """Create the league section with group tables"""
@@ -494,53 +506,29 @@ class PDFGenerator:
         footer_text = f"Updated: {latest_date} – Season Summary"
         return Paragraph(footer_text, self.styles['Footer'])
 
-    def _create_player_profile(self, physical_measurements: List[PhysicalMeasurement] = None) -> List:
-        """Create player profile section with physical attributes"""
+    def _create_player_profile_simplified(self, physical_metrics: List[PhysicalMetrics] = None) -> List:
+        """Create simplified player profile section - name, DOB, position, current club, performance metrics"""
         elements = []
         
         elements.append(Paragraph("Player Profile", self.styles['SectionHeader']))
+        elements.append(Spacer(1, 12))
         
-        profile_data = []
-        
-        # Basic info
-        profile_info = []
-        if self.settings.date_of_birth:
-            profile_info.append(f"DOB: {self.settings.date_of_birth}")
-        if self.settings.position:
-            profile_info.append(f"Position: {self.settings.position}")
-        if self.settings.dominant_foot:
-            profile_info.append(f"Foot: {self.settings.dominant_foot}")
-        
-        # Physical attributes
-        physical_info = []
-        if self.settings.height_cm:
-            physical_info.append(f"Height: {self.settings.height_cm} cm")
-        if self.settings.weight_kg:
-            physical_info.append(f"Weight: {self.settings.weight_kg} kg")
-        if self.settings.phv_date:
-            physical_info.append(f"PHV Date: {self.settings.phv_date}")
-        if self.settings.phv_age:
-            physical_info.append(f"PHV Age: {self.settings.phv_age:.1f} years")
-        
-        # Performance attributes
-        perf_info = []
-        if self.settings.sprint_speed_ms:
-            perf_info.append(f"Sprint: {self.settings.sprint_speed_ms:.2f} m/s")
-        elif self.settings.sprint_speed_kmh:
-            perf_info.append(f"Sprint: {self.settings.sprint_speed_kmh:.1f} km/h")
-        if self.settings.vertical_jump_cm:
-            perf_info.append(f"Vertical Jump: {self.settings.vertical_jump_cm} cm")
-        if self.settings.agility_time_sec:
-            perf_info.append(f"Agility: {self.settings.agility_time_sec:.2f} sec")
-        
-        # Create profile table
+        # Build profile data - only essential info
         profile_rows = []
-        if profile_info:
-            profile_rows.append(["Basic Info", " | ".join(profile_info)])
-        if physical_info:
-            profile_rows.append(["Physical", " | ".join(physical_info)])
-        if perf_info:
-            profile_rows.append(["Performance", " | ".join(perf_info)])
+        
+        # Name
+        profile_rows.append(["Name", self.settings.player_name])
+        
+        # Date of Birth
+        if self.settings.date_of_birth:
+            profile_rows.append(["Date of Birth", self.settings.date_of_birth])
+        
+        # Position
+        if self.settings.position:
+            profile_rows.append(["Position", self.settings.position])
+        
+        # Current Club
+        profile_rows.append(["Current Club", self.settings.club_name])
         
         if profile_rows:
             data = [['Attribute', 'Details']] + profile_rows
@@ -564,67 +552,33 @@ class PDFGenerator:
             ])
             profile_table.setStyle(profile_style)
             elements.append(profile_table)
-            
-            # Add historical physical data table if available
-            if physical_measurements and len(physical_measurements) > 0:
-                elements.append(Spacer(1, 12))
-                elements.append(Paragraph("Historical Physical Data", self.styles['SectionHeader']))
-                
-                # Sort measurements by date
-                sorted_measurements = sorted(
-                    [m for m in physical_measurements if m.height_cm is not None],
-                    key=lambda m: datetime.strptime(m.date, "%d %b %Y")
-                )
-                
-                if sorted_measurements:
-                    # Create historical data table
-                    hist_data = [['Date', 'Height (cm)', 'Weight (kg)', 'Notes']]
-                    for m in sorted_measurements:
-                        hist_data.append([
-                            m.date,
-                            f"{m.height_cm:.1f}" if m.height_cm else '-',
-                            f"{m.weight_kg:.1f}" if m.weight_kg else '-',
-                            m.notes or '-'
-                        ])
-                    
-                    hist_table = Table(hist_data, colWidths=[1.5*inch, 1.2*inch, 1.2*inch, 3.1*inch])
-                    hist_style = TableStyle([
-                        ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
-                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                        ('FONTSIZE', (0, 0), (-1, 0), 9),
-                        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                        ('FONTSIZE', (0, 1), (-1, -1), 8.5),
-                        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.light_grey]),
-                        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                        ('ALIGN', (3, 1), (3, -1), 'LEFT'),  # Left align notes
-                        ('LEFTPADDING', (0, 0), (-1, -1), 4),
-                        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                        ('TOPPADDING', (0, 0), (-1, -1), 4),
-                        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-                    ])
-                    hist_table.setStyle(hist_style)
-                    elements.append(hist_table)
-                    
-                    # Add PHV calculation note if available
-                    if self.settings.phv_date and self.settings.phv_age:
-                        phv_note = f"PHV calculated from {len(sorted_measurements)} historical measurements"
-                        elements.append(Spacer(1, 6))
-                        elements.append(Paragraph(phv_note, self.styles['MetricLabel']))
-        else:
-            # Show placeholder if no profile data
-            no_data_msg = "Physical data not yet entered. Navigate to Settings in the app to add player physical metrics."
-            elements.append(Paragraph(no_data_msg, self.styles['TableCell']))
         
         return elements
+    
+    def _create_player_profile(self, physical_measurements: List[PhysicalMeasurement] = None, physical_metrics: List[PhysicalMetrics] = None) -> List:
+        """Create player profile section with physical attributes (legacy - kept for compatibility)"""
+        return self._create_player_profile_simplified(physical_metrics or [])
     
     def _create_advanced_metrics(self, matches: List[Match]) -> List:
         """Create advanced performance metrics section"""
         elements = []
         
         elements.append(Paragraph("Performance Metrics", self.styles['SectionHeader']))
+        
+        # Add period label if not all_time
+        if self.period != 'all_time':
+            period_label = Paragraph(
+                f"<i>Statistics for: {self._get_period_label()}</i>",
+                ParagraphStyle(
+                    name='PeriodLabel',
+                    parent=self.styles['Normal'],
+                    fontSize=9,
+                    textColor=self.dark_grey,
+                    alignment=TA_LEFT,
+                    spaceAfter=6
+                )
+            )
+            elements.append(period_label)
         
         completed_matches = [m for m in matches if not m.is_fixture]
         all_matches = completed_matches
@@ -752,7 +706,7 @@ class PDFGenerator:
             goal_matches = [m for m in sorted_matches if m.brodie_goals > 0]
             if goal_matches:
                 highlights.append(["", ""])  # Spacer
-                highlights.append(["Goal Scoring", f"{len(goal_matches)}/{len(sorted_matches)} matches with goals ({len(goal_matches)/len(sorted_matches)*100:.1f}%)"])
+                highlights.append(["Goal Scoring Consistency", f"{len(goal_matches)}/{len(sorted_matches)} matches with goals ({len(goal_matches)/len(sorted_matches)*100:.1f}%)"])
             
             # Recent form (last 5 matches)
             recent = sorted_matches[-5:] if len(sorted_matches) >= 5 else sorted_matches
@@ -909,8 +863,17 @@ class PDFGenerator:
         return elements
 
 
-def generate_season_pdf(matches: List[Match], settings: AppSettings, output_dir: str = "output", physical_measurements: List[PhysicalMeasurement] = None) -> str:
-    """Generate a season PDF report"""
+def generate_season_pdf(matches: List[Match], settings: AppSettings, output_dir: str = "output", physical_measurements: List[PhysicalMeasurement] = None, physical_metrics: List[PhysicalMetrics] = None, period: str = 'all_time') -> str:
+    """Generate a season PDF report
+    
+    Args:
+        matches: List of all matches
+        settings: App settings
+        output_dir: Output directory
+        physical_measurements: List of physical measurements
+        physical_metrics: List of physical metrics
+        period: Time period filter ('all_time', 'season', '12_months', '6_months', '3_months', 'last_month')
+    """
     # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
     
@@ -921,7 +884,7 @@ def generate_season_pdf(matches: List[Match], settings: AppSettings, output_dir:
     
     # Generate PDF
     generator = PDFGenerator(settings)
-    return generator.generate_pdf(matches, output_path, physical_measurements or [])
+    return generator.generate_pdf(matches, output_path, physical_measurements or [], physical_metrics or [], period=period)
 
 
 def generate_scout_pdf(
@@ -932,9 +895,22 @@ def generate_scout_pdf(
     physical_measurements: List[PhysicalMeasurement] = None,
     training_camps: List[TrainingCamp] = None,
     physical_metrics: List[PhysicalMetrics] = None,
-    output_dir: str = "output"
+    output_dir: str = "output",
+    period: str = 'all_time'
 ) -> str:
-    """Generate a professional scout-friendly PDF report"""
+    """Generate a professional scout-friendly PDF report
+    
+    Args:
+        matches: List of all matches
+        settings: App settings
+        achievements: List of achievements
+        club_history: List of club history entries
+        physical_measurements: List of physical measurements
+        training_camps: List of training camps
+        physical_metrics: List of physical metrics
+        output_dir: Output directory
+        period: Time period filter ('all_time', 'season', '12_months', '6_months', '3_months', 'last_month')
+    """
     # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
     
@@ -946,7 +922,7 @@ def generate_scout_pdf(
     
     # Generate PDF
     generator = ScoutPDFGenerator(settings)
-    return generator.generate_pdf(matches, output_path, achievements, club_history, physical_measurements or [], training_camps or [], physical_metrics or [])
+    return generator.generate_pdf(matches, output_path, achievements, club_history, physical_measurements or [], training_camps or [], physical_metrics or [], period=period)
 
 
 class ScoutPDFGenerator(PDFGenerator):
@@ -960,9 +936,27 @@ class ScoutPDFGenerator(PDFGenerator):
         club_history: List[ClubHistory],
         physical_measurements: List[PhysicalMeasurement] = None,
         training_camps: List[TrainingCamp] = None,
-        physical_metrics: List[PhysicalMetrics] = None
+        physical_metrics: List[PhysicalMetrics] = None,
+        period: str = 'all_time'
     ) -> str:
-        """Generate the complete scout-friendly PDF report"""
+        """Generate the complete scout-friendly PDF report
+        
+        Args:
+            matches: List of all matches
+            output_path: Path to save the PDF
+            achievements: List of achievements
+            club_history: List of club history entries
+            physical_measurements: List of physical measurements
+            training_camps: List of training camps
+            physical_metrics: List of physical metrics
+            period: Time period filter ('all_time', 'season', '12_months', '6_months', '3_months', 'last_month')
+        """
+        # Filter matches by period if specified
+        if period and period != 'all_time':
+            matches = filter_matches_by_period(matches, period, self.settings.season_year)
+        
+        self.period = period  # Store period for use in sections
+        
         doc = SimpleDocTemplate(
             output_path,
             pagesize=A4,  # Portrait for scout reports
@@ -974,47 +968,72 @@ class ScoutPDFGenerator(PDFGenerator):
         
         story = []
         
-        # Add professional title page
+        # PAGE 1: Cover page
         story.extend(self._create_title_page())
         story.append(PageBreak())
         
-        # Add player profile section
-        story.extend(self._create_scout_player_profile(physical_measurements or []))
-        story.append(Spacer(1, 20))
+        # PAGE 2: Player photo & social media links
+        story.extend(self._create_player_media_section())
+        story.append(PageBreak())
         
-        # Add club history
+        # PAGE 3: Club history and training camps
+        club_history_elements = []
+        training_camps_elements = []
+        
         if club_history:
-            story.extend(self._create_club_history_section(club_history))
-            story.append(Spacer(1, 20))
-        
-        # Add training camps (always on a new page)
+            club_history_elements = self._create_club_history_section(club_history)
         if training_camps:
-            story.append(PageBreak())
-            story.extend(self._create_training_camps_section(training_camps))
-            story.append(Spacer(1, 20))
+            training_camps_elements = self._create_training_camps_section(training_camps)
+        
+        # Combine both sections and keep them together on same page
+        if club_history_elements or training_camps_elements:
+            combined_elements = []
+            if club_history_elements:
+                combined_elements.extend(club_history_elements)
+                combined_elements.append(Spacer(1, 12))
+            if training_camps_elements:
+                combined_elements.extend(training_camps_elements)
+            # Use KeepTogether to ensure both sections stay on same page
+            story.append(KeepTogether(combined_elements))
+        story.append(PageBreak())
+        
+        # PAGE 4: Key achievements, physical development, physical performance metrics
+        page4_elements = []
         
         # Add achievements
         if achievements:
-            story.extend(self._create_achievements_section(achievements))
-            story.append(Spacer(1, 20))
+            page4_elements.extend(self._create_achievements_section(achievements))
+            page4_elements.append(Spacer(1, 12))
         
         # Add physical development
         if physical_measurements:
-            story.extend(self._create_physical_development_section(physical_measurements))
-            story.append(Spacer(1, 20))
+            page4_elements.extend(self._create_physical_development_section(physical_measurements))
+            page4_elements.append(Spacer(1, 12))
         
         # Add physical performance metrics
         if physical_metrics:
-            story.extend(self._create_physical_metrics_section(physical_metrics))
-            story.append(Spacer(1, 20))
+            page4_elements.extend(self._create_physical_metrics_section(physical_metrics))
+        
+        # Keep all page 4 content together
+        if page4_elements:
+            story.append(KeepTogether(page4_elements))
+        story.append(PageBreak())
+        
+        # PAGE 5: Performance summary and key statistics
+        page5_elements = []
         
         # Add performance summary
-        story.extend(self._create_performance_summary(matches))
-        story.append(Spacer(1, 20))
+        performance_summary_elements = self._create_performance_summary(matches)
+        if performance_summary_elements:
+            page5_elements.extend(performance_summary_elements)
+            page5_elements.append(Spacer(1, 12))
         
         # Add key statistics
-        story.extend(self._create_key_statistics(matches))
-        story.append(Spacer(1, 20))
+        page5_elements.extend(self._create_key_statistics(matches))
+        
+        # Keep all page 5 content together
+        if page5_elements:
+            story.append(KeepTogether(page5_elements))
         
         # Add footer
         story.append(self._create_footer(matches))
@@ -1076,7 +1095,7 @@ class ScoutPDFGenerator(PDFGenerator):
         
         return elements
     
-    def _create_scout_player_profile(self, physical_measurements: List[PhysicalMeasurement]) -> List:
+    def _create_scout_player_profile(self, physical_measurements: List[PhysicalMeasurement], physical_metrics: List[PhysicalMetrics] = None) -> List:
         """Create comprehensive player profile for scouts"""
         elements = []
         
@@ -1107,15 +1126,31 @@ class ScoutPDFGenerator(PDFGenerator):
             bmi = self.settings.weight_kg / ((self.settings.height_cm / 100) ** 2)
             profile_data.append(["BMI", f"{bmi:.1f}"])
         
-        # Performance Metrics
-        if self.settings.sprint_speed_ms:
-            profile_data.append(["Sprint Speed", f"{self.settings.sprint_speed_ms:.2f} m/s"])
-        elif self.settings.sprint_speed_kmh:
-            profile_data.append(["Sprint Speed", f"{self.settings.sprint_speed_kmh:.1f} km/h"])
-        if self.settings.vertical_jump_cm:
-            profile_data.append(["Vertical Jump", f"{self.settings.vertical_jump_cm:.1f} cm"])
-        if self.settings.agility_time_sec:
-            profile_data.append(["Agility Time", f"{self.settings.agility_time_sec:.2f} sec"])
+        # Performance Metrics - use latest physical metric if available, otherwise fall back to settings
+        latest_metric = None
+        if physical_metrics:
+            sorted_metrics = sorted(physical_metrics, key=lambda x: datetime.strptime(x.date, "%d %b %Y"), reverse=True)
+            latest_metric = sorted_metrics[0] if sorted_metrics else None
+        
+        if latest_metric:
+            if latest_metric.sprint_speed_ms:
+                profile_data.append(["Sprint Speed", f"{latest_metric.sprint_speed_ms:.2f} m/s"])
+            elif latest_metric.sprint_speed_kmh:
+                profile_data.append(["Sprint Speed", f"{latest_metric.sprint_speed_kmh:.1f} km/h"])
+            if latest_metric.vertical_jump_cm:
+                profile_data.append(["Vertical Jump", f"{latest_metric.vertical_jump_cm:.1f} cm"])
+            if latest_metric.agility_time_sec:
+                profile_data.append(["Agility Time", f"{latest_metric.agility_time_sec:.2f} sec"])
+        else:
+            # Fallback to settings for backward compatibility
+            if self.settings.sprint_speed_ms:
+                profile_data.append(["Sprint Speed", f"{self.settings.sprint_speed_ms:.2f} m/s"])
+            elif self.settings.sprint_speed_kmh:
+                profile_data.append(["Sprint Speed", f"{self.settings.sprint_speed_kmh:.1f} km/h"])
+            if self.settings.vertical_jump_cm:
+                profile_data.append(["Vertical Jump", f"{self.settings.vertical_jump_cm:.1f} cm"])
+            if self.settings.agility_time_sec:
+                profile_data.append(["Agility Time", f"{self.settings.agility_time_sec:.2f} sec"])
         
         # PHV Information
         if self.settings.phv_date and self.settings.phv_age:
@@ -1158,12 +1193,83 @@ class ScoutPDFGenerator(PDFGenerator):
         
         return elements
     
+    def _create_player_media_section(self) -> List:
+        """Create player photo and links section"""
+        elements = []
+        
+        # Check if there's any media to display
+        has_photo = self.settings.player_photo_path and os.path.exists(self.settings.player_photo_path)
+        has_highlight_reels = self.settings.highlight_reel_urls and len(self.settings.highlight_reel_urls) > 0
+        has_contact_email = self.settings.contact_email and self.settings.contact_email.strip()
+        
+        # Always show section if there's a photo or contact email (even if no social media)
+        if not (has_photo or has_highlight_reels or has_contact_email):
+            return elements  # No media to display
+        
+        elements.append(Paragraph("Player Media & Links", self.styles['SectionHeader']))
+        elements.append(Spacer(1, 12))
+        
+        # Add player photo if available (centered)
+        if has_photo:
+            try:
+                # Handle both absolute and relative paths
+                photo_path = self.settings.player_photo_path
+                if not os.path.isabs(photo_path):
+                    # Try relative to current working directory first
+                    if not os.path.exists(photo_path):
+                        # Try relative to app directory
+                        app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                        photo_path = os.path.join(app_dir, photo_path)
+                
+                # Load and resize image (max 2.5 inches width, maintain aspect ratio)
+                img = Image(photo_path, width=2.5*inch, height=3*inch, kind='proportional')
+                # Center the image
+                img_table = Table([[img]], colWidths=[7.5*inch])
+                img_style = TableStyle([
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                    ('TOPPADDING', (0, 0), (-1, -1), 0),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+                ])
+                img_table.setStyle(img_style)
+                elements.append(img_table)
+                elements.append(Spacer(1, 12))
+            except Exception as e:
+                # If image loading fails, add a placeholder text
+                elements.append(Paragraph(f"<i>Photo unavailable</i>", self.styles['TableCell']))
+                elements.append(Spacer(1, 12))
+        
+        # Add contact email (below photo)
+        if has_contact_email:
+            elements.append(Paragraph("<b>Contact Email:</b>", self.styles['TableCell']))
+            elements.append(Spacer(1, 4))
+            email_para = Paragraph(
+                f'<a href="mailto:{self.settings.contact_email}" color="blue"><u>{self.settings.contact_email}</u></a>',
+                self.styles['TableCell']
+            )
+            elements.append(email_para)
+            elements.append(Spacer(1, 8))
+        
+        # Add social media section (below photo) - renamed from Highlight Reels
+        if has_highlight_reels:
+            elements.append(Paragraph("<b>Social Media:</b>", self.styles['TableCell']))
+            elements.append(Spacer(1, 4))
+            for url in self.settings.highlight_reel_urls:
+                # Create clickable link using ReportLab's <a> tag with full URL displayed
+                link_para = Paragraph(
+                    f'<a href="{url}" color="blue"><u>{url}</u></a>',
+                    self.styles['TableCell']
+                )
+                elements.append(link_para)
+            elements.append(Spacer(1, 8))
+        
+        return elements
+    
     def _create_club_history_section(self, club_history: List[ClubHistory]) -> List:
         """Create club history section"""
         elements = []
-        
-        elements.append(Paragraph("Club History", self.styles['SectionHeader']))
-        elements.append(Spacer(1, 12))
         
         # Sort by season (most recent first)
         sorted_history = sorted(club_history, key=lambda x: x.season, reverse=True)
@@ -1193,6 +1299,7 @@ class ScoutPDFGenerator(PDFGenerator):
                         wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
             wrapped_history_data.append(wrapped_row)
         
+        # Calculate better column widths for A4 portrait
         history_table = Table(wrapped_history_data, colWidths=[1.8*inch, 1.2*inch, 0.9*inch, 1*inch, 2.1*inch])
         history_style = TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
@@ -1216,16 +1323,17 @@ class ScoutPDFGenerator(PDFGenerator):
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ])
         history_table.setStyle(history_style)
-        elements.append(history_table)
+        
+        # Use KeepTogether to ensure header, spacer, and table stay together on same page
+        header_para = Paragraph("Club History", self.styles['SectionHeader'])
+        spacer = Spacer(1, 12)
+        elements.append(KeepTogether([header_para, spacer, history_table]))
         
         return elements
     
     def _create_achievements_section(self, achievements: List[Achievement]) -> List:
         """Create achievements section"""
         elements = []
-        
-        elements.append(Paragraph("Key Achievements", self.styles['SectionHeader']))
-        elements.append(Spacer(1, 12))
         
         # Sort by date (most recent first)
         sorted_achievements = sorted(
@@ -1280,16 +1388,17 @@ class ScoutPDFGenerator(PDFGenerator):
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ])
         achievements_table.setStyle(achievements_style)
-        elements.append(achievements_table)
+        
+        # Use KeepTogether to ensure header, spacer, and table stay together on same page
+        header_para = Paragraph("Key Achievements", self.styles['SectionHeader'])
+        spacer = Spacer(1, 12)
+        elements.append(KeepTogether([header_para, spacer, achievements_table]))
         
         return elements
     
     def _create_training_camps_section(self, training_camps: List[TrainingCamp]) -> List:
         """Create training camps section"""
         elements = []
-        
-        elements.append(Paragraph("Training Camps Attended", self.styles['SectionHeader']))
-        elements.append(Spacer(1, 12))
         
         # Sort by start date (most recent first)
         sorted_camps = sorted(
@@ -1349,16 +1458,17 @@ class ScoutPDFGenerator(PDFGenerator):
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ])
         camps_table.setStyle(camps_style)
-        elements.append(camps_table)
+        
+        # Use KeepTogether to ensure header, spacer, and table stay together on same page
+        header_para = Paragraph("Training Camps Attended", self.styles['SectionHeader'])
+        spacer = Spacer(1, 12)
+        elements.append(KeepTogether([header_para, spacer, camps_table]))
         
         return elements
     
     def _create_physical_metrics_section(self, physical_metrics: List[PhysicalMetrics]) -> List:
         """Create physical performance metrics section"""
         elements = []
-        
-        elements.append(Paragraph("Physical Performance Metrics", self.styles['SectionHeader']))
-        elements.append(Spacer(1, 12))
         
         # Sort by date (most recent first)
         sorted_metrics = sorted(
@@ -1368,51 +1478,44 @@ class ScoutPDFGenerator(PDFGenerator):
         )
         
         # Create a comprehensive table with key metrics
-        metrics_data = [['Date', 'Sprint', 'Jump', 'Agility', 'VO2 Max', 'Strength']]
+        metrics_data = [['Date', 'Sprint Speed', '10m (s)', '20m (s)', '30m (s)', 'Vertical Jump', 'Standing Long Jump', 'Beep Test']]
         for metric in sorted_metrics:
-            # Sprint info
+            # Sprint speed info
             sprint_str = '-'
             if metric.sprint_speed_ms:
                 sprint_str = f"{metric.sprint_speed_ms:.2f} m/s"
             elif metric.sprint_speed_kmh:
                 sprint_str = f"{metric.sprint_speed_kmh:.1f} km/h"
-            elif metric.sprint_30m_sec:
-                sprint_str = f"30m: {metric.sprint_30m_sec:.2f}s"
+            else:
+                sprint_str = '-'
             
-            # Jump info
-            jump_str = '-'
+            # Sprint times
+            sprint_10m_str = f"{metric.sprint_10m_sec:.2f}" if metric.sprint_10m_sec else '-'
+            sprint_20m_str = f"{metric.sprint_20m_sec:.2f}" if metric.sprint_20m_sec else '-'
+            sprint_30m_str = f"{metric.sprint_30m_sec:.2f}" if metric.sprint_30m_sec else '-'
+            
+            # Vertical Jump info
+            vertical_jump_str = '-'
             if metric.vertical_jump_cm:
-                jump_str = f"{metric.vertical_jump_cm:.1f} cm"
+                vertical_jump_str = f"{metric.vertical_jump_cm:.1f} cm"
             elif metric.countermovement_jump_cm:
-                jump_str = f"CMJ: {metric.countermovement_jump_cm:.1f} cm"
-            elif metric.standing_long_jump_cm:
-                jump_str = f"SLJ: {metric.standing_long_jump_cm:.1f} cm"
+                vertical_jump_str = f"CMJ: {metric.countermovement_jump_cm:.1f} cm"
             
-            # Agility
-            agility_str = f"{metric.agility_time_sec:.2f} sec" if metric.agility_time_sec else '-'
+            # Standing Long Jump info
+            standing_long_jump_str = f"{metric.standing_long_jump_cm:.1f} cm" if metric.standing_long_jump_cm else '-'
             
-            # VO2 Max
-            vo2_str = f"{metric.vo2_max:.1f}" if metric.vo2_max else '-'
-            
-            # Strength (show best of the three)
-            strength_str = '-'
-            strengths = []
-            if metric.bench_press_kg:
-                strengths.append(f"BP: {metric.bench_press_kg:.1f}kg")
-            if metric.squat_kg:
-                strengths.append(f"SQ: {metric.squat_kg:.1f}kg")
-            if metric.deadlift_kg:
-                strengths.append(f"DL: {metric.deadlift_kg:.1f}kg")
-            if strengths:
-                strength_str = ', '.join(strengths[:2])  # Show max 2
+            # Beep Test
+            beep_test_str = f"{metric.beep_test_level:.1f}" if metric.beep_test_level else '-'
             
             metrics_data.append([
                 metric.date,
                 sprint_str,
-                jump_str,
-                agility_str,
-                vo2_str,
-                strength_str
+                sprint_10m_str,
+                sprint_20m_str,
+                sprint_30m_str,
+                vertical_jump_str,
+                standing_long_jump_str,
+                beep_test_str
             ])
         
         # Convert to Paragraph objects for proper text wrapping
@@ -1426,27 +1529,48 @@ class ScoutPDFGenerator(PDFGenerator):
                     wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
             wrapped_metrics_data.append(wrapped_row)
         
-        metrics_table = Table(wrapped_metrics_data, colWidths=[1.2*inch, 1.3*inch, 1.2*inch, 1*inch, 0.9*inch, 1.4*inch])
+        # Calculate better column widths for A4 portrait (8.27 inches total width, minus margins)
+        # Using approximately 7.5 inches for table width
+        metrics_table = Table(wrapped_metrics_data, colWidths=[
+            0.85*inch,  # Date
+            1.0*inch,   # Sprint Speed
+            0.7*inch,   # 10m
+            0.7*inch,   # 20m
+            0.7*inch,   # 30m
+            1.0*inch,   # Vertical Jump
+            1.1*inch,   # Standing Long Jump
+            0.75*inch   # Beep Test
+        ])
         metrics_style = TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
             ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
             ('ALIGN', (0, 1), (0, -1), 'CENTER'),  # Date
-            ('ALIGN', (1, 1), (-1, -1), 'LEFT'),  # Other columns
+            ('ALIGN', (1, 1), (1, -1), 'CENTER'),  # Sprint Speed
+            ('ALIGN', (2, 1), (2, -1), 'CENTER'),  # 10m
+            ('ALIGN', (3, 1), (3, -1), 'CENTER'),  # 20m
+            ('ALIGN', (4, 1), (4, -1), 'CENTER'),  # 30m
+            ('ALIGN', (5, 1), (5, -1), 'CENTER'),  # Vertical Jump
+            ('ALIGN', (6, 1), (6, -1), 'CENTER'),  # Standing Long Jump
+            ('ALIGN', (7, 1), (7, -1), 'CENTER'),  # Beep Test
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.light_grey]),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
         ])
         metrics_table.setStyle(metrics_style)
-        elements.append(metrics_table)
+        
+        # Use KeepTogether to ensure header and table stay on same page
+        header_para = Paragraph("Physical Performance Metrics", self.styles['SectionHeader'])
+        spacer = Spacer(1, 12)
+        elements.append(KeepTogether([header_para, spacer, metrics_table]))
         
         return elements
     
@@ -1516,19 +1640,32 @@ class ScoutPDFGenerator(PDFGenerator):
         """Create performance summary section"""
         elements = []
         
-        elements.append(Paragraph("Performance Summary", self.styles['SectionHeader']))
-        elements.append(Spacer(1, 12))
-        
         completed_matches = [m for m in matches if not m.is_fixture]
         if not completed_matches:
             elements.append(Paragraph("No match data available.", self.styles['TableCell']))
             return elements
         
+        # Add period label if not all_time
+        if self.period != 'all_time':
+            period_label = Paragraph(
+                f"<i>Statistics for: {self._get_period_label()}</i>",
+                ParagraphStyle(
+                    name='PeriodLabel',
+                    parent=self.styles['Normal'],
+                    fontSize=9,
+                    textColor=self.dark_grey,
+                    alignment=TA_LEFT,
+                    spaceAfter=6
+                )
+            )
+            elements.append(period_label)
+        
         # Calculate overall stats
         total_stats = self._calculate_category_stats(completed_matches)
         
-        # Create summary cards
+        # Create summary table with proper header
         summary_data = [
+            ['Metric', 'Value'],  # Header row
             ['Total Matches', str(total_stats['matches'])],
             ['Total Goals', str(total_stats['goals'])],
             ['Total Assists', str(total_stats['assists'])],
@@ -1553,7 +1690,7 @@ class ScoutPDFGenerator(PDFGenerator):
                         wrapped_row.append(Paragraph(str(cell), self.styles['TableCellCenter']))
             wrapped_summary_data.append(wrapped_row)
         
-        summary_table = Table(wrapped_summary_data, colWidths=[3.5*inch, 3.5*inch])
+        summary_table = Table(wrapped_summary_data, colWidths=[3.5*inch, 3.5*inch], repeatRows=1)
         summary_style = TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -1572,7 +1709,11 @@ class ScoutPDFGenerator(PDFGenerator):
             ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
         ])
         summary_table.setStyle(summary_style)
-        elements.append(summary_table)
+        
+        # Use KeepTogether to ensure header, spacer, and table stay together on same page
+        header_para = Paragraph("Performance Summary", self.styles['SectionHeader'])
+        spacer = Spacer(1, 12)
+        elements = [KeepTogether([header_para, spacer, summary_table])]
         
         return elements
     
@@ -1581,6 +1722,22 @@ class ScoutPDFGenerator(PDFGenerator):
         elements = []
         
         elements.append(Paragraph("Key Performance Metrics", self.styles['SectionHeader']))
+        
+        # Add period label if not all_time
+        if self.period != 'all_time':
+            period_label = Paragraph(
+                f"<i>Statistics for: {self._get_period_label()}</i>",
+                ParagraphStyle(
+                    name='PeriodLabel',
+                    parent=self.styles['Normal'],
+                    fontSize=9,
+                    textColor=self.dark_grey,
+                    alignment=TA_LEFT,
+                    spaceAfter=6
+                )
+            )
+            elements.append(period_label)
+        
         elements.append(Spacer(1, 12))
         
         completed_matches = [m for m in matches if not m.is_fixture]

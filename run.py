@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
-FutureElite Tracker - Main Entry Point
+FutureElite - Main Entry Point
 Privacy-First Youth Football Match Tracker for Brodie Hardy (Al Qadsiah U12)
+
+Copyright (c) 2025 [Your Name]. All Rights Reserved.
+This software is proprietary and confidential. Unauthorized copying, modification,
+distribution, or use of this software, via any medium, is strictly prohibited.
 """
 
 import sys

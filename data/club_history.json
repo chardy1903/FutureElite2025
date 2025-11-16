@@ -6,7 +6,8 @@
     "age_group": "U12",
     "position": "Forward",
     "achievements": "Pre-season top scorer, 11 goals in 14 games",
-    "notes": ""
+    "notes": "",
+    "user_id": "20251115_221430"
   },
   {
     "id": "20251115_130643",
@@ -15,7 +16,8 @@
     "age_group": "U11",
     "position": "Right Winger",
     "achievements": "Academy Player of the Year, Ramadam Cup Player of the Tournament",
-    "notes": ""
+    "notes": "",
+    "user_id": "20251115_221430"
   },
   {
     "id": "20251115_130749",
@@ -24,7 +26,8 @@
     "age_group": "U10",
     "position": "Right Winger",
     "achievements": "",
-    "notes": ""
+    "notes": "",
+    "user_id": "20251115_221430"
   },
   {
     "id": "20251115_130826",
@@ -33,7 +36,8 @@
     "age_group": "U9",
     "position": "Midfielder",
     "achievements": "",
-    "notes": ""
+    "notes": "",
+    "user_id": "20251115_221430"
   },
   {
     "id": "20251115_133159",
@@ -42,6 +46,7 @@
     "age_group": "Foundation and development age groups",
     "position": "Various",
     "achievements": "Consistently attended structured technical and physical development sessions. Built core skills, game understanding, and regular training habits.",
-    "notes": ""
+    "notes": "",
+    "user_id": "20251115_221430"
   }
 ]

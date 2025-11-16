@@ -1,1 +1,26 @@
-[]
+[
+  {
+    "id": "20251116_140918",
+    "date": "16 Nov 2025",
+    "sprint_speed_ms": 6.67,
+    "sprint_speed_kmh": 24.0,
+    "sprint_10m_sec": 1.75,
+    "sprint_20m_sec": 3.19,
+    "sprint_30m_sec": 4.5,
+    "vertical_jump_cm": 80.0,
+    "standing_long_jump_cm": 200.0,
+    "countermovement_jump_cm": null,
+    "agility_time_sec": null,
+    "yo_yo_test_level": null,
+    "beep_test_level": 5.9,
+    "bench_press_kg": null,
+    "squat_kg": null,
+    "deadlift_kg": null,
+    "vo2_max": null,
+    "max_heart_rate": null,
+    "resting_heart_rate": null,
+    "sit_and_reach_cm": null,
+    "notes": "",
+    "user_id": "20251115_221430"
+  }
+]

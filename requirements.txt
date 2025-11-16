@@ -1,0 +1,8 @@
+Flask>=2.0.0
+flask-login>=0.6.0
+pydantic>=1.8.0
+reportlab>=3.6.0
+openpyxl>=3.0.0
+stripe>=7.0.0
+python-dotenv>=1.0.0
+

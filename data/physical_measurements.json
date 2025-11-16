@@ -4,41 +4,47 @@
     "date": "01 Nov 2025",
     "height_cm": 168.0,
     "weight_kg": 53.0,
-    "notes": null
+    "notes": null,
+    "user_id": "20251115_221430"
   },
   {
     "id": "20251115_123004",
     "date": "15 Sep 2025",
     "height_cm": 167.0,
     "weight_kg": 48.0,
-    "notes": null
+    "notes": null,
+    "user_id": "20251115_221430"
   },
   {
     "id": "20251115_123037",
     "date": "31 May 2025",
     "height_cm": 164.0,
     "weight_kg": null,
-    "notes": null
+    "notes": null,
+    "user_id": "20251115_221430"
   },
   {
     "id": "20251115_123120",
     "date": "15 Mar 2025",
     "height_cm": 161.5,
     "weight_kg": 44.3,
-    "notes": null
+    "notes": null,
+    "user_id": "20251115_221430"
   },
   {
     "id": "20251115_123148",
     "date": "15 Dec 2024",
     "height_cm": 160.0,
     "weight_kg": null,
-    "notes": null
+    "notes": null,
+    "user_id": "20251115_221430"
   },
   {
     "id": "20251115_123211",
     "date": "15 Nov 2022",
     "height_cm": 148.0,
     "weight_kg": null,
-    "notes": null
+    "notes": null,
+    "user_id": "20251115_221430"
   }
 ]

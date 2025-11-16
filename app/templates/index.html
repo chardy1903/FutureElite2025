@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - FutureElite Tracker{% endblock %}
+{% block title %}Dashboard - FutureElite{% endblock %}
 
 {% block content %}
 <div class="px-4 py-6 sm:px-0">
     <!-- Header -->
     <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">{{ settings.club_name }} - {{ settings.player_name }}</h1>
-        <p class="mt-2 text-lg text-gray-600">Season {{ settings.season_year }}</p>
+        <h1 id="dashboardTitle" class="text-3xl font-bold text-gray-900">Loading...</h1>
+        <p id="dashboardSeason" class="mt-2 text-lg text-gray-600"></p>
     </div>
 
     <!-- Action Buttons -->
@@ -32,40 +32,19 @@
     <!-- Season Stats -->
     <div class="bg-white shadow rounded-lg mb-8">
         <div class="px-4 py-5 sm:p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Season Summary</h3>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-qadsiah-red">{{ season_stats.total_matches }}</div>
-                    <div class="text-sm text-gray-600">Matches</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-green-600">{{ season_stats.wins }}</div>
-                    <div class="text-sm text-gray-600">Wins</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-yellow-600">{{ season_stats.draws }}</div>
-                    <div class="text-sm text-gray-600">Draws</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-red-600">{{ season_stats.losses }}</div>
-                    <div class="text-sm text-gray-600">Losses</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-blue-600">{{ season_stats.goals }}</div>
-                    <div class="text-sm text-gray-600">Goals</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-purple-600">{{ season_stats.assists }}</div>
-                    <div class="text-sm text-gray-600">Assists</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-indigo-600">{{ season_stats.minutes }}</div>
-                    <div class="text-sm text-gray-600">Minutes</div>
-                </div>
-                <div class="text-center">
-                    <div class="text-2xl font-bold text-gray-600">{{ "%.1f"|format(season_stats.minutes / (season_stats.total_matches if season_stats.total_matches > 0 else 1)) }}</div>
-                    <div class="text-sm text-gray-600">Avg Minutes</div>
-                </div>
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-medium text-gray-900">Statistics Summary</h3>
+                <select id="statsPeriod" onchange="updateStatsPeriod()" class="text-sm border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                    <option value="all_time">All Time</option>
+                    <option value="season" selected>Current Season</option>
+                    <option value="12_months">Last 12 Months</option>
+                    <option value="6_months">Last 6 Months</option>
+                    <option value="3_months">Last 3 Months</option>
+                    <option value="last_month">Last Month</option>
+                </select>
+            </div>
+            <div id="statsContainer" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <!-- Stats will be loaded client-side -->
             </div>
         </div>
     </div>
@@ -75,35 +54,9 @@
         <div class="bg-white shadow rounded-lg">
             <div class="px-4 py-5 sm:p-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">Recent Matches</h3>
-                {% if matches %}
-                    <div class="space-y-3">
-                        {% for match in matches %}
-                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div class="flex-1">
-                                <div class="flex items-center space-x-2">
-                                    <span class="text-sm font-medium text-gray-900">{{ match.opponent }}</span>
-                                    <span class="px-2 py-1 text-xs rounded-full {% if match.category.value == 'Pre-Season Friendly' %}bg-blue-100 text-blue-800{% elif match.category.value == 'League' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
-                                        {{ match.category.value }}
-                                    </span>
-                                </div>
-                                <div class="text-sm text-gray-600">{{ match.date }} • {{ match.location }}</div>
-                                {% if match.result %}
-                                <div class="text-sm {% if match.result.value == 'Win' %}text-green-600{% elif match.result.value == 'Draw' %}text-yellow-600{% elif match.result.value == 'Loss' %}text-red-600{% else %}text-gray-600{% endif %}">
-                                    {{ match.result.value }} {{ match.score or '' }}
-                                </div>
-                                {% endif %}
-                            </div>
-                            <div class="text-right">
-                                <div class="text-sm font-medium text-gray-900">{{ match.brodie_goals }}G {{ match.brodie_assists }}A</div>
-                                <div class="text-xs text-gray-600">{{ match.minutes_played }}m</div>
-                                <button onclick="editMatch('{{ match.id }}')" class="mt-2 text-qadsiah-red hover:text-red-700 text-sm font-medium">Edit</button>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <p class="text-gray-500 text-center py-4">No matches logged yet</p>
-                {% endif %}
+                <div id="recentMatchesContainer">
+                    <p class="text-gray-500 text-center py-4">Loading...</p>
+                </div>
             </div>
         </div>
 
@@ -111,44 +64,9 @@
         <div class="bg-white shadow rounded-lg">
             <div class="px-4 py-5 sm:p-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">Recent Achievements</h3>
-                {% if achievements %}
-                    <div class="space-y-3">
-                        {% for achievement in achievements %}
-                        <div class="flex items-start justify-between p-3 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-lg border border-yellow-200">
-                            <div class="flex-1">
-                                <div class="flex items-center space-x-2 mb-1">
-                                    <span class="text-sm font-semibold text-gray-900">{{ achievement.title }}</span>
-                                    <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 font-medium">
-                                        {{ achievement.category }}
-                                    </span>
-                                </div>
-                                {% if achievement.description %}
-                                <div class="text-sm text-gray-700 mb-1">{{ achievement.description }}</div>
-                                {% endif %}
-                                <div class="flex items-center space-x-2 text-xs text-gray-500">
-                                    <span>{{ achievement.date }}</span>
-                                    {% if achievement.season %}
-                                    <span>•</span>
-                                    <span>{{ achievement.season }}</span>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    <div class="mt-4 text-center">
-                        <a href="/achievements" class="text-sm text-qadsiah-red hover:text-red-700 font-medium">
-                            View All Achievements →
-                        </a>
-                    </div>
-                {% else %}
-                    <div class="text-center py-8">
-                        <p class="text-gray-500 mb-2">No achievements yet</p>
-                        <a href="/achievements" class="text-sm text-qadsiah-red hover:text-red-700 font-medium">
-                            Add Your First Achievement →
-                        </a>
-                    </div>
-                {% endif %}
+                <div id="recentAchievementsContainer">
+                    <p class="text-gray-500 text-center py-4">Loading...</p>
+                </div>
             </div>
         </div>
     </div>
@@ -417,8 +335,20 @@ async function generateScoutPDF() {
     try {
         showLoading('Generating scout report...');
         
+        // Get current period selection
+        const period = document.getElementById('statsPeriod')?.value || 'all_time';
+        
+        // Get all data from client storage
+        await ensureStorageReady();
+        const data = await clientStorage.exportData();
+        data.period = period;
+        
         const response = await fetch('/scout-pdf', {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
         });
         
         if (!response.ok) {
@@ -451,7 +381,21 @@ async function generatePDF() {
     try {
         showLoading('Generating PDF...');
         
-        const response = await fetch('/pdf', { method: 'POST' });
+        // Get current period selection
+        const period = document.getElementById('statsPeriod')?.value || 'all_time';
+        
+        // Get all data from client storage
+        await ensureStorageReady();
+        const data = await clientStorage.exportData();
+        data.period = period;
+        
+        const response = await fetch('/pdf', { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
         
         if (!response.ok) {
             throw new Error('Failed to generate PDF');
@@ -492,13 +436,16 @@ async function exportData() {
     try {
         showLoading('Exporting data...');
         
-        const response = await fetch('/export');
-        const blob = await response.blob();
+        await ensureStorageReady();
+        const data = await clientStorage.exportData();
         
+        // Create JSON file (or ZIP if JSZip is available)
+        const jsonStr = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'FutureElite_Backup.zip';
+        a.download = 'FutureElite_Backup.json';
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
@@ -511,6 +458,7 @@ async function exportData() {
     } catch (error) {
         hideLoading();
         console.error('Error exporting data:', error);
+        showToast('Error exporting data: ' + error.message, 'error');
     }
 }
 
@@ -526,24 +474,19 @@ async function importData() {
     try {
         showLoading('Importing data...');
         
-        const formData = new FormData();
-        formData.append('file', file);
+        await ensureStorageReady();
         
-        const response = await fetch('/import', {
-            method: 'POST',
-            body: formData
-        });
+        // Read file as text
+        const text = await file.text();
+        const data = JSON.parse(text);
         
-        const result = await response.json();
+        // Import data
+        await clientStorage.importData(data);
         
-        if (result.success) {
-            hideLoading();
-            showToast('Data imported successfully!');
-            closeExportModal();
-            setTimeout(() => window.location.reload(), 1000);
-        } else {
-            throw new Error(result.errors.join(', '));
-        }
+        hideLoading();
+        showToast('Data imported successfully!');
+        closeExportModal();
+        setTimeout(() => window.location.reload(), 1000);
         
     } catch (error) {
         hideLoading();
@@ -562,6 +505,14 @@ async function importExcelData() {
     }
     
     try {
+        await ensureStorageReady();
+        
+        // Check authentication
+        if (!clientAuth.isAuthenticated()) {
+            showToast('Please log in to import data', 'error');
+            return;
+        }
+        
         showLoading('Importing Excel file...');
         
         const formData = new FormData();
@@ -579,6 +530,46 @@ async function importExcelData() {
         const result = await response.json();
         
         if (result.success) {
+            // Save matches to client-side storage
+            const importedMatches = result.matches || [];
+            
+            const currentUserId = clientStorage.getCurrentUserId();
+            if (!currentUserId) {
+                throw new Error('User must be logged in to import data');
+            }
+            
+            if (importMode === 'replace') {
+                // Replace mode: delete all existing matches for current user, then add imported ones
+                const existingMatches = await clientStorage.getAllMatches();
+                
+                // Delete all current user's matches
+                for (const match of existingMatches) {
+                    if (match.user_id === currentUserId) {
+                        await clientStorage.deleteMatch(match.id);
+                    }
+                }
+                
+                // Add imported matches with current user_id
+                for (const matchData of importedMatches) {
+                    matchData.user_id = currentUserId;
+                    await clientStorage.saveMatch(matchData);
+                }
+            } else {
+                // Append mode: add imported matches, ensuring unique IDs
+                const existingMatches = await clientStorage.getAllMatches();
+                const existingIds = new Set(existingMatches.map(m => m.id));
+                
+                for (const matchData of importedMatches) {
+                    // Ensure unique ID
+                    if (existingIds.has(matchData.id)) {
+                        matchData.id = 'match_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    }
+                    matchData.user_id = currentUserId;
+                    await clientStorage.saveMatch(matchData);
+                    existingIds.add(matchData.id);
+                }
+            }
+            
             hideLoading();
             const message = `Successfully imported ${result.imported} matches${result.errors.length > 0 ? ' (with some warnings)' : ''}!`;
             showToast(message, 'success');
@@ -586,7 +577,13 @@ async function importExcelData() {
                 console.warn('Import warnings:', result.errors);
             }
             closeExportModal();
-            setTimeout(() => window.location.reload(), 1000);
+            
+            // Reload dashboard data instead of full page reload
+            if (typeof loadDashboardData === 'function') {
+                await loadDashboardData();
+            } else {
+                setTimeout(() => window.location.reload(), 1000);
+            }
         } else {
             throw new Error(result.errors.join(', '));
         }
@@ -619,5 +616,175 @@ function getCategoryBadgeColor(category) {
         default: return 'bg-gray-100 text-gray-800';
     }
 }
+
+async function loadDashboardData() {
+    try {
+        await ensureStorageReady();
+        
+        // Check authentication
+        if (!clientAuth.isAuthenticated()) {
+            window.location.href = '/login';
+            return;
+        }
+        
+        // Load settings
+        const settings = await clientStorage.loadSettings();
+        document.getElementById('dashboardTitle').textContent = 
+            `${settings.club_name || 'Club'} - ${settings.player_name || 'Player'}`;
+        document.getElementById('dashboardSeason').textContent = 
+            settings.season_year ? `Season ${settings.season_year}` : '';
+        
+        // Load and display stats
+        await updateStatsPeriod();
+        
+        // Load recent matches
+        const matches = await clientStorage.getAllMatches();
+        const recentMatches = matches
+            .filter(m => !m.is_fixture)
+            .sort((a, b) => {
+                try {
+                    const dateA = new Date(a.date.split(' ').reverse().join('-'));
+                    const dateB = new Date(b.date.split(' ').reverse().join('-'));
+                    return dateB - dateA;
+                } catch {
+                    return 0;
+                }
+            })
+            .slice(0, 5);
+        
+        const matchesContainer = document.getElementById('recentMatchesContainer');
+        if (recentMatches.length === 0) {
+            matchesContainer.innerHTML = '<p class="text-gray-500 text-center py-4">No matches logged yet</p>';
+        } else {
+            matchesContainer.innerHTML = recentMatches.map(match => `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-3">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm font-medium text-gray-900">${match.opponent || 'Unknown'}</span>
+                            <span class="px-2 py-1 text-xs rounded-full ${getCategoryBadgeColor(match.category || '')}">
+                                ${match.category || ''}
+                            </span>
+                        </div>
+                        <div class="text-sm text-gray-600">${match.date || ''} • ${match.location || ''}</div>
+                        ${match.result ? `<div class="text-sm ${getResultColor(match.result)}">${match.result} ${match.score || ''}</div>` : ''}
+                    </div>
+                    <div class="text-right">
+                        <div class="text-sm font-medium text-gray-900">${match.brodie_goals || 0}G ${match.brodie_assists || 0}A</div>
+                        <div class="text-xs text-gray-600">${match.minutes_played || 0}m</div>
+                        <button onclick="editMatch('${match.id}')" class="mt-2 text-qadsiah-red hover:text-red-700 text-sm font-medium">Edit</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Load recent achievements
+        const achievements = await clientStorage.getAllAchievements();
+        const recentAchievements = achievements
+            .sort((a, b) => {
+                try {
+                    const dateA = new Date(a.date.split(' ').reverse().join('-'));
+                    const dateB = new Date(b.date.split(' ').reverse().join('-'));
+                    return dateB - dateA;
+                } catch {
+                    return 0;
+                }
+            })
+            .slice(0, 5);
+        
+        const achievementsContainer = document.getElementById('recentAchievementsContainer');
+        if (recentAchievements.length === 0) {
+            achievementsContainer.innerHTML = `
+                <div class="text-center py-8">
+                    <p class="text-gray-500 mb-2">No achievements yet</p>
+                    <a href="/achievements" class="text-sm text-qadsiah-red hover:text-red-700 font-medium">
+                        Add Your First Achievement →
+                    </a>
+                </div>
+            `;
+        } else {
+            achievementsContainer.innerHTML = recentAchievements.map(ach => `
+                <div class="flex items-start justify-between p-3 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-lg border border-yellow-200 mb-3">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-2 mb-1">
+                            <span class="text-sm font-semibold text-gray-900">${ach.title || ''}</span>
+                            <span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800 font-medium">
+                                ${ach.category || ''}
+                            </span>
+                        </div>
+                        ${ach.description ? `<div class="text-sm text-gray-700 mb-1">${ach.description}</div>` : ''}
+                        <div class="flex items-center space-x-2 text-xs text-gray-500">
+                            <span>${ach.date || ''}</span>
+                            ${ach.season ? `<span>•</span><span>${ach.season}</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('') + `
+                <div class="mt-4 text-center">
+                    <a href="/achievements" class="text-sm text-qadsiah-red hover:text-red-700 font-medium">
+                        View All Achievements →
+                    </a>
+                </div>
+            `;
+        }
+        
+    } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        showToast('Error loading dashboard: ' + error.message, 'error');
+    }
+}
+
+async function updateStatsPeriod() {
+    const period = document.getElementById('statsPeriod').value;
+    const container = document.getElementById('statsContainer');
+    
+    try {
+        await ensureStorageReady();
+        const stats = await clientStorage.getSeasonStats(null, period);
+        const avgMinutes = stats.total_matches > 0 ? (stats.minutes / stats.total_matches).toFixed(1) : '0.0';
+        
+        container.innerHTML = `
+            <div class="text-center">
+                <div class="text-2xl font-bold text-qadsiah-red">${stats.total_matches}</div>
+                <div class="text-sm text-gray-600">Matches</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold text-green-600">${stats.wins}</div>
+                <div class="text-sm text-gray-600">Wins</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold text-yellow-600">${stats.draws}</div>
+                <div class="text-sm text-gray-600">Draws</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold text-red-600">${stats.losses}</div>
+                <div class="text-sm text-gray-600">Losses</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold text-blue-600">${stats.goals}</div>
+                <div class="text-sm text-gray-600">Goals</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold text-purple-600">${stats.assists}</div>
+                <div class="text-sm text-gray-600">Assists</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold text-indigo-600">${stats.minutes}</div>
+                <div class="text-sm text-gray-600">Minutes</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold text-gray-600">${avgMinutes}</div>
+                <div class="text-sm text-gray-600">Avg Minutes</div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error updating statistics:', error);
+        showToast('Error loading statistics: ' + error.message, 'error');
+    }
+}
+
+// Load dashboard data on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboardData();
+});
 </script>
 {% endblock %}

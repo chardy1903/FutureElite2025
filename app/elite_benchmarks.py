@@ -562,3 +562,4 @@ def compare_to_elite(
         'description': benchmark.get('description', '')
     }
 
+

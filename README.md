@@ -1,4 +1,4 @@
-# FutureElite Tracker
+# FutureElite
 
 A privacy-first, offline desktop application for tracking youth football (soccer) matches. Built specifically for Brodie Hardy of Al Qadsiah U12, this app allows you to log matches, track statistics, and generate professional PDF reports.
 
@@ -67,13 +67,13 @@ Run the PowerShell build script:
 .\build_windows.ps1
 ```
 
-This creates `dist\FutureEliteTracker.exe` - a single-file executable.
+This creates `dist\FutureElite.exe` - a single-file executable.
 
 **Creating a Desktop Shortcut:**
 1. Right-click on your desktop
 2. Select "New" > "Shortcut"
-3. Browse to `dist\FutureEliteTracker.exe`
-4. Name it "FutureElite Tracker"
+3. Browse to `dist\FutureElite.exe`
+4. Name it "FutureElite"
 5. Click "Finish"
 
 ### macOS
@@ -84,10 +84,10 @@ Run the shell build script:
 ./build_macos.sh
 ```
 
-This creates `dist\FutureEliteTracker.app` - a macOS application bundle.
+This creates `dist\FutureElite.app` - a macOS application bundle.
 
 **Installing the App:**
-1. Drag `FutureEliteTracker.app` to your Applications folder
+1. Drag `FutureElite.app` to your Applications folder
 2. Double-click the app in Applications to run it
 3. On first run, you may need to right-click and select "Open" due to macOS security
 
@@ -289,11 +289,18 @@ Potential features for future versions:
 
 ## 📄 License
 
+**Copyright (c) 2025 [Your Name]. All Rights Reserved.**
+
+This software is proprietary and confidential. Unauthorized copying, modification, 
+distribution, or use of this software, via any medium, is strictly prohibited.
+
+See [LICENSE](LICENSE) for full terms and conditions.
+
 This project is built for personal use. All data remains private and local to your device.
 
 ---
 
-**FutureElite Tracker** - Tracking Brodie's journey to football excellence! ⚽🏆
+**FutureElite** - Tracking Brodie's journey to football excellence! ⚽🏆
 
 
 

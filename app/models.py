@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict
 from pydantic import BaseModel, Field, validator
 from enum import Enum
 
@@ -76,7 +76,7 @@ class AppSettings(BaseModel):
     player_name: str = "Brodie Hardy"
     primary_color: str = "#B22222"  # Qadsiah red
     header_color: str = "#1F2937"   # Header grey
-    footer_text: str = "FutureElite Tracker - Privacy First"
+    footer_text: str = "FutureElite - Privacy First"
     show_logo: bool = False
     league_name: str = "Eastern Province U12 League 2025/26"
     
@@ -105,6 +105,12 @@ class AppSettings(BaseModel):
     dominant_foot: Optional[str] = None  # "Left", "Right", or "Both"
     vertical_jump_cm: Optional[float] = None  # Vertical jump height in cm
     agility_time_sec: Optional[float] = None  # Agility test time in seconds
+    
+    # Media and links
+    player_photo_path: Optional[str] = None  # Path to player photo file
+    highlight_reel_urls: Optional[List[str]] = Field(default_factory=list)  # List of highlight reel URLs
+    social_media_links: Optional[Dict[str, str]] = Field(default_factory=dict)  # Dictionary of social media platform -> URL
+    contact_email: Optional[str] = None  # Player/Parent contact email
     
     @validator('date_of_birth', 'phv_date')
     def validate_date_fields(cls, v):
@@ -391,4 +397,52 @@ class TrainingCamp(BaseModel):
 class MatchData(BaseModel):
     matches: List[Match] = Field(default_factory=list)
     settings: AppSettings = Field(default_factory=AppSettings)
+
+
+class User(BaseModel):
+    """User account model"""
+    id: str = Field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
+    username: str
+    password_hash: str  # Hashed password (using werkzeug's generate_password_hash)
+    email: Optional[str] = None
+    created_at: str = Field(default_factory=lambda: datetime.now().strftime("%d %b %Y"))
+    is_active: bool = True
+    
+    @validator('username')
+    def validate_username(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Username cannot be empty')
+        v = v.strip()
+        if len(v) < 3:
+            raise ValueError('Username must be at least 3 characters')
+        if ' ' in v:
+            raise ValueError('Username cannot contain spaces')
+        return v
+
+
+class SubscriptionStatus(str, Enum):
+    """Subscription status enum"""
+    ACTIVE = "active"
+    CANCELED = "canceled"
+    PAST_DUE = "past_due"
+    UNPAID = "unpaid"
+    TRIALING = "trialing"
+    INCOMPLETE = "incomplete"
+    INCOMPLETE_EXPIRED = "incomplete_expired"
+    NONE = "none"
+
+
+class Subscription(BaseModel):
+    """Subscription model"""
+    user_id: str
+    stripe_customer_id: Optional[str] = None
+    stripe_subscription_id: Optional[str] = None
+    status: SubscriptionStatus = SubscriptionStatus.NONE
+    plan_id: Optional[str] = None  # Stripe price ID
+    plan_name: Optional[str] = None  # e.g., "Monthly", "Annual"
+    current_period_start: Optional[str] = None  # ISO format date
+    current_period_end: Optional[str] = None  # ISO format date
+    cancel_at_period_end: bool = False
+    created_at: str = Field(default_factory=lambda: datetime.now().strftime("%d %b %Y"))
+    updated_at: str = Field(default_factory=lambda: datetime.now().strftime("%d %b %Y"))
 

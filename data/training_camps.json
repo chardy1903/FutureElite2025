@@ -10,7 +10,8 @@
     "age_group": "U12",
     "focus_area": "Technical Skills and Technical Awareness",
     "achievements": "",
-    "notes": ""
+    "notes": "",
+    "user_id": "20251115_221430"
   },
   {
     "id": "20251115_134556",
@@ -23,7 +24,8 @@
     "age_group": "U12",
     "focus_area": "Fitness, Technical Skills and Technical Awareness",
     "achievements": "",
-    "notes": ""
+    "notes": "",
+    "user_id": "20251115_221430"
   },
   {
     "id": "20251115_134639",
@@ -36,6 +38,21 @@
     "age_group": "U12",
     "focus_area": "Fitness, Technical Skills and Technical Awareness",
     "achievements": "",
-    "notes": ""
+    "notes": "",
+    "user_id": "20251115_221430"
+  },
+  {
+    "id": "20251115_204350",
+    "camp_name": "Aberdeen FC Summer Camp",
+    "organizer": "Aberdeen FC",
+    "location": "Aberdeen, UK",
+    "start_date": "08 Aug 2022",
+    "end_date": "12 Aug 2022",
+    "duration_days": 5,
+    "age_group": "U9",
+    "focus_area": "Development of Fundamentals",
+    "achievements": "",
+    "notes": "",
+    "user_id": "20251115_221430"
   }
 ]
