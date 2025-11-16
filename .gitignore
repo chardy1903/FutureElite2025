@@ -40,3 +40,6 @@ Thumbs.db
 output/*.pdf
 !output/.gitkeep
 
+
+# Environment variables
+.env
