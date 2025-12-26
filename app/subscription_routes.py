@@ -303,6 +303,7 @@ def create_portal_session():
 
 
 @subscription_bp.route('/api/subscription/webhook', methods=['POST'])
+@subscription_bp.route('/stripe/webhook', methods=['POST'])  # Alias for Render/Stripe configuration
 def stripe_webhook():
     # Security: Basic rate limiting for webhook endpoint (if limiter available)
     # Note: Stripe webhooks should be verified by signature, but rate limiting adds defense in depth

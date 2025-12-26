@@ -1,12 +1,25 @@
+# Production dependencies for FutureElite GoalTracker
+# Flask web framework and extensions
 Flask>=2.0.0
 flask-login>=0.6.0
 flask-wtf>=1.0.0
 flask-limiter>=3.0.0
 flask-talisman>=1.1.0
-gunicorn>=21.2.0
-pydantic>=1.8.0
-reportlab>=3.6.0
-openpyxl>=3.0.0
-stripe>=7.0.0
-python-dotenv>=1.0.0
 
+# Production WSGI server
+gunicorn>=21.2.0
+
+# Data validation and models
+pydantic>=1.8.0
+
+# PDF generation
+reportlab>=3.6.0
+
+# Excel file support
+openpyxl>=3.0.0
+
+# Payment processing
+stripe>=7.0.0
+
+# Environment variable management
+python-dotenv>=1.0.0
