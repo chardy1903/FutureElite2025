@@ -7,6 +7,7 @@ from enum import Enum
 class MatchCategory(str, Enum):
     PRE_SEASON_FRIENDLY = "Pre-Season Friendly"
     LEAGUE = "League"
+    FRIENDLY = "Friendly"
 
 
 class MatchResult(str, Enum):
@@ -25,9 +26,11 @@ class Match(BaseModel):
     score: Optional[str] = None  # Format: "7 - 5"
     brodie_goals: int = 0
     brodie_assists: int = 0
+    clean_sheets: Optional[int] = None  # Clean sheets (for defenders/goalkeepers)
     minutes_played: int = 0
     notes: str = ""
     is_fixture: bool = False  # True for upcoming matches without results
+    include_in_report: bool = True  # Whether to include this match in PDF reports
 
     @validator('date')
     def validate_date(cls, v):
@@ -112,6 +115,12 @@ class AppSettings(BaseModel):
     social_media_links: Optional[Dict[str, str]] = Field(default_factory=dict)  # Dictionary of social media platform -> URL
     contact_email: Optional[str] = None  # Player/Parent contact email
     
+    # Playing profile
+    playing_profile: Optional[List[str]] = Field(default_factory=list)  # List of playing profile comments/bullet points
+    
+    # Performance metric comments/context
+    performance_metric_comments: Optional[Dict[str, str]] = Field(default_factory=dict)  # Dictionary mapping metric names to contextual comments
+    
     @validator('date_of_birth', 'phv_date')
     def validate_date_fields(cls, v):
         if v is None:
@@ -138,6 +147,7 @@ class PhysicalMeasurement(BaseModel):
     height_cm: Optional[float] = None  # Height in centimeters
     weight_kg: Optional[float] = None  # Weight in kilograms
     notes: Optional[str] = None  # Optional notes about the measurement
+    include_in_report: bool = True  # Whether to include this measurement in PDF reports (all data kept for PHV calculation)
     
     @validator('date')
     def validate_date(cls, v):
@@ -165,6 +175,9 @@ class Achievement(BaseModel):
     season: Optional[str] = None  # e.g., "2025/26"
     description: Optional[str] = None  # Additional details about the achievement
     notes: Optional[str] = None  # Optional notes
+    # Position-specific stats
+    goals: Optional[int] = None  # Number of goals (for forwards/strikers)
+    clean_sheets: Optional[int] = None  # Number of clean sheets (for defenders/goalkeepers)
     
     @validator('date')
     def validate_date(cls, v):
@@ -225,6 +238,9 @@ class PhysicalMetrics(BaseModel):
     agility_time_sec: Optional[float] = None  # Agility test time in seconds (e.g., 5-10-5 shuttle)
     yo_yo_test_level: Optional[float] = None  # Yo-Yo test level achieved
     beep_test_level: Optional[float] = None  # Beep test level achieved
+    
+    # Report inclusion flag
+    include_in_report: bool = True  # Whether to include this metric in PDF reports (all data kept for calculations)
     
     # Strength metrics
     bench_press_kg: Optional[float] = None  # Bench press max in kg
@@ -443,6 +459,34 @@ class Subscription(BaseModel):
     current_period_start: Optional[str] = None  # ISO format date
     current_period_end: Optional[str] = None  # ISO format date
     cancel_at_period_end: bool = False
+    created_at: str = Field(default_factory=lambda: datetime.now().strftime("%d %b %Y"))
+    updated_at: str = Field(default_factory=lambda: datetime.now().strftime("%d %b %Y"))
+    
+    @validator('status', pre=True)
+    def validate_status(cls, v):
+        """Convert string status to enum if needed"""
+        if isinstance(v, str):
+            try:
+                return SubscriptionStatus(v.lower())
+            except ValueError:
+                return SubscriptionStatus.NONE
+        elif isinstance(v, SubscriptionStatus):
+            return v
+        else:
+            return SubscriptionStatus.NONE
+
+
+class Reference(BaseModel):
+    """Reference model for contacts/references"""
+    id: str = Field(default_factory=lambda: datetime.now().strftime("%Y%m%d_%H%M%S"))
+    user_id: str
+    name: str
+    position: str  # e.g., "Head Coach", "Academy Director", "Scout"
+    organization: Optional[str] = None  # e.g., "Manchester United FC", "FA"
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    relationship: Optional[str] = None  # e.g., "Former Coach", "Current Manager"
+    notes: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now().strftime("%d %b %Y"))
     updated_at: str = Field(default_factory=lambda: datetime.now().strftime("%d %b %Y"))
 

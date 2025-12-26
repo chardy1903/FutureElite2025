@@ -1,0 +1,824 @@
+{% extends "base.html" %}
+
+{% block title %}Player Profile - FutureElite{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Player Profile</h1>
+        <p class="mt-2 text-lg text-gray-600">Enter your personal information and physical attributes</p>
+    </div>
+
+    <!-- Player Profile Form -->
+    <form id="playerProfileForm" onsubmit="savePlayerProfile(event)" class="space-y-8">
+        <!-- Basic Information -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Basic Information</h2>
+            <p class="text-sm text-gray-600 mb-4">Essential player details required for calculations and reports</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Date of Birth *</label>
+                    <input type="date" id="date_of_birth" name="date_of_birth" required
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                    <p class="mt-1 text-xs text-gray-500">Required for calculating age and PHV</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Position</label>
+                    <select name="position" id="position"
+                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                        <option value="">Select position</option>
+                        <option value="Goalkeeper">Goalkeeper</option>
+                        <option value="Defender">Defender</option>
+                        <option value="Midfielder">Midfielder</option>
+                        <option value="Forward">Forward</option>
+                        <option value="Winger">Winger</option>
+                        <option value="Attacking Midfielder">Attacking Midfielder</option>
+                        <option value="Defensive Midfielder">Defensive Midfielder</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Dominant Foot</label>
+                    <select name="dominant_foot" id="dominant_foot"
+                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                        <option value="">Select foot</option>
+                        <option value="Left">Left</option>
+                        <option value="Right">Right</option>
+                        <option value="Both">Both</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Physical Attributes -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Current Physical Attributes</h2>
+            <p class="text-sm text-gray-600 mb-4">Current snapshot of height and weight from your latest measurement. To update these values, add a new measurement on the <a href="/physical-data" class="text-blue-600 underline">Physical Data</a> page.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Current Height (cm)</label>
+                    <input type="text" id="height_cm" readonly
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm bg-gray-50" 
+                           placeholder="No measurements yet">
+                    <p class="mt-1 text-xs text-gray-500">From latest measurement on Physical Data page</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Current Weight (kg)</label>
+                    <input type="text" id="weight_kg" readonly
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm bg-gray-50" 
+                           placeholder="No measurements yet">
+                    <p class="mt-1 text-xs text-gray-500">From latest measurement on Physical Data page</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Player Photo -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Player Photo</h2>
+            <p class="text-sm text-gray-600 mb-4">Upload a player photo for use in scout reports</p>
+            
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Player Photo</label>
+                <div class="flex items-center space-x-4">
+                    <input type="file" id="photoUpload" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" class="hidden">
+                    <button type="button" onclick="document.getElementById('photoUpload').click()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors">
+                        Choose Photo
+                    </button>
+                    <span id="photoStatus" class="text-sm text-gray-600">
+                        Loading...
+                    </span>
+                    <span id="photoRemoveBtn" style="display: none;">
+                        <button type="button" onclick="removePhoto()" class="text-red-600 text-sm hover:text-red-800">Remove</button>
+                    </span>
+                </div>
+                <p class="mt-2 text-xs text-gray-500">Supported formats: PNG, JPG, JPEG, GIF, WEBP</p>
+            </div>
+        </div>
+
+        <!-- PHV Information (Read-only, auto-calculated) -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Peak Height Velocity (PHV)</h2>
+            <p class="text-sm text-gray-600 mb-4">PHV is automatically calculated from historical measurements on the Physical Data page.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">PHV Date</label>
+                    <input type="date" id="phv_date" name="phv_date" readonly
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm bg-gray-50">
+                    <p class="mt-1 text-xs text-gray-500">Auto-calculated from historical measurements</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">PHV Age (years)</label>
+                    <input type="number" step="0.1" name="phv_age" id="phv_age" readonly
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm bg-gray-50" 
+                           placeholder="Auto-calculated">
+                    <p class="mt-1 text-xs text-gray-500">Auto-calculated from historical measurements</p>
+                </div>
+            </div>
+            
+            <!-- PHV Status Explanation -->
+            <div class="mt-4" id="phvStatusExplanation" style="display: none;">
+                <label class="block text-sm font-medium text-gray-700 mb-1">PHV Status</label>
+                <div class="mt-1 p-3 bg-gray-50 border border-gray-200 rounded-md">
+                    <p class="text-sm text-gray-700" id="phvStatusText">Loading...</p>
+                </div>
+            </div>
+            
+            <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg" id="phvStatus">
+                <h3 class="text-sm font-semibold text-blue-900 mb-2">PHV Calculation Status</h3>
+                <p class="text-xs text-blue-700" id="phvStatusText">Loading...</p>
+                <button type="button" onclick="calculatePHV()" class="mt-2 text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
+                    Calculate PHV Now
+                </button>
+                <p class="mt-2 text-xs text-blue-600">Note: Add at least 2 historical height measurements on the <a href="/physical-data" class="underline">Physical Data</a> page to enable PHV calculation.</p>
+            </div>
+        </div>
+
+        <!-- Playing Profile -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Playing Profile</h2>
+            <p class="text-sm text-gray-600 mb-4">Add bullet points describing the player's playing style and characteristics. These will appear in scout reports.</p>
+            
+            <div id="playingProfileContainer">
+                <!-- Playing profile items will be added here dynamically -->
+            </div>
+            
+            <button type="button" onclick="addPlayingProfileItem()" class="mt-4 text-sm bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors">
+                + Add Comment
+            </button>
+            <p class="mt-2 text-xs text-gray-500">Examples: "Forward with strong off ball movement", "Comfortable receiving under pressure", "Right foot dominant, competent weak foot finishing"</p>
+        </div>
+
+        <!-- Performance Metric Comments -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Performance Metric Context</h2>
+            <p class="text-sm text-gray-600 mb-4">Add contextual comments for key performance metrics. These will appear in scout reports next to the metrics.</p>
+            
+            <div id="metricCommentsContainer" class="space-y-4">
+                <!-- Metric comment items will be added here dynamically -->
+            </div>
+            
+            <button type="button" onclick="addMetricComment()" class="mt-4 text-sm bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors">
+                + Add Metric Comment
+            </button>
+            <p class="mt-2 text-xs text-gray-500">Examples: "Goals per 60: (above typical U12 forward range)", "G+A per 60: (internal team comparison only)"</p>
+        </div>
+
+        <!-- Save Button -->
+        <div class="flex justify-end">
+            <button type="submit" class="bg-qadsiah-red text-white px-6 py-3 rounded-lg font-medium hover:bg-red-700 transition-colors">
+                Save Profile
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Check if user has active subscription
+async function checkSubscriptionAccess() {
+    try {
+        await ensureStorageReady();
+        const userId = clientStorage.getCurrentUserId();
+        if (!userId) {
+            return false;
+        }
+        
+        // Try to get subscription from server first
+        try {
+            const response = await fetch('/api/subscription/status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ user_id: userId })
+            });
+            const data = await response.json();
+            if (data.success && data.subscription && data.subscription.has_access) {
+                // Sync to client storage
+                await clientStorage.saveSubscription(data.subscription);
+                return true;
+            }
+        } catch (e) {
+            console.warn('Could not check subscription from server:', e);
+        }
+        
+        // Fallback to client storage
+        const subscription = await clientStorage.getSubscription(userId);
+        return subscription && subscription.status === 'active';
+    } catch (error) {
+        console.error('Error checking subscription:', error);
+        return false;
+    }
+}
+
+// Load player profile data on page load
+async function loadPlayerProfileData() {
+    try {
+        await ensureStorageReady();
+        
+        // Check authentication
+        if (!clientAuth.isAuthenticated()) {
+            window.location.href = '/login';
+            return;
+        }
+        
+        // Load settings from server (most up-to-date)
+        let settings = {};
+        try {
+            const serverData = await apiCall('/api/settings');
+            if (serverData.success && serverData.settings) {
+                settings = serverData.settings;
+                // Sync to client storage
+                await clientStorage.saveSettings(settings);
+            }
+        } catch (e) {
+            console.warn('Could not load settings from server, using client storage:', e);
+            settings = await clientStorage.loadSettings();
+        }
+        
+        // Populate form fields
+        if (settings.date_of_birth) {
+            const dobDate = convertDateToInput(settings.date_of_birth);
+            document.getElementById('date_of_birth').value = dobDate;
+        }
+        if (settings.phv_date) {
+            const phvDate = convertDateToInput(settings.phv_date);
+            document.getElementById('phv_date').value = phvDate;
+        }
+        if (settings.phv_age) document.getElementById('phv_age').value = settings.phv_age;
+        if (settings.position) document.getElementById('position').value = settings.position;
+        if (settings.dominant_foot) document.getElementById('dominant_foot').value = settings.dominant_foot;
+        
+        // Load latest physical measurement for current height/weight
+        await loadLatestPhysicalMeasurement();
+        
+        // Load photo status
+        await loadPhotoStatus();
+        
+        // Load playing profile
+        loadPlayingProfile(settings.playing_profile || []);
+        
+        // Load performance metric comments
+        loadMetricComments(settings.performance_metric_comments || {});
+        
+        // Update PHV status and button visibility
+        await updatePHVStatus();
+        await updatePHVButtonVisibility();
+        
+        // Update PHV status explanation
+        updatePHVStatusExplanation(settings.phv_date, settings.phv_age);
+        
+    } catch (error) {
+        console.error('Error loading player profile data:', error);
+        showToast('Error loading player profile: ' + error.message, 'error');
+    }
+}
+
+// Load latest physical measurement to populate current height/weight
+async function loadLatestPhysicalMeasurement() {
+    try {
+        const response = await apiCall('/api/physical-measurements');
+        if (response.success && response.measurements && response.measurements.length > 0) {
+            // Sort measurements by date (most recent first)
+            const measurements = response.measurements.sort((a, b) => {
+                // Parse dates in "dd MMM yyyy" format
+                const parseDate = (dateStr) => {
+                    const months = {
+                        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3,
+                        'May': 4, 'Jun': 5, 'Jul': 6, 'Aug': 7,
+                        'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+                    };
+                    const parts = dateStr.split(' ');
+                    if (parts.length === 3) {
+                        const day = parseInt(parts[0]);
+                        const month = months[parts[1]];
+                        const year = parseInt(parts[2]);
+                        return new Date(year, month, day);
+                    }
+                    return new Date(0); // Invalid date
+                };
+                
+                const dateA = parseDate(a.date);
+                const dateB = parseDate(b.date);
+                return dateB - dateA; // Most recent first
+            });
+            
+            // Get the most recent measurement
+            const latest = measurements[0];
+            
+            // Populate height and weight fields
+            if (latest.height_cm !== null && latest.height_cm !== undefined) {
+                document.getElementById('height_cm').value = latest.height_cm.toFixed(1);
+            } else {
+                document.getElementById('height_cm').value = 'N/A';
+            }
+            
+            if (latest.weight_kg !== null && latest.weight_kg !== undefined) {
+                document.getElementById('weight_kg').value = latest.weight_kg.toFixed(1);
+            } else {
+                document.getElementById('weight_kg').value = 'N/A';
+            }
+        } else {
+            // No measurements yet
+            document.getElementById('height_cm').value = 'No measurements yet';
+            document.getElementById('weight_kg').value = 'No measurements yet';
+        }
+    } catch (error) {
+        console.error('Error loading latest physical measurement:', error);
+        document.getElementById('height_cm').value = 'Error loading';
+        document.getElementById('weight_kg').value = 'Error loading';
+    }
+}
+
+// Helper function to convert date from "dd MMM yyyy" to "YYYY-MM-DD"
+function convertDateToInput(dateStr) {
+    if (!dateStr || dateStr === 'None' || dateStr === 'null') return '';
+    
+    // If already in YYYY-MM-DD format, return as is
+    if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return dateStr;
+    }
+    
+    // Convert from "dd MMM yyyy" format
+    const months = {
+        'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+        'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+        'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+    };
+    
+    const parts = dateStr.split(' ');
+    if (parts.length === 3) {
+        const day = parts[0].padStart(2, '0');
+        const month = months[parts[1]];
+        const year = parts[2];
+        return `${year}-${month}-${day}`;
+    }
+    return '';
+}
+
+// Update PHV button visibility based on subscription
+async function updatePHVButtonVisibility() {
+    const hasAccess = await checkSubscriptionAccess();
+    const btn = document.getElementById('calculatePHVBtn');
+    if (btn) {
+        if (!hasAccess) {
+            btn.disabled = true;
+            btn.className = 'mt-2 text-xs bg-gray-400 text-white px-3 py-1 rounded cursor-not-allowed';
+            btn.textContent = 'PHV Calculation (Premium Only)';
+            btn.onclick = () => showPremiumFeatureMessage('PHV Calculation');
+        } else {
+            btn.disabled = false;
+            btn.className = 'mt-2 text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700';
+            btn.textContent = 'Calculate PHV Now';
+            btn.onclick = calculatePHV;
+        }
+    }
+}
+
+// Update PHV status
+async function updatePHVStatus() {
+    try {
+        const data = await apiCall('/api/phv/calculate');
+        const statusText = document.getElementById('phvStatusText');
+        const statusDiv = document.getElementById('phvStatus');
+        
+        if (data.success && data.phv) {
+            statusText.innerHTML = `<strong>PHV Calculated:</strong> ${data.phv.phv_date} (Age: ${data.phv.phv_age?.toFixed(1)} years)<br>`;
+            if (data.phv.phv_velocity_cm_per_year) {
+                statusText.innerHTML += `Growth velocity: ${data.phv.phv_velocity_cm_per_year.toFixed(1)} cm/year`;
+            }
+            statusDiv.className = 'mt-6 p-4 bg-green-50 border border-green-200 rounded-lg';
+            
+            // Update form fields
+            if (data.phv.phv_date) {
+                const phvDate = convertDateToInput(data.phv.phv_date);
+                document.getElementById('phv_date').value = phvDate;
+            }
+            if (data.phv.phv_age) {
+                document.getElementById('phv_age').value = data.phv.phv_age.toFixed(1);
+            }
+            
+            // Update PHV status explanation
+            updatePHVStatusExplanation(data.phv.phv_date, data.phv.phv_age);
+        } else if (data.validation) {
+            const validation = data.validation;
+            if (validation.valid) {
+                statusText.innerHTML = `<strong>Status:</strong> ${validation.message}`;
+                if (validation.recommendation) {
+                    statusText.innerHTML += `<br><span class="text-xs text-yellow-700">⚠️ ${validation.recommendation}</span>`;
+                }
+            } else {
+                statusText.innerHTML = `<strong>PHV Calculation Unavailable:</strong><br>${validation.message}`;
+                if (validation.recommendation) {
+                    statusText.innerHTML += `<br><span class="text-xs text-red-700">💡 ${validation.recommendation}</span>`;
+                }
+                statusDiv.className = 'mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg';
+            }
+        } else {
+            const errorMessage = data.errors?.[0] || data.validation?.message || 'Unable to calculate PHV';
+            statusText.innerHTML = `<strong>PHV Calculation Error:</strong><br>${errorMessage}`;
+            if (data.validation?.recommendation) {
+                statusText.innerHTML += `<br><span class="text-xs text-red-700">💡 ${data.validation.recommendation}</span>`;
+            }
+            statusDiv.className = 'mt-6 p-4 bg-red-50 border border-red-200 rounded-lg';
+        }
+    } catch (error) {
+        console.error('Error updating PHV status:', error);
+        const statusText = document.getElementById('phvStatusText');
+        const statusDiv = document.getElementById('phvStatus');
+        statusText.innerHTML = `<strong>Error:</strong><br>${error.message || 'Error loading PHV status'}`;
+        statusDiv.className = 'mt-6 p-4 bg-red-50 border border-red-200 rounded-lg';
+    }
+}
+
+// Update PHV status explanation
+function updatePHVStatusExplanation(phvDate, phvAge) {
+    const explanationDiv = document.getElementById('phvStatusExplanation');
+    const explanationText = document.getElementById('phvStatusText');
+    
+    if (!phvDate || !phvAge) {
+        explanationDiv.style.display = 'none';
+        return;
+    }
+    
+    try {
+        // Parse PHV date
+        const phvDateObj = new Date(phvDate);
+        const currentDate = new Date();
+        
+        // Calculate days difference
+        const daysDiff = Math.floor((currentDate - phvDateObj) / (1000 * 60 * 60 * 24));
+        
+        // Determine status
+        let statusText = '';
+        if (daysDiff < 0) {
+            // Pre-PHV
+            statusText = `Currently pre-PHV, indicating early stage of growth spurt.`;
+        } else if (daysDiff < 180) {
+            // At PHV (within 6 months)
+            statusText = `Currently at PHV, indicating peak growth velocity period.`;
+        } else {
+            // Post-PHV
+            statusText = `Currently post-PHV, indicating advanced physical development relative to chronological age.`;
+        }
+        
+        // Format the full explanation
+        const formattedDate = formatDateFromInput(phvDate);
+        const fullExplanation = `Peak Height Velocity (PHV): Age ${parseFloat(phvAge).toFixed(1)} years (${formattedDate})\n${statusText}`;
+        
+        explanationText.textContent = fullExplanation;
+        explanationDiv.style.display = 'block';
+    } catch (error) {
+        console.error('Error updating PHV status explanation:', error);
+        explanationDiv.style.display = 'none';
+    }
+}
+
+// Helper function to format date from input format (YYYY-MM-DD) to display format (dd MMM yyyy)
+function formatDateFromInput(dateStr) {
+    if (!dateStr) return '';
+    try {
+        const date = new Date(dateStr);
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const day = date.getDate();
+        const month = months[date.getMonth()];
+        const year = date.getFullYear();
+        return `${day} ${month} ${year}`;
+    } catch (error) {
+        return dateStr;
+    }
+}
+
+// Calculate PHV manually
+async function calculatePHV() {
+    // Check if user has subscription - PHV is premium only
+    const hasAccess = await checkSubscriptionAccess();
+    if (!hasAccess) {
+        showPremiumFeatureMessage('PHV Calculation');
+        return;
+    }
+    
+    try {
+        showLoading('Calculating PHV...');
+        
+        const data = await apiCall('/api/phv/calculate');
+        
+        if (data.success) {
+            hideLoading();
+            
+            if (data.phv) {
+                showToast(`PHV calculated: ${data.phv.phv_age?.toFixed(1)} years on ${data.phv.phv_date}`, 'success');
+                // Reload profile to show updated PHV fields
+                await loadPlayerProfileData();
+                // Update PHV status display
+                await updatePHVStatus();
+            } else {
+                showToast(data.validation?.message || 'Unable to calculate PHV. Add more measurements.', 'warning');
+                await updatePHVStatus();
+            }
+        } else {
+            hideLoading();
+            showToast(data.errors?.[0] || 'Error calculating PHV', 'error');
+            await updatePHVStatus();
+        }
+    } catch (error) {
+        hideLoading();
+        console.error('Error calculating PHV:', error);
+        showToast('Error calculating PHV', 'error');
+    }
+}
+
+// Save player profile
+async function savePlayerProfile(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const data = Object.fromEntries(formData.entries());
+    
+    // Handle empty date fields as null
+    if (data.date_of_birth === '') {
+        data.date_of_birth = null;
+    }
+    if (data.phv_date === '') {
+        data.phv_date = null;
+    }
+    
+    // Remove height_cm and weight_kg from data - they come from physical measurements
+    delete data.height_cm;
+    delete data.weight_kg;
+    
+    // Convert numeric fields (handle empty strings as null)
+    const numericFields = ['phv_age'];
+    numericFields.forEach(field => {
+        if (data[field] === '' || data[field] === null) {
+            data[field] = null;
+        } else {
+            data[field] = parseFloat(data[field]);
+        }
+    });
+    
+    // Handle empty strings as null for optional fields
+    const optionalFields = ['position', 'dominant_foot'];
+    optionalFields.forEach(field => {
+        if (data[field] === '') {
+            data[field] = null;
+        }
+    });
+    
+    // Collect playing profile items
+    const playingProfileItems = [];
+    const playingProfileInputs = document.querySelectorAll('.playing-profile-item');
+    playingProfileInputs.forEach(input => {
+        const value = input.value.trim();
+        if (value) {
+            playingProfileItems.push(value);
+        }
+    });
+    data.playing_profile = playingProfileItems;
+    
+    // Collect performance metric comments
+    const metricComments = {};
+    const metricCommentRows = document.querySelectorAll('.metric-comment-row');
+    metricCommentRows.forEach(row => {
+        const metricSelect = row.querySelector('.metric-select');
+        const commentInput = row.querySelector('.metric-comment-input');
+        if (metricSelect && commentInput) {
+            const metricName = metricSelect.value;
+            const comment = commentInput.value.trim();
+            if (metricName && comment) {
+                metricComments[metricName] = comment;
+            }
+        }
+    });
+    data.performance_metric_comments = metricComments;
+    
+    try {
+        showLoading('Saving player profile...');
+        
+        const result = await apiCall('/settings', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        
+        hideLoading();
+        
+        if (result.success) {
+            showToast('Player profile saved successfully!');
+            
+            // If date_of_birth was added/updated, try to calculate PHV automatically
+            if (data.date_of_birth && data.date_of_birth !== null && data.date_of_birth !== '') {
+                // Small delay to ensure settings are saved
+                setTimeout(async () => {
+                    try {
+                        const phvResult = await apiCall('/api/phv/calculate');
+                        if (phvResult.success && phvResult.phv) {
+                            await updatePHVStatus();
+                            showToast(`PHV calculated: ${phvResult.phv.phv_age?.toFixed(1)} years on ${phvResult.phv.phv_date}`, 'success');
+                            // Reload to show updated PHV
+                            await loadPlayerProfileData();
+                        }
+                    } catch (phvError) {
+                        // PHV calculation failed - this is OK if there aren't enough measurements
+                        console.log('PHV calculation not possible:', phvError);
+                    }
+                }, 500);
+            } else {
+                // Reload data to show updated values
+                await loadPlayerProfileData();
+            }
+        } else {
+            showToast(result.errors ? result.errors.join(', ') : 'Error saving player profile', 'error');
+        }
+        
+    } catch (error) {
+        hideLoading();
+        console.error('Error saving player profile:', error);
+        showToast('Error saving player profile: ' + (error.message || 'Unknown error'), 'error');
+    }
+}
+
+// Load photo status
+async function loadPhotoStatus() {
+    try {
+        const settings = await apiCall('/api/settings');
+        if (settings.success && settings.settings) {
+            const photoStatus = document.getElementById('photoStatus');
+            const photoRemoveBtn = document.getElementById('photoRemoveBtn');
+            
+            if (settings.settings.player_photo_path) {
+                photoStatus.textContent = 'Photo uploaded';
+                photoRemoveBtn.style.display = 'inline';
+            } else {
+                photoStatus.textContent = 'No photo selected';
+                photoRemoveBtn.style.display = 'none';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading photo status:', error);
+        document.getElementById('photoStatus').textContent = 'Error loading status';
+    }
+}
+
+// Photo upload handler
+document.addEventListener('DOMContentLoaded', function() {
+    loadPlayerProfileData();
+    
+    // Set up photo upload handler
+    const photoUpload = document.getElementById('photoUpload');
+    if (photoUpload) {
+        photoUpload.addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('photo', file);
+            
+            try {
+                showLoading('Uploading photo...');
+                const response = await fetch('/api/upload-photo', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                hideLoading();
+                
+                if (data.success) {
+                    document.getElementById('photoStatus').textContent = 'Photo uploaded';
+                    document.getElementById('photoRemoveBtn').style.display = 'inline';
+                    showToast('Photo uploaded successfully!', 'success');
+                    // Reload photo status to ensure consistency
+                    await loadPhotoStatus();
+                } else {
+                    showToast(data.errors?.[0] || 'Error uploading photo', 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showToast('Error uploading photo: ' + error.message, 'error');
+            }
+        });
+    }
+});
+
+// Playing Profile Management
+function addPlayingProfileItem(value = '') {
+    const container = document.getElementById('playingProfileContainer');
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'playing-profile-item-wrapper flex items-center gap-2 mb-2';
+    itemDiv.innerHTML = `
+        <input type="text" class="playing-profile-item flex-1 border-gray-300 rounded-md shadow-sm px-3 py-2 focus:ring-qadsiah-red focus:border-qadsiah-red" 
+               value="${value.replace(/"/g, '&quot;')}" 
+               placeholder="e.g., Forward with strong off ball movement">
+        <button type="button" onclick="removePlayingProfileItem(this)" class="text-red-600 hover:text-red-800 px-2">
+            ×
+        </button>
+    `;
+    container.appendChild(itemDiv);
+}
+
+function removePlayingProfileItem(button) {
+    button.parentElement.remove();
+}
+
+function loadPlayingProfile(items) {
+    const container = document.getElementById('playingProfileContainer');
+    container.innerHTML = '';
+    if (items && items.length > 0) {
+        items.forEach(item => {
+            addPlayingProfileItem(item);
+        });
+    }
+}
+
+// Performance Metric Comments Management
+const METRIC_OPTIONS = [
+    { value: 'goals_per_60', label: 'Goals per 60' },
+    { value: 'assists_per_60', label: 'Assists per 60' },
+    { value: 'contribution_per_60', label: 'G+A per 60' },
+    { value: 'goals_per_match', label: 'Goals per Match' },
+    { value: 'assists_per_match', label: 'Assists per Match' },
+    { value: 'g_a_per_match', label: 'G+A per Match' },
+    { value: 'min_per_ga', label: 'Minutes per Goal Contribution' }
+];
+
+function addMetricComment(metricName = '', comment = '') {
+    const container = document.getElementById('metricCommentsContainer');
+    const rowDiv = document.createElement('div');
+    rowDiv.className = 'metric-comment-row flex items-center gap-2 mb-2';
+    
+    // Metric select dropdown
+    const metricSelect = document.createElement('select');
+    metricSelect.className = 'metric-select flex-1 border-gray-300 rounded-md shadow-sm px-3 py-2 focus:ring-qadsiah-red focus:border-qadsiah-red';
+    metricSelect.innerHTML = '<option value="">Select metric</option>' + 
+        METRIC_OPTIONS.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('');
+    if (metricName) {
+        metricSelect.value = metricName;
+    }
+    
+    // Comment input
+    const commentInput = document.createElement('input');
+    commentInput.type = 'text';
+    commentInput.className = 'metric-comment-input flex-1 border-gray-300 rounded-md shadow-sm px-3 py-2 focus:ring-qadsiah-red focus:border-qadsiah-red';
+    commentInput.placeholder = 'e.g., above typical U12 forward range';
+    if (comment) {
+        commentInput.value = comment;
+    }
+    
+    // Remove button
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.onclick = () => rowDiv.remove();
+    removeBtn.className = 'text-red-600 hover:text-red-800 px-2';
+    removeBtn.textContent = '×';
+    
+    rowDiv.appendChild(metricSelect);
+    rowDiv.appendChild(commentInput);
+    rowDiv.appendChild(removeBtn);
+    container.appendChild(rowDiv);
+}
+
+function loadMetricComments(comments) {
+    const container = document.getElementById('metricCommentsContainer');
+    container.innerHTML = '';
+    if (comments && Object.keys(comments).length > 0) {
+        Object.entries(comments).forEach(([metricName, comment]) => {
+            addMetricComment(metricName, comment);
+        });
+    }
+}
+
+// Remove photo
+async function removePhoto() {
+    if (!confirm('Remove the uploaded photo?')) return;
+    
+    try {
+        const settings = await apiCall('/api/settings');
+        if (settings.success) {
+            const updatedSettings = {
+                ...settings.settings,
+                player_photo_path: null
+            };
+            
+            showLoading('Removing photo...');
+            await apiCall('/settings', {
+                method: 'POST',
+                body: JSON.stringify(updatedSettings)
+            });
+            
+            hideLoading();
+            showToast('Photo removed', 'success');
+            // Reload photo status
+            await loadPhotoStatus();
+        }
+    } catch (error) {
+        hideLoading();
+        showToast('Error removing photo: ' + error.message, 'error');
+    }
+}
+</script>
+{% endblock %}
+

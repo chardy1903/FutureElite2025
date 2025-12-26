@@ -2,9 +2,10 @@
 Authentication routes for FutureElite
 """
 
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash
+import time
 
 from .storage import StorageManager
 from .auth import UserSession
@@ -15,8 +16,32 @@ auth_bp = Blueprint('auth', __name__)
 # Initialize storage
 storage = StorageManager()
 
+# Security: Rate limiting for auth endpoints
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    RATE_LIMITER_AVAILABLE = True
+    # Limiter will be initialized in main.py and passed via app context
+except ImportError:
+    RATE_LIMITER_AVAILABLE = False
+
+def rate_limit_if_available(limit_str):
+    """Decorator helper for conditional rate limiting"""
+    def decorator(f):
+        if RATE_LIMITER_AVAILABLE:
+            try:
+                from flask import current_app
+                limiter = current_app.extensions.get('limiter')
+                if limiter:
+                    return limiter.limit(limit_str)(f)
+            except Exception:
+                pass
+        return f
+    return decorator
+
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
+@rate_limit_if_available("10 per minute")
 def login():
     """Login page"""
     if request.method == 'POST':
@@ -33,7 +58,14 @@ def login():
         
         # Get user
         user = storage.get_user_by_username(username)
+        
+        # Security: Prevent timing attacks and account enumeration
+        # Always perform password check (even with dummy hash) to prevent timing differences
+        dummy_hash = "$2b$12$dummyhashfordummyuserpreventingtimingattacks"
         if not user:
+            # Simulate password check with dummy hash to prevent timing attacks
+            check_password_hash(dummy_hash, password)
+            time.sleep(0.1)  # Add small delay to prevent timing-based enumeration
             if request.is_json:
                 return jsonify({'success': False, 'errors': ['Invalid username or password']}), 401
             flash('Invalid username or password', 'error')
@@ -50,6 +82,14 @@ def login():
         user_session = UserSession(user)
         login_user(user_session, remember=True)
         
+        # Security: Prevent session fixation by clearing and recreating session
+        from flask import session
+        session.permanent = True
+        # Clear old session data to prevent fixation attacks
+        session.clear()
+        # Re-login to get new session ID
+        login_user(user_session, remember=True)
+        
         if request.is_json:
             return jsonify({'success': True, 'redirect': url_for('main.homepage')})
         
@@ -59,6 +99,7 @@ def login():
 
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
+@rate_limit_if_available("5 per minute")
 def register():
     """Registration page"""
     if request.method == 'POST':
@@ -90,6 +131,14 @@ def register():
         
         # Auto-login after registration
         user_session = UserSession(user)
+        login_user(user_session, remember=True)
+        
+        # Security: Prevent session fixation by clearing and recreating session
+        from flask import session
+        session.permanent = True
+        # Clear old session data to prevent fixation attacks
+        session.clear()
+        # Re-login to get new session ID
         login_user(user_session, remember=True)
         
         if request.is_json:

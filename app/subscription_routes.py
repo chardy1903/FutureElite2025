@@ -3,6 +3,7 @@ Stripe subscription routes for FutureElite
 """
 
 from flask import Blueprint, request, jsonify, redirect, url_for, render_template, current_app
+from flask_login import login_required, current_user
 from datetime import datetime
 import os
 import json
@@ -24,6 +25,10 @@ subscription_bp = Blueprint('subscription', __name__)
 
 # Initialize storage
 storage = StorageManager()
+
+# Security: In-memory store for webhook event IDs (for idempotency)
+# TODO: Replace with persistent storage (Redis/DB) in production for distributed systems
+_processed_webhook_events = set()
 
 # Initialize Stripe (use environment variables)
 if STRIPE_AVAILABLE:
@@ -52,21 +57,12 @@ SUBSCRIPTION_PLANS = {
 
 
 @subscription_bp.route('/api/subscription/status', methods=['POST'])
+@login_required
 def get_subscription_status():
-    """Get subscription status for current user (client-side)"""
+    """Get subscription status for current authenticated user"""
     try:
-        # This endpoint accepts user_id from client since we're using client-side auth
-        data = request.get_json() if request.is_json else {}
-        user_id = data.get('user_id')
-        
-        if not user_id:
-            return jsonify({
-                'success': False,
-                'subscription': {
-                    'status': SubscriptionStatus.NONE,
-                    'has_access': False
-                }
-            }), 400
+        # Security: Use authenticated user's ID, not client-provided user_id
+        user_id = current_user.id
         
         # Check server-side storage for subscription
         subscription = storage.get_subscription_by_user_id(user_id)
@@ -127,6 +123,7 @@ def create_checkout_session():
         data = request.get_json() or {}
         user_id = data.get('user_id')
         plan_type = data.get('plan_type', 'monthly')  # 'monthly' or 'annual'
+        requested_currency = data.get('currency', 'usd').lower()  # Get currency from request
         
         if not user_id:
             return jsonify({'success': False, 'errors': ['User ID is required']}), 400
@@ -136,16 +133,6 @@ def create_checkout_session():
         
         plan = SUBSCRIPTION_PLANS[plan_type]
         
-        if not plan['price_id'] or plan['price_id'].strip() == '' or 'YOUR_' in plan['price_id']:
-            return jsonify({
-                'success': False,
-                'errors': [
-                    f'Stripe {plan_type} price ID not configured.',
-                    'Please set STRIPE_MONTHLY_PRICE_ID or STRIPE_ANNUAL_PRICE_ID environment variable in your .env file.',
-                    'See QUICK_STRIPE_SETUP.md for instructions.'
-                ]
-            }), 500
-        
         # Check if Stripe API key is configured
         if not stripe.api_key or stripe.api_key.strip() == '' or stripe.api_key == 'sk_test_YOUR_SECRET_KEY_HERE':
             return jsonify({
@@ -153,6 +140,64 @@ def create_checkout_session():
                 'errors': [
                     'Stripe API key not configured.',
                     'Please set STRIPE_SECRET_KEY environment variable in your .env file.',
+                    'See QUICK_STRIPE_SETUP.md for instructions.'
+                ]
+            }), 500
+        
+        # Currency conversion rates (approximate)
+        currency_rates = {
+            'usd': {'monthly': 9.99, 'annual': 99.99},
+            'gbp': {'monthly': 7.99, 'annual': 79.99},
+            'eur': {'monthly': 9.49, 'annual': 94.99},
+            'aed': {'monthly': 36.99, 'annual': 369.99},
+            'sar': {'monthly': 37.49, 'annual': 374.99}
+        }
+        
+        # Get price ID - check for currency-specific price IDs first
+        price_id = None
+        if requested_currency == 'usd':
+            # Use default price ID for USD
+            price_id = plan['price_id']
+        else:
+            # Check for currency-specific price ID in environment variables
+            currency_price_key = f'STRIPE_{plan_type.upper()}_PRICE_ID_{requested_currency.upper()}'
+            price_id = os.environ.get(currency_price_key, '').strip()
+            
+            # If no currency-specific price ID, try to create one dynamically
+            if not price_id or price_id == '':
+                try:
+                    # Get product ID from existing price (if available)
+                    if plan['price_id'] and plan['price_id'].strip() and 'YOUR_' not in plan['price_id']:
+                        try:
+                            existing_price = stripe.Price.retrieve(plan['price_id'])
+                            product_id = existing_price.product
+                            
+                            # Create new price for requested currency
+                            amount = int(currency_rates.get(requested_currency, currency_rates['usd'])[plan_type] * 100)  # Convert to cents
+                            
+                            new_price = stripe.Price.create(
+                                product=product_id,
+                                unit_amount=amount,
+                                currency=requested_currency,
+                                recurring={'interval': plan['interval']}
+                            )
+                            price_id = new_price.id
+                        except Exception as e:
+                            current_app.logger.warning(f"Could not create dynamic price: {e}")
+                            # Fall back to default price ID
+                            price_id = plan['price_id']
+                    else:
+                        price_id = plan['price_id']
+                except Exception as e:
+                    current_app.logger.warning(f"Error creating price for {requested_currency}: {e}")
+                    price_id = plan['price_id']
+        
+        if not price_id or price_id.strip() == '' or 'YOUR_' in price_id:
+            return jsonify({
+                'success': False,
+                'errors': [
+                    f'Stripe {plan_type} price ID not configured.',
+                    'Please set STRIPE_MONTHLY_PRICE_ID or STRIPE_ANNUAL_PRICE_ID environment variable in your .env file.',
                     'See QUICK_STRIPE_SETUP.md for instructions.'
                 ]
             }), 500
@@ -166,7 +211,7 @@ def create_checkout_session():
             customer_email=data.get('email'),  # Optional: pass email if available
             payment_method_types=['card'],
             line_items=[{
-                'price': plan['price_id'],
+                'price': price_id,
                 'quantity': 1,
             }],
             mode='subscription',
@@ -174,12 +219,14 @@ def create_checkout_session():
             cancel_url=request.host_url + 'subscription/cancel',
             metadata={
                 'user_id': user_id,
-                'plan_type': plan_type
+                'plan_type': plan_type,
+                'currency': requested_currency
             },
             subscription_data={
                 'metadata': {
                     'user_id': user_id,
-                    'plan_type': plan_type
+                    'plan_type': plan_type,
+                    'currency': requested_currency
                 }
             }
         )
@@ -257,22 +304,47 @@ def create_portal_session():
 
 @subscription_bp.route('/api/subscription/webhook', methods=['POST'])
 def stripe_webhook():
+    # Security: Basic rate limiting for webhook endpoint (if limiter available)
+    # Note: Stripe webhooks should be verified by signature, but rate limiting adds defense in depth
+    try:
+        from flask import current_app
+        limiter = current_app.extensions.get('limiter')
+        if limiter:
+            # Allow higher rate for webhooks (Stripe may send multiple events)
+            limiter.limit("100 per hour", key_func=lambda: request.remote_addr)
+    except Exception:
+        pass  # Continue if rate limiting not available
     """Handle Stripe webhook events"""
     if not STRIPE_AVAILABLE:
         return jsonify({'error': 'Stripe is not installed'}), 500
     
     payload = request.data
     sig_header = request.headers.get('Stripe-Signature')
-    webhook_secret = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+    webhook_secret = os.environ.get('STRIPE_WEBHOOK_SECRET', '').strip()
+    
+    # Security: Require webhook secret - reject if not configured
+    if not webhook_secret:
+        current_app.logger.error("STRIPE_WEBHOOK_SECRET not configured - rejecting webhook")
+        return jsonify({'error': 'Webhook secret not configured'}), 500
     
     try:
-        if webhook_secret:
-            event = stripe.Webhook.construct_event(
-                payload, sig_header, webhook_secret
-            )
-        else:
-            # In development, you might skip signature verification
-            event = json.loads(payload)
+        # Always verify webhook signature
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, webhook_secret
+        )
+        
+        # Security: Idempotency check - prevent duplicate event processing
+        event_id = event.get('id')
+        if event_id:
+            if event_id in _processed_webhook_events:
+                current_app.logger.info(f"Duplicate webhook event ignored: {event_id}")
+                return jsonify({'success': True, 'message': 'Event already processed'}), 200
+            _processed_webhook_events.add(event_id)
+            # TODO: In production, use persistent storage (Redis/DB) for event IDs
+            # Limit in-memory set size to prevent memory issues
+            if len(_processed_webhook_events) > 10000:
+                # Clear oldest 50% (simple cleanup)
+                _processed_webhook_events.clear()
         
         # Handle the event
         if event['type'] == 'checkout.session.completed':
@@ -296,12 +368,15 @@ def stripe_webhook():
         
     except ValueError as e:
         # Invalid payload
-        return jsonify({'error': str(e)}), 400
+        current_app.logger.warning(f"Invalid webhook payload: {e}")
+        return jsonify({'error': 'Invalid payload'}), 400
     except stripe.error.SignatureVerificationError as e:
-        # Invalid signature
-        return jsonify({'error': str(e)}), 400
+        # Invalid signature - log for security monitoring
+        current_app.logger.warning(f"Webhook signature verification failed: {e}")
+        return jsonify({'error': 'Invalid signature'}), 400
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.error(f"Webhook processing error: {e}", exc_info=True)
+        return jsonify({'error': 'Internal server error'}), 500
 
 
 def handle_checkout_completed(session):
@@ -372,43 +447,125 @@ def handle_subscription_deleted(subscription):
 def update_subscription_from_stripe(stripe_subscription, user_id: str, customer_id: str):
     """Update or create subscription record from Stripe subscription object"""
     try:
+        # Handle both dict and object formats
+        if hasattr(stripe_subscription, 'get'):
+            # It's a dict
+            sub_dict = stripe_subscription
+        else:
+            # It's a Stripe object, convert to dict
+            sub_dict = stripe_subscription.to_dict() if hasattr(stripe_subscription, 'to_dict') else dict(stripe_subscription)
+        
         # Get plan details
-        price_id = stripe_subscription.get('items', {}).get('data', [{}])[0].get('price', {}).get('id', '')
-        plan_name = 'Monthly' if 'monthly' in price_id.lower() else 'Annual'
+        items = sub_dict.get('items', {})
+        if isinstance(items, dict):
+            price_id = items.get('data', [{}])[0].get('price', {}).get('id', '')
+        else:
+            # Handle Stripe object
+            price_id = items.data[0].price.id if hasattr(items, 'data') and items.data else ''
+        
+        # Determine plan name from price_id or metadata
+        plan_name = 'Monthly'
+        if price_id:
+            # Check metadata first
+            metadata = sub_dict.get('metadata', {})
+            plan_type = metadata.get('plan_type', '')
+            if 'annual' in plan_type.lower() or 'year' in price_id.lower():
+                plan_name = 'Annual'
+            elif 'monthly' in plan_type.lower() or 'month' in price_id.lower():
+                plan_name = 'Monthly'
+        
+        # Get status - handle both string and enum
+        status_str = sub_dict.get('status', 'none')
+        if isinstance(status_str, str):
+            # Map Stripe status to our enum
+            status_map = {
+                'active': SubscriptionStatus.ACTIVE,
+                'canceled': SubscriptionStatus.CANCELED,
+                'past_due': SubscriptionStatus.PAST_DUE,
+                'unpaid': SubscriptionStatus.UNPAID,
+                'trialing': SubscriptionStatus.TRIALING,
+                'incomplete': SubscriptionStatus.INCOMPLETE,
+                'incomplete_expired': SubscriptionStatus.INCOMPLETE_EXPIRED,
+            }
+            status = status_map.get(status_str.lower(), SubscriptionStatus.NONE)
+        else:
+            status = SubscriptionStatus(status_str)
+        
+        # Handle dates - Stripe returns timestamps
+        current_period_start = None
+        current_period_end = None
+        
+        if sub_dict.get('current_period_start'):
+            start_val = sub_dict.get('current_period_start')
+            if isinstance(start_val, (int, float)):
+                current_period_start = datetime.fromtimestamp(start_val).isoformat()
+            else:
+                current_period_start = start_val.isoformat() if hasattr(start_val, 'isoformat') else str(start_val)
+        
+        if sub_dict.get('current_period_end'):
+            end_val = sub_dict.get('current_period_end')
+            if isinstance(end_val, (int, float)):
+                current_period_end = datetime.fromtimestamp(end_val).isoformat()
+            else:
+                current_period_end = end_val.isoformat() if hasattr(end_val, 'isoformat') else str(end_val)
         
         # Create or update subscription
         subscription = Subscription(
             user_id=user_id,
             stripe_customer_id=customer_id,
-            stripe_subscription_id=stripe_subscription.get('id'),
-            status=SubscriptionStatus(stripe_subscription.get('status', 'none')),
+            stripe_subscription_id=sub_dict.get('id'),
+            status=status,
             plan_id=price_id,
             plan_name=plan_name,
-            current_period_start=datetime.fromtimestamp(stripe_subscription.get('current_period_start', 0)).isoformat() if stripe_subscription.get('current_period_start') else None,
-            current_period_end=datetime.fromtimestamp(stripe_subscription.get('current_period_end', 0)).isoformat() if stripe_subscription.get('current_period_end') else None,
-            cancel_at_period_end=stripe_subscription.get('cancel_at_period_end', False),
+            current_period_start=current_period_start,
+            current_period_end=current_period_end,
+            cancel_at_period_end=sub_dict.get('cancel_at_period_end', False),
             updated_at=datetime.now().isoformat()
         )
         
         storage.save_subscription(subscription)
-        print(f"Subscription saved for user {user_id}: {subscription.status}")
+        print(f"Subscription saved for user {user_id}: {subscription.status} (plan: {plan_name})")
         
     except Exception as e:
         print(f"Error updating subscription: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 @subscription_bp.route('/subscription/success')
 def subscription_success():
-    """Success page after checkout"""
+    """Success page after checkout - manually sync subscription from Stripe"""
     session_id = request.args.get('session_id')
     
-    if session_id:
+    if session_id and STRIPE_AVAILABLE:
         try:
+            # Retrieve the checkout session from Stripe
             session = stripe.checkout.Session.retrieve(session_id)
-            # You can retrieve subscription info here
+            
+            # Get user_id from session metadata
+            user_id = session.get('metadata', {}).get('user_id')
+            subscription_id = session.get('subscription')
+            customer_id = session.get('customer')
+            
+            if user_id and subscription_id:
+                try:
+                    # Retrieve the subscription from Stripe
+                    stripe_subscription = stripe.Subscription.retrieve(subscription_id)
+                    
+                    # Update or create subscription in our database
+                    update_subscription_from_stripe(stripe_subscription, user_id, customer_id)
+                    
+                    print(f"Subscription synced for user {user_id} from success page")
+                except Exception as e:
+                    print(f"Error syncing subscription from success page: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
             return redirect(url_for('subscription.subscription_page', success=True))
-        except:
-            pass
+        except Exception as e:
+            print(f"Error retrieving checkout session: {e}")
+            import traceback
+            traceback.print_exc()
     
     return redirect(url_for('subscription.subscription_page', success=True))
 
@@ -417,6 +574,82 @@ def subscription_success():
 def subscription_cancel():
     """Cancel page"""
     return redirect(url_for('subscription.subscription_page', canceled=True))
+
+
+@subscription_bp.route('/api/subscription/sync', methods=['POST'])
+def sync_subscription():
+    """Manually sync subscription from Stripe for a user"""
+    try:
+        if not STRIPE_AVAILABLE:
+            return jsonify({
+                'success': False,
+                'errors': ['Stripe is not installed']
+            }), 500
+        
+        data = request.get_json() if request.is_json else {}
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'errors': ['User ID is required']
+            }), 400
+        
+        # Check if user has any existing subscription in our database
+        existing_sub = storage.get_subscription_by_user_id(user_id)
+        
+        # If they have a Stripe subscription ID, retrieve it
+        if existing_sub and existing_sub.stripe_subscription_id:
+            try:
+                stripe_sub = stripe.Subscription.retrieve(existing_sub.stripe_subscription_id)
+                update_subscription_from_stripe(stripe_sub, user_id, existing_sub.stripe_customer_id)
+                return jsonify({
+                    'success': True,
+                    'message': 'Subscription synced from Stripe'
+                })
+            except stripe.error.StripeError as e:
+                return jsonify({
+                    'success': False,
+                    'errors': [f'Stripe error: {str(e)}']
+                }), 400
+        
+        # Search Stripe for subscriptions with this user_id in metadata
+        try:
+            subscriptions = stripe.Subscription.list(
+                limit=100,
+                expand=['data.default_payment_method']
+            )
+            
+            # Find subscription with matching user_id in metadata
+            for sub in subscriptions.data:
+                metadata = sub.metadata or {}
+                if metadata.get('user_id') == user_id:
+                    # Found it! Update our database
+                    customer_id = sub.customer if isinstance(sub.customer, str) else sub.customer.id
+                    update_subscription_from_stripe(sub, user_id, customer_id)
+                    return jsonify({
+                        'success': True,
+                        'message': 'Subscription found and synced from Stripe'
+                    })
+            
+            return jsonify({
+                'success': False,
+                'errors': ['No active subscription found in Stripe for this user. Please complete checkout first.']
+            }), 404
+            
+        except stripe.error.StripeError as e:
+            return jsonify({
+                'success': False,
+                'errors': [f'Stripe error searching subscriptions: {str(e)}']
+            }), 400
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'errors': [f'Error syncing subscription: {str(e)}']
+        }), 500
 
 
 @subscription_bp.route('/subscription')

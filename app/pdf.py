@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List, Dict, Any
 import os
 
-from .models import Match, AppSettings, PhysicalMeasurement, Achievement, ClubHistory, TrainingCamp, PhysicalMetrics
+from .models import Match, AppSettings, PhysicalMeasurement, Achievement, ClubHistory, TrainingCamp, PhysicalMetrics, Reference
 from .utils import sort_matches_by_date, filter_matches_by_period
 
 
@@ -492,7 +492,7 @@ class PDFGenerator:
         elements.append(qual_para)
         
         return elements
-
+    
     def _create_footer(self, matches: List[Match]) -> Paragraph:
         """Create the footer with latest match date"""
         # Find the latest match date
@@ -895,6 +895,7 @@ def generate_scout_pdf(
     physical_measurements: List[PhysicalMeasurement] = None,
     training_camps: List[TrainingCamp] = None,
     physical_metrics: List[PhysicalMetrics] = None,
+    references: List[Reference] = None,
     output_dir: str = "output",
     period: str = 'all_time'
 ) -> str:
@@ -922,7 +923,7 @@ def generate_scout_pdf(
     
     # Generate PDF
     generator = ScoutPDFGenerator(settings)
-    return generator.generate_pdf(matches, output_path, achievements, club_history, physical_measurements or [], training_camps or [], physical_metrics or [], period=period)
+    return generator.generate_pdf(matches, output_path, achievements, club_history, physical_measurements or [], training_camps or [], physical_metrics or [], references or [], period=period)
 
 
 class ScoutPDFGenerator(PDFGenerator):
@@ -937,6 +938,7 @@ class ScoutPDFGenerator(PDFGenerator):
         physical_measurements: List[PhysicalMeasurement] = None,
         training_camps: List[TrainingCamp] = None,
         physical_metrics: List[PhysicalMetrics] = None,
+        references: List[Reference] = None,
         period: str = 'all_time'
     ) -> str:
         """Generate the complete scout-friendly PDF report
@@ -969,12 +971,25 @@ class ScoutPDFGenerator(PDFGenerator):
         story = []
         
         # PAGE 1: Cover page
-        story.extend(self._create_title_page())
-        story.append(PageBreak())
+        title_page_elements = self._create_title_page()
+        story.extend(title_page_elements)
         
-        # PAGE 2: Player photo & social media links
-        story.extend(self._create_player_media_section())
+        # PAGE 2: Player profile details, photo, media, and references
+        page2_elements = []
+        
+        # Add comprehensive player profile (always include this - it always returns content)
+        profile_elements = self._create_scout_player_profile(physical_measurements or [], physical_metrics)
+        page2_elements.extend(profile_elements)
+        page2_elements.append(Spacer(1, 12))
+        
+        # Add player photo, media, and references
+        media_elements = self._create_player_media_section(references or [])
+        if media_elements:
+            page2_elements.extend(media_elements)
+        
+        # Always add page 2 (player profile is always included)
         story.append(PageBreak())
+        story.append(KeepTogether(page2_elements))
         
         # PAGE 3: Club history and training camps
         club_history_elements = []
@@ -987,6 +1002,7 @@ class ScoutPDFGenerator(PDFGenerator):
         
         # Combine both sections and keep them together on same page
         if club_history_elements or training_camps_elements:
+            story.append(PageBreak())
             combined_elements = []
             if club_history_elements:
                 combined_elements.extend(club_history_elements)
@@ -995,10 +1011,14 @@ class ScoutPDFGenerator(PDFGenerator):
                 combined_elements.extend(training_camps_elements)
             # Use KeepTogether to ensure both sections stay on same page
             story.append(KeepTogether(combined_elements))
-        story.append(PageBreak())
         
-        # PAGE 4: Key achievements, physical development, physical performance metrics
+        # PAGE 4: Playing Profile, Key achievements, physical development, physical performance metrics
         page4_elements = []
+        
+        # Add playing profile section
+        if self.settings.playing_profile and len(self.settings.playing_profile) > 0:
+            page4_elements.extend(self._create_playing_profile_section())
+            page4_elements.append(Spacer(1, 12))
         
         # Add achievements
         if achievements:
@@ -1016,10 +1036,10 @@ class ScoutPDFGenerator(PDFGenerator):
         
         # Keep all page 4 content together
         if page4_elements:
+            story.append(PageBreak())
             story.append(KeepTogether(page4_elements))
-        story.append(PageBreak())
         
-        # PAGE 5: Performance summary and key statistics
+        # PAGE 5: Performance summary and key statistics (always include if there are matches)
         page5_elements = []
         
         # Add performance summary
@@ -1029,10 +1049,13 @@ class ScoutPDFGenerator(PDFGenerator):
             page5_elements.append(Spacer(1, 12))
         
         # Add key statistics
-        page5_elements.extend(self._create_key_statistics(matches))
+        key_stats_elements = self._create_key_statistics(matches)
+        if key_stats_elements:
+            page5_elements.extend(key_stats_elements)
         
         # Keep all page 5 content together
         if page5_elements:
+            story.append(PageBreak())
             story.append(KeepTogether(page5_elements))
         
         # Add footer
@@ -1047,8 +1070,9 @@ class ScoutPDFGenerator(PDFGenerator):
         elements = []
         
         # Title
+        player_name = self.settings.player_name or "Player"
         title = Paragraph(
-            f"{self.settings.player_name}<br/>Player Profile & Performance Report",
+            f"{player_name}<br/>Player Profile & Performance Report",
             ParagraphStyle(
                 name='TitlePage',
                 parent=self.styles['Title'],
@@ -1063,10 +1087,13 @@ class ScoutPDFGenerator(PDFGenerator):
         elements.append(title)
         elements.append(Spacer(1, 40))
         
-        # Current club and season
+        # Current club and season - handle empty values
+        club_name = self.settings.club_name or "N/A"
+        season_year = self.settings.season_year or "N/A"
+        
         club_info = Paragraph(
-            f"<b>Current Club:</b> {self.settings.club_name}<br/>"
-            f"<b>Season:</b> {self.settings.season_year}",
+            f"<b>Current Club:</b> {club_name}<br/>"
+            f"<b>Season:</b> {season_year}",
             ParagraphStyle(
                 name='ClubInfo',
                 parent=self.styles['Normal'],
@@ -1105,17 +1132,15 @@ class ScoutPDFGenerator(PDFGenerator):
         # Create profile table
         profile_data = []
         
-        # Basic Information
-        if self.settings.player_name:
-            profile_data.append(["Name", self.settings.player_name])
+        # Basic Information - always include name and club
+        profile_data.append(["Name", self.settings.player_name or "N/A"])
         if self.settings.date_of_birth:
             profile_data.append(["Date of Birth", self.settings.date_of_birth])
         if self.settings.position:
             profile_data.append(["Position", self.settings.position])
         if self.settings.dominant_foot:
             profile_data.append(["Dominant Foot", self.settings.dominant_foot])
-        if self.settings.club_name:
-            profile_data.append(["Current Club", self.settings.club_name])
+        profile_data.append(["Current Club", self.settings.club_name or "N/A"])
         
         # Physical Attributes
         if self.settings.height_cm:
@@ -1152,48 +1177,71 @@ class ScoutPDFGenerator(PDFGenerator):
             if self.settings.agility_time_sec:
                 profile_data.append(["Agility Time", f"{self.settings.agility_time_sec:.2f} sec"])
         
-        # PHV Information
+        # PHV Information with status explanation
         if self.settings.phv_date and self.settings.phv_age:
-            profile_data.append(["Peak Height Velocity", f"Age {self.settings.phv_age:.1f} years ({self.settings.phv_date})"])
+            # Determine PHV status
+            try:
+                phv_date_obj = datetime.strptime(self.settings.phv_date, "%d %b %Y")
+                current_date = datetime.now()
+                days_diff = (current_date - phv_date_obj).days
+                
+                if days_diff < 0:
+                    status_text = "Currently pre-PHV, indicating early stage of growth spurt."
+                elif days_diff < 180:
+                    status_text = "Currently at PHV, indicating peak growth velocity period."
+                else:
+                    status_text = "Currently post-PHV, indicating advanced physical development relative to chronological age."
+                
+                # Use <br/> for ReportLab paragraph formatting
+                phv_value = f"Age {self.settings.phv_age:.1f} years ({self.settings.phv_date})<br/>{status_text}"
+            except:
+                phv_value = f"Age {self.settings.phv_age:.1f} years ({self.settings.phv_date})"
+            
+            profile_data.append(["Peak Height Velocity", phv_value])
         
-        if profile_data:
-            data = [['Attribute', 'Value']] + profile_data
-            
-            # Convert to Paragraph objects for proper text wrapping
-            wrapped_profile_data = []
-            for row_idx, row in enumerate(data):
-                wrapped_row = []
-                for col_idx, cell in enumerate(row):
-                    if row_idx == 0:  # Header row
-                        wrapped_row.append(Paragraph(str(cell), self.styles['TableHeader']))
-                    else:
-                        # Both columns can wrap, left column is label, right is value
-                        wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
-                wrapped_profile_data.append(wrapped_row)
-            
-            profile_table = Table(wrapped_profile_data, colWidths=[2.5*inch, 4.5*inch])
-            profile_style = TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 11),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 10),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.light_grey]),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('LEFTPADDING', (0, 0), (-1, -1), 8),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-                ('TOPPADDING', (0, 0), (-1, -1), 8),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ])
-            profile_table.setStyle(profile_style)
-            elements.append(profile_table)
+        # Always create table (profile_data should always have at least name and club)
+        # But add a safety check
+        if not profile_data:
+            profile_data.append(["Name", self.settings.player_name or "N/A"])
+            profile_data.append(["Current Club", self.settings.club_name or "N/A"])
+        
+        data = [['Attribute', 'Value']] + profile_data
+        
+        # Convert to Paragraph objects for proper text wrapping
+        wrapped_profile_data = []
+        for row_idx, row in enumerate(data):
+            wrapped_row = []
+            for col_idx, cell in enumerate(row):
+                if row_idx == 0:  # Header row
+                    wrapped_row.append(Paragraph(str(cell), self.styles['TableHeader']))
+                else:
+                    # Both columns can wrap, left column is label, right is value
+                    wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
+            wrapped_profile_data.append(wrapped_row)
+        
+        profile_table = Table(wrapped_profile_data, colWidths=[2.5*inch, 4.5*inch])
+        profile_style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.light_grey]),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ])
+        profile_table.setStyle(profile_style)
+        elements.append(profile_table)
         
         return elements
     
-    def _create_player_media_section(self) -> List:
+    def _create_player_media_section(self, references: List[Reference] = None) -> List:
         """Create player photo and links section"""
         elements = []
         
@@ -1265,6 +1313,33 @@ class ScoutPDFGenerator(PDFGenerator):
                 elements.append(link_para)
             elements.append(Spacer(1, 8))
         
+        # Add references section (below social media links)
+        if references and len(references) > 0:
+            elements.append(Paragraph("<b>References:</b>", self.styles['TableCell']))
+            elements.append(Spacer(1, 4))
+            
+            for ref in references:
+                ref_text = f"<b>{ref.name}</b>"
+                if ref.position:
+                    ref_text += f" - {ref.position}"
+                if ref.organization:
+                    ref_text += f" ({ref.organization})"
+                elements.append(Paragraph(ref_text, self.styles['TableCell']))
+                
+                # Add contact info if available
+                contact_parts = []
+                if ref.email:
+                    contact_parts.append(f'<a href="mailto:{ref.email}" color="blue"><u>{ref.email}</u></a>')
+                if ref.phone:
+                    contact_parts.append(ref.phone)
+                if contact_parts:
+                    elements.append(Paragraph(" | ".join(contact_parts), self.styles['TableCell']))
+                
+                if ref.relationship:
+                    elements.append(Paragraph(f"<i>{ref.relationship}</i>", self.styles['TableCell']))
+                
+                elements.append(Spacer(1, 6))
+        
         return elements
     
     def _create_club_history_section(self, club_history: List[ClubHistory]) -> List:
@@ -1328,6 +1403,35 @@ class ScoutPDFGenerator(PDFGenerator):
         header_para = Paragraph("Club History", self.styles['SectionHeader'])
         spacer = Spacer(1, 12)
         elements.append(KeepTogether([header_para, spacer, history_table]))
+        
+        return elements
+    
+    def _create_playing_profile_section(self) -> List:
+        """Create Playing Profile section with bullet points"""
+        elements = []
+        
+        if not self.settings.playing_profile or len(self.settings.playing_profile) == 0:
+            return elements
+        
+        elements.append(Paragraph("Playing Profile", self.styles['SectionHeader']))
+        elements.append(Spacer(1, 8))
+        
+        # Create bullet list
+        for item in self.settings.playing_profile:
+            if item and item.strip():
+                bullet_para = Paragraph(
+                    f"• {item.strip()}",
+                    ParagraphStyle(
+                        name='PlayingProfileBullet',
+                        parent=self.styles['Normal'],
+                        fontSize=10,
+                        leftIndent=12,
+                        spaceAfter=6,
+                        fontName='Helvetica',
+                        leading=14
+                    )
+                )
+                elements.append(bullet_para)
         
         return elements
     
@@ -1467,110 +1571,206 @@ class ScoutPDFGenerator(PDFGenerator):
         return elements
     
     def _create_physical_metrics_section(self, physical_metrics: List[PhysicalMetrics]) -> List:
-        """Create physical performance metrics section"""
+        """Create physical performance metrics section grouped by category"""
         elements = []
         
-        # Sort by date (most recent first)
+        if not physical_metrics:
+            return elements
+        
+        # Filter to only include metrics marked for report
+        # All metrics are kept for calculations, but only selected ones appear in PDF
+        report_metrics = [
+            m for m in physical_metrics 
+            if (m.include_in_report if hasattr(m, 'include_in_report') else True)
+        ]
+        
+        if not report_metrics:
+            return elements
+        
+        # Sort by date (most recent first) and use latest metric
         sorted_metrics = sorted(
-            physical_metrics, 
+            report_metrics, 
             key=lambda x: datetime.strptime(x.date, "%d %b %Y"), 
             reverse=True
         )
         
-        # Create a comprehensive table with key metrics
-        metrics_data = [['Date', 'Sprint Speed', '10m (s)', '20m (s)', '30m (s)', 'Vertical Jump', 'Standing Long Jump', 'Beep Test']]
-        for metric in sorted_metrics:
-            # Sprint speed info
-            sprint_str = '-'
-            if metric.sprint_speed_ms:
-                sprint_str = f"{metric.sprint_speed_ms:.2f} m/s"
-            elif metric.sprint_speed_kmh:
-                sprint_str = f"{metric.sprint_speed_kmh:.1f} km/h"
-            else:
-                sprint_str = '-'
+        latest_metric = sorted_metrics[0]
+        
+        elements.append(Paragraph("Physical Performance Metrics", self.styles['SectionHeader']))
+        elements.append(Spacer(1, 12))
+        
+        # Speed Category
+        speed_items = []
+        if latest_metric.sprint_10m_sec:
+            speed_items.append(["10m", f"{latest_metric.sprint_10m_sec:.2f} s"])
+        if latest_metric.sprint_20m_sec:
+            speed_items.append(["20m", f"{latest_metric.sprint_20m_sec:.2f} s"])
+        if latest_metric.sprint_30m_sec:
+            speed_items.append(["30m", f"{latest_metric.sprint_30m_sec:.2f} s"])
+        if latest_metric.sprint_speed_ms:
+            speed_items.append(["Max Sprint Speed", f"{latest_metric.sprint_speed_ms:.2f} m/s"])
+        elif latest_metric.sprint_speed_kmh:
+            speed_items.append(["Max Sprint Speed", f"{latest_metric.sprint_speed_kmh:.1f} km/h"])
+        
+        if speed_items:
+            # Speed header
+            speed_header = Paragraph(
+                "Speed",
+                ParagraphStyle(
+                    name='CategoryHeader',
+                    parent=self.styles['Normal'],
+                    fontSize=11,
+                    fontName='Helvetica-Bold',
+                    textColor=self.header_color,
+                    spaceAfter=6
+                )
+            )
+            elements.append(speed_header)
             
-            # Sprint times
-            sprint_10m_str = f"{metric.sprint_10m_sec:.2f}" if metric.sprint_10m_sec else '-'
-            sprint_20m_str = f"{metric.sprint_20m_sec:.2f}" if metric.sprint_20m_sec else '-'
-            sprint_30m_str = f"{metric.sprint_30m_sec:.2f}" if metric.sprint_30m_sec else '-'
+            # Speed items table
+            speed_data = [['Metric', 'Value']] + speed_items
+            wrapped_speed_data = []
+            for row_idx, row in enumerate(speed_data):
+                wrapped_row = []
+                for col_idx, cell in enumerate(row):
+                    if row_idx == 0:
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableHeader']))
+                    else:
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
+                wrapped_speed_data.append(wrapped_row)
             
-            # Vertical Jump info
-            vertical_jump_str = '-'
-            if metric.vertical_jump_cm:
-                vertical_jump_str = f"{metric.vertical_jump_cm:.1f} cm"
-            elif metric.countermovement_jump_cm:
-                vertical_jump_str = f"CMJ: {metric.countermovement_jump_cm:.1f} cm"
-            
-            # Standing Long Jump info
-            standing_long_jump_str = f"{metric.standing_long_jump_cm:.1f} cm" if metric.standing_long_jump_cm else '-'
-            
-            # Beep Test
-            beep_test_str = f"{metric.beep_test_level:.1f}" if metric.beep_test_level else '-'
-            
-            metrics_data.append([
-                metric.date,
-                sprint_str,
-                sprint_10m_str,
-                sprint_20m_str,
-                sprint_30m_str,
-                vertical_jump_str,
-                standing_long_jump_str,
-                beep_test_str
+            speed_table = Table(wrapped_speed_data, colWidths=[3*inch, 4*inch])
+            speed_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.light_grey]),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             ])
+            speed_table.setStyle(speed_style)
+            elements.append(speed_table)
+            elements.append(Spacer(1, 12))
         
-        # Convert to Paragraph objects for proper text wrapping
-        wrapped_metrics_data = []
-        for row_idx, row in enumerate(metrics_data):
-            wrapped_row = []
-            for col_idx, cell in enumerate(row):
-                if row_idx == 0:  # Header row
-                    wrapped_row.append(Paragraph(str(cell), self.styles['TableHeader']))
-                else:
-                    wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
-            wrapped_metrics_data.append(wrapped_row)
+        # Power Category
+        power_items = []
+        if latest_metric.vertical_jump_cm:
+            power_items.append(["Vertical Jump", f"{latest_metric.vertical_jump_cm:.1f} cm"])
+        elif latest_metric.countermovement_jump_cm:
+            power_items.append(["Countermovement Jump", f"{latest_metric.countermovement_jump_cm:.1f} cm"])
+        if latest_metric.standing_long_jump_cm:
+            power_items.append(["Standing Long Jump", f"{latest_metric.standing_long_jump_cm:.1f} cm"])
         
-        # Calculate better column widths for A4 portrait (8.27 inches total width, minus margins)
-        # Using approximately 7.5 inches for table width
-        metrics_table = Table(wrapped_metrics_data, colWidths=[
-            0.85*inch,  # Date
-            1.0*inch,   # Sprint Speed
-            0.7*inch,   # 10m
-            0.7*inch,   # 20m
-            0.7*inch,   # 30m
-            1.0*inch,   # Vertical Jump
-            1.1*inch,   # Standing Long Jump
-            0.75*inch   # Beep Test
-        ])
-        metrics_style = TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 9),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 8),
-            ('ALIGN', (0, 1), (0, -1), 'CENTER'),  # Date
-            ('ALIGN', (1, 1), (1, -1), 'CENTER'),  # Sprint Speed
-            ('ALIGN', (2, 1), (2, -1), 'CENTER'),  # 10m
-            ('ALIGN', (3, 1), (3, -1), 'CENTER'),  # 20m
-            ('ALIGN', (4, 1), (4, -1), 'CENTER'),  # 30m
-            ('ALIGN', (5, 1), (5, -1), 'CENTER'),  # Vertical Jump
-            ('ALIGN', (6, 1), (6, -1), 'CENTER'),  # Standing Long Jump
-            ('ALIGN', (7, 1), (7, -1), 'CENTER'),  # Beep Test
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.light_grey]),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 4),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ])
-        metrics_table.setStyle(metrics_style)
+        if power_items:
+            # Power header
+            power_header = Paragraph(
+                "Power",
+                ParagraphStyle(
+                    name='CategoryHeader',
+                    parent=self.styles['Normal'],
+                    fontSize=11,
+                    fontName='Helvetica-Bold',
+                    textColor=self.header_color,
+                    spaceAfter=6
+                )
+            )
+            elements.append(power_header)
+            
+            # Power items table
+            power_data = [['Metric', 'Value']] + power_items
+            wrapped_power_data = []
+            for row_idx, row in enumerate(power_data):
+                wrapped_row = []
+                for col_idx, cell in enumerate(row):
+                    if row_idx == 0:
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableHeader']))
+                    else:
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
+                wrapped_power_data.append(wrapped_row)
+            
+            power_table = Table(wrapped_power_data, colWidths=[3*inch, 4*inch])
+            power_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.light_grey]),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ])
+            power_table.setStyle(power_style)
+            elements.append(power_table)
+            elements.append(Spacer(1, 12))
         
-        # Use KeepTogether to ensure header and table stay on same page
-        header_para = Paragraph("Physical Performance Metrics", self.styles['SectionHeader'])
-        spacer = Spacer(1, 12)
-        elements.append(KeepTogether([header_para, spacer, metrics_table]))
+        # Endurance Category
+        endurance_items = []
+        if latest_metric.beep_test_level:
+            endurance_items.append(["Beep Test", f"Level {latest_metric.beep_test_level:.1f}"])
+        
+        if endurance_items:
+            # Endurance header
+            endurance_header = Paragraph(
+                "Endurance",
+                ParagraphStyle(
+                    name='CategoryHeader',
+                    parent=self.styles['Normal'],
+                    fontSize=11,
+                    fontName='Helvetica-Bold',
+                    textColor=self.header_color,
+                    spaceAfter=6
+                )
+            )
+            elements.append(endurance_header)
+            
+            # Endurance items table
+            endurance_data = [['Metric', 'Value']] + endurance_items
+            wrapped_endurance_data = []
+            for row_idx, row in enumerate(endurance_data):
+                wrapped_row = []
+                for col_idx, cell in enumerate(row):
+                    if row_idx == 0:
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableHeader']))
+                    else:
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
+                wrapped_endurance_data.append(wrapped_row)
+            
+            endurance_table = Table(wrapped_endurance_data, colWidths=[3*inch, 4*inch])
+            endurance_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.light_grey]),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ])
+            endurance_table.setStyle(endurance_style)
+            elements.append(endurance_table)
         
         return elements
     
@@ -1581,9 +1781,16 @@ class ScoutPDFGenerator(PDFGenerator):
         elements.append(Paragraph("Physical Development", self.styles['SectionHeader']))
         elements.append(Spacer(1, 12))
         
+        # Filter to only include measurements marked for report
+        # All measurements are kept for PHV calculation, but only selected ones appear in PDF
+        report_measurements = [
+            m for m in physical_measurements 
+            if m.height_cm is not None and (m.include_in_report if hasattr(m, 'include_in_report') else True)
+        ]
+        
         # Sort by date
         sorted_measurements = sorted(
-            [m for m in physical_measurements if m.height_cm is not None],
+            report_measurements,
             key=lambda m: datetime.strptime(m.date, "%d %b %Y")
         )
         
@@ -1747,20 +1954,47 @@ class ScoutPDFGenerator(PDFGenerator):
         # Calculate advanced stats
         advanced_stats = self._calculate_advanced_stats(completed_matches)
         
+        # Get performance metric comments from settings
+        metric_comments = self.settings.performance_metric_comments or {}
+        
+        # Build metrics data with comments
+        goals_60_value = f"{advanced_stats['goals_per_60']:.2f}"
+        goals_60_comment = metric_comments.get('goals_per_60', '')
+        if goals_60_comment:
+            goals_60_value += f" ({goals_60_comment})"
+        
+        assists_60_value = f"{advanced_stats['assists_per_60']:.2f}"
+        assists_60_comment = metric_comments.get('assists_per_60', '')
+        if assists_60_comment:
+            assists_60_value += f" ({assists_60_comment})"
+        
+        contribution_60_value = f"{advanced_stats['contribution_per_60']:.2f}"
+        contribution_60_comment = metric_comments.get('contribution_per_60', '')
+        if contribution_60_comment:
+            contribution_60_value += f" ({contribution_60_comment})"
+        
         metrics_data = [
             ['Metric', 'Value'],
-            ['Goals per 60 minutes', f"{advanced_stats['goals_per_60']:.2f}"],
-            ['Assists per 60 minutes', f"{advanced_stats['assists_per_60']:.2f}"],
-            ['Goal Contributions per 60', f"{advanced_stats['contribution_per_60']:.2f}"],
+            ['Goals per 60 minutes', goals_60_value],
+            ['Assists per 60 minutes', assists_60_value],
+            ['Goal Contributions per 60', contribution_60_value],
         ]
         
         if advanced_stats['matches'] > 0:
             g_a_per_match = (advanced_stats['goals'] + advanced_stats['assists']) / advanced_stats['matches']
-            metrics_data.append(['Goal Contributions per Match', f"{g_a_per_match:.2f}"])
+            g_a_per_match_value = f"{g_a_per_match:.2f}"
+            g_a_comment = metric_comments.get('g_a_per_match', '')
+            if g_a_comment:
+                g_a_per_match_value += f" ({g_a_comment})"
+            metrics_data.append(['Goal Contributions per Match', g_a_per_match_value])
         
         if advanced_stats['goals'] + advanced_stats['assists'] > 0:
             min_per_ga = advanced_stats['minutes'] / (advanced_stats['goals'] + advanced_stats['assists'])
-            metrics_data.append(['Minutes per Goal Contribution', f"{min_per_ga:.0f}"])
+            min_per_ga_value = f"{min_per_ga:.0f}"
+            min_per_ga_comment = metric_comments.get('min_per_ga', '')
+            if min_per_ga_comment:
+                min_per_ga_value += f" ({min_per_ga_comment})"
+            metrics_data.append(['Minutes per Goal Contribution', min_per_ga_value])
         
         # Convert to Paragraph objects for proper text wrapping
         wrapped_metrics_data = []

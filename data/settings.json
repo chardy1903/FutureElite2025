@@ -48,14 +48,14 @@
   "highlight_reel_urls": [],
   "social_media_links": {},
   "20251115_221430": {
-    "season_year": "",
-    "club_name": "",
-    "player_name": "",
-    "primary_color": "#f90101",
+    "season_year": "2025/26",
+    "club_name": "Al Qadsiah U12",
+    "player_name": "Brodie Hardy",
+    "primary_color": "#000000",
     "header_color": "#000000",
     "footer_text": "",
     "show_logo": false,
-    "league_name": "",
+    "league_name": "Eastern Province U12 League 2025/26",
     "group1_teams": [
       "Winners Club",
       "Dhahran Sports",
@@ -82,22 +82,29 @@
       "Generations Sports",
       "Aspire"
     ],
-    "date_of_birth": null,
-    "height_cm": null,
-    "weight_kg": null,
-    "phv_date": null,
-    "phv_age": null,
+    "date_of_birth": "04 Jun 2013",
+    "height_cm": 167.5,
+    "weight_kg": 49.1,
+    "phv_date": "22 Apr 2025",
+    "phv_age": 11.88227241615332,
     "sprint_speed_ms": null,
     "sprint_speed_kmh": null,
-    "position": null,
-    "dominant_foot": null,
+    "position": "Forward",
+    "dominant_foot": "Right",
     "vertical_jump_cm": null,
     "agility_time_sec": null,
-    "player_photo_path": "data/photos/player_photo_20251115_215415.jpeg",
+    "player_photo_path": "data/photos/player_photo_20251223_211605.jpeg",
     "highlight_reel_urls": [
       "https://www.instagram.com/brodie_baller_no1"
     ],
     "social_media_links": {},
-    "contact_email": ""
+    "contact_email": "Chris@reserva-group.co.uk",
+    "playing_profile": [
+      "Forward with strong off ball movement",
+      "Right foot dominant, competent weak foot finishing"
+    ],
+    "performance_metric_comments": {
+      "goals_per_60": "above typical U12 forward range"
+    }
   }
 }

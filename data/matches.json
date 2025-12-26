@@ -208,5 +208,36 @@
     "notes": "Both goals reactive finish in crowded box",
     "is_fixture": false,
     "user_id": "20251115_221430"
+  },
+  {
+    "id": "20251129_120000_0015",
+    "category": "Pre-Season Friendly",
+    "date": "29 Nov 2025",
+    "opponent": "Stars Academy",
+    "location": "Ras Tanura",
+    "result": "Win",
+    "score": "4 - 2",
+    "brodie_goals": 0,
+    "brodie_assists": 0,
+    "minutes_played": 20,
+    "notes": "",
+    "is_fixture": false,
+    "user_id": "20251115_221430"
+  },
+  {
+    "id": "20251225_205716",
+    "category": "Friendly",
+    "date": "25 Dec 2025",
+    "opponent": "Qadsiah Academy",
+    "location": "Al Farabi",
+    "result": "Win",
+    "score": "4 - 3",
+    "brodie_goals": 1,
+    "brodie_assists": 0,
+    "clean_sheets": 0,
+    "minutes_played": 50,
+    "notes": "",
+    "is_fixture": false,
+    "user_id": "20251115_221430"
   }
 ]

@@ -1,0 +1,28 @@
+[
+  {
+    "user_id": "user_1763316525248_bymjzy3bn",
+    "stripe_customer_id": "cus_TewKV0NzAVrhnH",
+    "stripe_subscription_id": "sub_1ShcReRqnmdkcIXQkjeFVFKn",
+    "status": "active",
+    "plan_id": "price_1SUBjERqnmdkcIXQ6PPdZdlc",
+    "plan_name": "Monthly",
+    "current_period_start": null,
+    "current_period_end": null,
+    "cancel_at_period_end": false,
+    "created_at": "23 Dec 2025",
+    "updated_at": "2025-12-23T23:52:15.603454"
+  },
+  {
+    "user_id": "20251115_221430",
+    "stripe_customer_id": "cus_TewKV0NzAVrhnH",
+    "stripe_subscription_id": "sub_1ShcReRqnmdkcIXQkjeFVFKn",
+    "status": "active",
+    "plan_id": "price_1SUBjERqnmdkcIXQ6PPdZdlc",
+    "plan_name": "Monthly",
+    "current_period_start": null,
+    "current_period_end": null,
+    "cancel_at_period_end": false,
+    "created_at": "23 Dec 2025",
+    "updated_at": "2025-12-23T23:52:15.603454"
+  }
+]

@@ -274,17 +274,25 @@ const clientAPI = {
 const originalApiCall = window.apiCall;
 window.apiCall = async function(url, options = {}) {
     // Check if this is a client-side route
+    // Note: /api/settings GET and /api/achievements should go to server to get latest data
     const clientRoutes = [
-        '/matches', '/api/matches', '/api/settings', '/api/physical-measurements',
-        '/api/achievements', '/api/club-history', '/api/training-camps',
+        '/matches', '/api/matches', '/api/physical-measurements',
+        '/api/club-history', '/api/training-camps',
         '/api/physical-metrics', '/stats'
     ];
 
     const isClientRoute = clientRoutes.some(route => url.startsWith(route));
+    const method = options.method || 'GET';
+    
+    // Settings GET should always go to server to ensure we have latest data
+    if (url === '/api/settings' && method === 'GET') {
+        if (originalApiCall) {
+            return await originalApiCall(url, options);
+        }
+    }
     
     if (isClientRoute && !url.startsWith('/pdf') && !url.startsWith('/scout-pdf') && !url.startsWith('/export') && !url.startsWith('/import')) {
         // Use client-side API
-        const method = options.method || 'GET';
         const body = options.body ? JSON.parse(options.body) : {};
         
         try {
@@ -293,37 +301,283 @@ window.apiCall = async function(url, options = {}) {
                 return await clientAPI.getMatch(matchId);
             } else if (url.startsWith('/matches/') && method === 'PUT') {
                 const matchId = url.split('/matches/')[1];
-                return await clientAPI.updateMatch(matchId, body);
+                // PUT should go to server first for validation, then sync to client
+                try {
+                    // Security: Get CSRF token for state-changing request
+                    const csrfToken = await csrfManager.getToken();
+                    const headers = {
+                        'Content-Type': 'application/json'
+                    };
+                    if (csrfToken) {
+                        headers['X-CSRFToken'] = csrfToken;
+                    }
+                    
+                    const response = await fetch(url, {
+                        method: 'PUT',
+                        headers: headers,
+                        credentials: 'include',
+                        body: options.body || JSON.stringify(body)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        // Reload match from server to get updated data, then sync to client
+                        try {
+                            const getResponse = await fetch(`/matches/${matchId}`, {
+                                method: 'GET',
+                                credentials: 'include'
+                            });
+                            const getResult = await getResponse.json();
+                            if (getResult.success && getResult.match) {
+                                await clientAPI.updateMatch(matchId, getResult.match);
+                            }
+                        } catch (e) {
+                            console.warn('Failed to sync match to client storage:', e);
+                        }
+                    }
+                    
+                    if (!response.ok) {
+                        throw new Error(result.errors ? result.errors.join(', ') : 'Request failed');
+                    }
+                    
+                    return result;
+                } catch (error) {
+                    console.error('Error calling server API:', error);
+                    throw error;
+                }
             } else if (url.startsWith('/matches/') && method === 'DELETE') {
                 const matchId = url.split('/matches/')[1];
                 return await clientAPI.deleteMatch(matchId);
             } else if (url === '/matches' && method === 'POST') {
-                return await clientAPI.saveMatch(body);
+                // POST should go to server first for validation and subscription checks, then sync to client
+                // Use fetch directly to ensure it goes to server
+                try {
+                    // Security: Get CSRF token for state-changing request
+                    const csrfToken = await csrfManager.getToken();
+                    const headers = {
+                        'Content-Type': 'application/json'
+                    };
+                    if (csrfToken) {
+                        headers['X-CSRFToken'] = csrfToken;
+                    }
+                    
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: headers,
+                        credentials: 'include',
+                        body: options.body || JSON.stringify(body)
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        // If match object is returned, sync it; otherwise reload to get it
+                        if (result.match) {
+                            try {
+                                await clientAPI.saveMatch(result.match);
+                            } catch (e) {
+                                console.warn('Failed to sync match to client storage:', e);
+                            }
+                        } else if (result.match_id) {
+                            // Reload match from server to get full data
+                            try {
+                                const getResponse = await fetch(`/matches/${result.match_id}`, {
+                                method: 'GET',
+                                credentials: 'include'
+                            });
+                                const getResult = await getResponse.json();
+                                if (getResult.success && getResult.match) {
+                                    await clientAPI.saveMatch(getResult.match);
+                                }
+                            } catch (e) {
+                                console.warn('Failed to sync match to client storage:', e);
+                            }
+                        }
+                    }
+                    
+                    if (!response.ok) {
+                        throw new Error(result.errors ? result.errors.join(', ') : 'Request failed');
+                    }
+                    
+                    return result;
+                } catch (error) {
+                    console.error('Error calling server API:', error);
+                    throw error;
+                }
             } else if (url === '/matches' && method === 'GET') {
                 return await clientAPI.getMatches();
             } else if (url === '/settings' && method === 'GET') {
                 return await clientAPI.getSettings();
             } else if (url === '/settings' && method === 'POST') {
+                // Settings POST should go to server to ensure PHV calculation works
+                // Then sync to client storage
+                if (originalApiCall) {
+                    const result = await originalApiCall(url, options);
+                    // Also save to client storage for local access
+                    if (result.success && body) {
+                        try {
+                            // Parse the body to get the settings data
+                            const settingsData = typeof body === 'string' ? JSON.parse(body) : body;
+                            await clientAPI.saveSettings(settingsData);
+                        } catch (e) {
+                            console.warn('Failed to sync settings to client storage:', e);
+                        }
+                    }
+                    return result;
+                }
                 return await clientAPI.saveSettings(body);
             } else if (url === '/api/physical-measurements' && method === 'GET') {
+                // GET should go to server first, then sync to client storage
+                if (originalApiCall) {
+                    const result = await originalApiCall(url, options);
+                    if (result.success && result.measurements) {
+                        // Sync to client storage
+                        for (const m of result.measurements) {
+                            try {
+                                await clientAPI.savePhysicalMeasurement(m);
+                            } catch (e) {
+                                console.warn('Failed to sync measurement to client storage:', e);
+                            }
+                        }
+                    }
+                    return result;
+                }
                 return await clientAPI.getPhysicalMeasurements();
             } else if (url === '/api/physical-measurements' && method === 'POST') {
+                // POST should go to server first, then sync to client storage
+                if (originalApiCall) {
+                    const result = await originalApiCall(url, options);
+                    if (result.success) {
+                        try {
+                            // Use the measurement from server response (has converted date format)
+                            if (result.measurement) {
+                                await clientAPI.savePhysicalMeasurement(result.measurement);
+                            } else if (result.measurement_id) {
+                                // If no measurement in response, reload all to get the new one with correct format
+                                const getAllResult = await originalApiCall('/api/physical-measurements', {method: 'GET'});
+                                if (getAllResult.success && getAllResult.measurements) {
+                                    // Sync all measurements to client storage
+                                    for (const m of getAllResult.measurements) {
+                                        await clientAPI.savePhysicalMeasurement(m);
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('Failed to sync measurement to client storage:', e);
+                        }
+                    }
+                    return result;
+                }
                 return await clientAPI.savePhysicalMeasurement(body);
             } else if (url.startsWith('/api/physical-measurements/') && method === 'PUT') {
                 const id = url.split('/api/physical-measurements/')[1];
+                // PUT should go to server first, then sync to client storage
+                if (originalApiCall) {
+                    const result = await originalApiCall(url, options);
+                    if (result.success) {
+                        try {
+                            // Use the measurement from server response (has converted date format)
+                            if (result.measurement) {
+                                await clientAPI.savePhysicalMeasurement(result.measurement);
+                            } else {
+                                // Fallback: reload all measurements
+                                const getAllResult = await originalApiCall('/api/physical-measurements', {method: 'GET'});
+                                if (getAllResult.success && getAllResult.measurements) {
+                                    for (const m of getAllResult.measurements) {
+                                        await clientAPI.savePhysicalMeasurement(m);
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('Failed to sync measurement to client storage:', e);
+                        }
+                    }
+                    return result;
+                }
                 return await clientAPI.updatePhysicalMeasurement(id, body);
             } else if (url.startsWith('/api/physical-measurements/') && method === 'DELETE') {
                 const id = url.split('/api/physical-measurements/')[1];
+                // DELETE should go to server first, then sync to client storage
+                if (originalApiCall) {
+                    const result = await originalApiCall(url, options);
+                    if (result.success) {
+                        try {
+                            await clientAPI.deletePhysicalMeasurement(id);
+                        } catch (e) {
+                            console.warn('Failed to sync measurement deletion to client storage:', e);
+                        }
+                    }
+                    return result;
+                }
                 return await clientAPI.deletePhysicalMeasurement(id);
             } else if (url === '/api/achievements' && method === 'GET') {
+                // GET should go to server first, then sync to client storage
+                if (originalApiCall) {
+                    const result = await originalApiCall(url, options);
+                    if (result.success && result.achievements) {
+                        // Sync to client storage
+                        for (const ach of result.achievements) {
+                            try {
+                                await clientAPI.saveAchievement(ach);
+                            } catch (e) {
+                                console.warn('Failed to sync achievement to client storage:', e);
+                            }
+                        }
+                    }
+                    return result;
+                }
                 return await clientAPI.getAchievements();
             } else if (url === '/api/achievements' && method === 'POST') {
+                // POST should go to server first, then sync to client storage
+                if (originalApiCall) {
+                    const result = await originalApiCall(url, options);
+                    if (result.success && body) {
+                        try {
+                            const achievementData = typeof body === 'string' ? JSON.parse(body) : body;
+                            // Add the ID from the result if available
+                            if (result.achievement_id) {
+                                achievementData.id = result.achievement_id;
+                            }
+                            await clientAPI.saveAchievement(achievementData);
+                        } catch (e) {
+                            console.warn('Failed to sync achievement to client storage:', e);
+                        }
+                    }
+                    return result;
+                }
                 return await clientAPI.saveAchievement(body);
             } else if (url.startsWith('/api/achievements/') && method === 'PUT') {
                 const id = url.split('/api/achievements/')[1];
+                // PUT should go to server first, then sync to client storage
+                if (originalApiCall) {
+                    const result = await originalApiCall(url, options);
+                    if (result.success && body) {
+                        try {
+                            const achievementData = typeof body === 'string' ? JSON.parse(body) : body;
+                            achievementData.id = id;
+                            await clientAPI.saveAchievement(achievementData);
+                        } catch (e) {
+                            console.warn('Failed to sync achievement to client storage:', e);
+                        }
+                    }
+                    return result;
+                }
                 return await clientAPI.updateAchievement(id, body);
             } else if (url.startsWith('/api/achievements/') && method === 'DELETE') {
                 const id = url.split('/api/achievements/')[1];
+                // DELETE should go to server first, then sync to client storage
+                if (originalApiCall) {
+                    const result = await originalApiCall(url, options);
+                    if (result.success) {
+                        try {
+                            await clientAPI.deleteAchievement(id);
+                        } catch (e) {
+                            console.warn('Failed to sync achievement deletion to client storage:', e);
+                        }
+                    }
+                    return result;
+                }
                 return await clientAPI.deleteAchievement(id);
             } else if (url === '/api/club-history' && method === 'GET') {
                 return await clientAPI.getClubHistory();
@@ -375,8 +629,12 @@ window.apiCall = async function(url, options = {}) {
         if (originalApiCall) {
             return await originalApiCall(url, options);
         }
-        // Fallback to fetch
-        const response = await fetch(url, options);
+        // Fallback to fetch - ensure credentials included
+        const fetchOptions = {
+            ...options,
+            credentials: 'include'
+        };
+        const response = await fetch(url, fetchOptions);
         const data = await response.json();
         if (!response.ok) {
             throw new Error(data.errors ? data.errors.join(', ') : 'Request failed');

@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from .models import MatchData, Match, AppSettings, PhysicalMeasurement, MatchResult, Achievement, ClubHistory, TrainingCamp, PhysicalMetrics, User, Subscription, SubscriptionStatus
+from .models import MatchData, Match, AppSettings, PhysicalMeasurement, MatchResult, Achievement, ClubHistory, TrainingCamp, PhysicalMetrics, User, Subscription, SubscriptionStatus, Reference
 
 
 class StorageManager:
@@ -20,6 +20,7 @@ class StorageManager:
         self.physical_metrics_file = self.data_dir / "physical_metrics.json"
         self.users_file = self.data_dir / "users.json"
         self.subscriptions_file = self.data_dir / "subscriptions.json"
+        self.references_file = self.data_dir / "references.json"
         
         # Ensure data directory exists
         self.data_dir.mkdir(exist_ok=True)
@@ -53,6 +54,9 @@ class StorageManager:
         
         if not self.users_file.exists():
             self._save_users([])
+        
+        if not self.references_file.exists():
+            self._save_references([])
 
     def _save_matches(self, matches: list) -> None:
         """Save matches to JSON file"""
@@ -845,14 +849,37 @@ class StorageManager:
             return []
     
     def get_subscription_by_user_id(self, user_id: str) -> Optional[Subscription]:
-        """Get subscription for a user"""
+        """Get subscription for a user - tries multiple user ID formats"""
         subscriptions = self.load_subscriptions()
+        
+        # Try exact match first
         for sub_data in subscriptions:
             if sub_data.get('user_id') == user_id:
                 try:
+                    # Ensure status is properly converted to enum
+                    if 'status' in sub_data and isinstance(sub_data['status'], str):
+                        try:
+                            from .models import SubscriptionStatus
+                            sub_data['status'] = SubscriptionStatus(sub_data['status'].lower())
+                        except (ValueError, AttributeError):
+                            pass  # Will use default from model
                     return Subscription(**sub_data)
-                except (ValueError, TypeError, KeyError):
+                except (ValueError, TypeError, KeyError) as e:
+                    import traceback
+                    print(f"Error loading subscription for user {user_id}: {e}")
+                    traceback.print_exc()
                     continue
+        
+        # If no exact match, try to find subscription by Stripe customer ID
+        # This handles cases where user_id format changed
+        # First, try to get user by ID to see if we can find a match
+        user = self.get_user_by_id(user_id)
+        if user:
+            # Check if any subscription might belong to this user
+            # (e.g., by username or email if stored in metadata)
+            # For now, return None if no exact match
+            pass
+        
         return None
     
     def get_subscription_by_stripe_id(self, stripe_subscription_id: str) -> Optional[Subscription]:
@@ -892,6 +919,68 @@ class StorageManager:
         
         if len(subscriptions) < original_count:
             self._save_subscriptions(subscriptions)
+            return True
+        return False
+    
+    # ========== References ==========
+    def _save_references(self, references: list) -> None:
+        """Save references to JSON file"""
+        try:
+            with open(self.references_file, 'w', encoding='utf-8') as f:
+                json.dump(references, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"Error saving references: {e}")
+    
+    def load_references(self, user_id: Optional[str] = None) -> list:
+        """Load references, optionally filtered by user_id"""
+        try:
+            if not self.references_file.exists():
+                return []
+            with open(self.references_file, 'r', encoding='utf-8') as f:
+                references = json.load(f)
+                if user_id:
+                    references = [r for r in references if r.get('user_id') == user_id]
+                return references
+        except Exception as e:
+            print(f"Error loading references: {e}")
+            return []
+    
+    def get_reference(self, reference_id: str, user_id: Optional[str] = None) -> Optional[Reference]:
+        """Get a reference by ID"""
+        references = self.load_references(user_id)
+        for ref_data in references:
+            if ref_data.get('id') == reference_id:
+                return Reference(**ref_data)
+        return None
+    
+    def save_reference(self, reference: Reference) -> Reference:
+        """Save or update a reference"""
+        references = self.load_references()
+        # Find existing reference
+        existing_index = None
+        for i, ref_data in enumerate(references):
+            if ref_data.get('id') == reference.id:
+                existing_index = i
+                break
+        
+        # Update or add
+        ref_dict = reference.dict()
+        if existing_index is not None:
+            references[existing_index] = ref_dict
+        else:
+            references.append(ref_dict)
+        
+        self._save_references(references)
+        return reference
+    
+    def delete_reference(self, reference_id: str, user_id: Optional[str] = None) -> bool:
+        """Delete a reference"""
+        references = self.load_references(user_id)
+        original_count = len(references)
+        references = [r for r in references if r.get('id') != reference_id]
+        
+        if len(references) < original_count:
+            self._save_references(references)
             return True
         return False
 

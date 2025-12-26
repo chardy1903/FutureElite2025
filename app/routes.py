@@ -1,19 +1,36 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, send_file, current_app
 from flask_login import login_required, current_user
+import re
 from datetime import datetime
 import os
 import zipfile
 import tempfile
 import json
+import secrets
 from typing import Dict, Any, List
 from werkzeug.utils import secure_filename
+
+# Security: File upload validation
+try:
+    import magic
+    MAGIC_AVAILABLE = True
+except ImportError:
+    MAGIC_AVAILABLE = False
+    magic = None
+
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+    Image = None
 try:
     import openpyxl
     EXCEL_SUPPORT = True
 except ImportError:
     EXCEL_SUPPORT = False
 
-from .models import Match, MatchCategory, MatchResult, AppSettings, PhysicalMeasurement, Achievement, ClubHistory, TrainingCamp, PhysicalMetrics
+from .models import Match, MatchCategory, MatchResult, AppSettings, PhysicalMeasurement, Achievement, ClubHistory, TrainingCamp, PhysicalMetrics, Reference, SubscriptionStatus, Subscription
 from .storage import StorageManager
 from .utils import validate_match_data, parse_input_date, format_date_for_input
 from .pdf import generate_season_pdf, generate_scout_pdf
@@ -25,6 +42,55 @@ bp = Blueprint('main', __name__)
 
 # Initialize storage
 storage = StorageManager()
+
+# Free tier limits
+FREE_TIER_LIMITS = {
+    'matches': 5,
+    'achievements': 1,
+    'physical_measurements': 2,
+    'physical_metrics': 2,
+    'references': 1
+}
+
+def check_subscription_and_limit(user_id, resource_type, current_count=None):
+    """
+    Check if user has active subscription and if they've reached free tier limits.
+    Returns: (has_access, limit, current_count, error_message)
+    """
+    subscription = storage.get_subscription_by_user_id(user_id)
+    has_active_subscription = subscription and subscription.status == SubscriptionStatus.ACTIVE
+    
+    if has_active_subscription:
+        return (True, None, current_count, None)  # No limits for paid users
+    
+    # Free user - check limits
+    limit = FREE_TIER_LIMITS.get(resource_type)
+    if limit is None:
+        return (True, None, current_count, None)  # No limit for this resource type
+    
+    # Get current count if not provided
+    if current_count is None:
+        if resource_type == 'matches':
+            matches = storage.load_matches(user_id)
+            current_count = len(matches)
+        elif resource_type == 'achievements':
+            achievements = storage.load_achievements(user_id)
+            current_count = len(achievements)
+        elif resource_type == 'physical_measurements':
+            measurements = storage.load_physical_measurements(user_id)
+            current_count = len(measurements)
+        elif resource_type == 'physical_metrics':
+            metrics = storage.load_physical_metrics(user_id)
+            current_count = len(metrics)
+        elif resource_type == 'references':
+            references = storage.load_references(user_id)
+            current_count = len(references)
+    
+    if current_count >= limit:
+        error_msg = f"Free tier limit reached: {limit} {resource_type.replace('_', ' ')}. Subscribe to unlock unlimited entries."
+        return (False, limit, current_count, error_msg)
+    
+    return (True, limit, current_count, None)
 
 
 @bp.route('/test')
@@ -87,6 +153,12 @@ def matches():
 def create_match():
     """Create a new match"""
     user_id = current_user.id
+    
+    # Check subscription and limits
+    has_access, limit, current_count, error_msg = check_subscription_and_limit(user_id, 'matches')
+    if not has_access:
+        return jsonify({'success': False, 'errors': [error_msg], 'limit_reached': True, 'current_count': current_count, 'limit': limit}), 403
+    
     data = request.get_json()
     
     # Validate data
@@ -99,6 +171,14 @@ def create_match():
         if 'date' in data and '-' in data['date']:
             data['date'] = parse_input_date(data['date'])
         
+        # Handle clean sheets field
+        clean_sheets = None
+        if 'clean_sheets' in data and data['clean_sheets'] is not None and data['clean_sheets'] != '':
+            try:
+                clean_sheets = int(data['clean_sheets'])
+            except (ValueError, TypeError):
+                clean_sheets = None
+        
         # Create match object
         match = Match(
             category=MatchCategory(data['category']),
@@ -109,15 +189,19 @@ def create_match():
             score=data.get('score', ''),
             brodie_goals=int(data.get('brodie_goals', 0)),
             brodie_assists=int(data.get('brodie_assists', 0)),
+            clean_sheets=clean_sheets,
             minutes_played=int(data.get('minutes_played', 0)),
             notes=data.get('notes', ''),
-            is_fixture=data.get('is_fixture', False)
+            is_fixture=data.get('is_fixture', False),
+            include_in_report=data.get('include_in_report', True)  # Default to True
         )
         
         # Save match
         match_id = storage.save_match(match, user_id)
         
-        return jsonify({'success': True, 'match_id': match_id})
+        # Return the saved match object
+        saved_match = storage.get_match(match_id, user_id)
+        return jsonify({'success': True, 'match_id': match_id, 'match': saved_match.model_dump() if saved_match else None})
         
     except (ValueError, TypeError, KeyError) as e:
         return jsonify({'success': False, 'errors': [f'Invalid match data: {str(e)}']}), 400
@@ -147,6 +231,17 @@ def update_match(match_id):
         if 'date' in data and '-' in data['date']:
             data['date'] = parse_input_date(data['date'])
         
+        # Handle clean sheets field
+        clean_sheets = existing_match.clean_sheets
+        if 'clean_sheets' in data:
+            if data['clean_sheets'] is None or data['clean_sheets'] == '':
+                clean_sheets = None
+            else:
+                try:
+                    clean_sheets = int(data['clean_sheets'])
+                except (ValueError, TypeError):
+                    clean_sheets = None
+        
         # Update match object
         updated_match = Match(
             id=match_id,
@@ -158,15 +253,19 @@ def update_match(match_id):
             score=data.get('score', ''),
             brodie_goals=int(data.get('brodie_goals', 0)),
             brodie_assists=int(data.get('brodie_assists', 0)),
+            clean_sheets=clean_sheets,
             minutes_played=int(data.get('minutes_played', 0)),
             notes=data.get('notes', ''),
-            is_fixture=data.get('is_fixture', False)
+            is_fixture=data.get('is_fixture', False),
+            include_in_report=data.get('include_in_report', getattr(existing_match, 'include_in_report', True))
         )
         
         # Save updated match
         storage.save_match(updated_match, user_id)
         
-        return jsonify({'success': True})
+        # Return the updated match object
+        saved_match = storage.get_match(match_id, user_id)
+        return jsonify({'success': True, 'match': saved_match.model_dump() if saved_match else None})
         
     except (ValueError, TypeError, KeyError) as e:
         return jsonify({'success': False, 'errors': [f'Invalid match data: {str(e)}']}), 400
@@ -208,10 +307,65 @@ def fixtures():
 
 
 @bp.route('/pdf', methods=['POST'])
+@login_required
 def generate_pdf():
     """Generate PDF report - accepts data from client"""
     try:
+        # Check subscription status - try multiple methods
+        subscription = storage.get_subscription_by_user_id(current_user.id)
+        
+        # If no subscription found by user_id, check if there's exactly one active subscription
+        # This handles cases where user_id format changed (e.g., client-side ID vs server-side ID)
+        if not subscription:
+            subscriptions = storage.load_subscriptions()
+            active_subs = [s for s in subscriptions if s.get('status', '').lower() == 'active']
+            
+            # If there's exactly one active subscription, it's likely for the current user
+            # Update it to use the correct user_id
+            if len(active_subs) == 1:
+                sub_data = active_subs[0]
+                try:
+                    # Create subscription object and update user_id
+                    if 'status' in sub_data and isinstance(sub_data['status'], str):
+                        sub_data['status'] = SubscriptionStatus(sub_data['status'].lower())
+                    subscription = Subscription(**sub_data)
+                    subscription.user_id = current_user.id
+                    storage.save_subscription(subscription)
+                    current_app.logger.info(f"Updated subscription user_id from {sub_data.get('user_id')} to {current_user.id}")
+                except Exception as e:
+                    current_app.logger.error(f"Error updating subscription: {e}")
+                    subscription = None
+        
+        # Debug logging
+        current_app.logger.info(f"PDF generation request for user {current_user.id}")
+        current_app.logger.info(f"Subscription found: {subscription is not None}")
+        if subscription:
+            current_app.logger.info(f"Subscription status: {subscription.status}, type: {type(subscription.status)}")
+            current_app.logger.info(f"Subscription status == ACTIVE: {subscription.status == SubscriptionStatus.ACTIVE}")
+            current_app.logger.info(f"Subscription status value: {subscription.status.value if hasattr(subscription.status, 'value') else subscription.status}")
+        
+        # Check if subscription is active - simplified check
+        is_active = False
+        if subscription:
+            # Get status value (works for both enum and string)
+            status_value = subscription.status.value if hasattr(subscription.status, 'value') else str(subscription.status)
+            is_active = status_value.lower() == SubscriptionStatus.ACTIVE.value.lower()
+            current_app.logger.info(f"Status value: {status_value}, ACTIVE value: {SubscriptionStatus.ACTIVE.value}, is_active: {is_active}")
+        
+        if not subscription or not is_active:
+            current_app.logger.warning(f"PDF generation blocked for user {current_user.id}: subscription={subscription is not None}, is_active={is_active}")
+            return jsonify({
+                'success': False,
+                'errors': ['PDF generation is a premium feature. Please subscribe to unlock this feature.'],
+                'debug': {
+                    'has_subscription': subscription is not None,
+                    'status': subscription.status if subscription else None,
+                    'user_id': current_user.id
+                }
+            }), 403
+        
         data = request.get_json() if request.is_json else {}
+        user_id = current_user.id
         
         # Get data from request (client-side storage)
         matches_data = data.get('matches', [])
@@ -225,13 +379,284 @@ def generate_pdf():
         if period not in valid_periods:
             period = 'all_time'
         
+        # Load settings from server (most up-to-date, includes player profile data)
+        # Merge with client settings to ensure we have all data
+        try:
+            server_settings = storage.load_settings(user_id)
+            if server_settings:
+                # Merge server settings (source of truth) with client settings
+                # Server settings take priority, but client settings can fill in gaps
+                server_dict = server_settings.model_dump()
+                # Only update with client settings that are not None/empty in server settings
+                # AND the client value is not None/empty
+                for key, value in settings_data.items():
+                    if (key not in server_dict or 
+                        server_dict[key] is None or 
+                        server_dict[key] == '' or
+                        (isinstance(server_dict[key], list) and len(server_dict[key]) == 0)):
+                        # Only use client value if it's not None/empty
+                        if value is not None and value != '' and not (isinstance(value, list) and len(value) == 0):
+                            server_dict[key] = value
+                settings_data = server_dict
+        except Exception as e:
+            # If loading from server fails, use client settings
+            print(f"Warning: Could not load settings from server: {e}")
+            pass
+        
         # Convert data to model objects
         from .models import Match, AppSettings, PhysicalMeasurement, PhysicalMetrics
         
         matches = [Match(**m) for m in matches_data]
         settings = AppSettings(**settings_data) if settings_data else AppSettings()
-        physical_measurements = [PhysicalMeasurement(**pm) for pm in physical_measurements_data]
-        physical_metrics = [PhysicalMetrics(**pm) for pm in physical_metrics_data]
+        
+        # Convert physical measurement dates from YYYY-MM-DD to dd MMM yyyy format if needed
+        cleaned_measurements_data = []
+        for pm in physical_measurements_data:
+            cleaned_pm = pm.copy()
+            if 'date' in cleaned_pm and cleaned_pm['date']:
+                date_str = str(cleaned_pm['date']).strip()
+                # Check if date is in YYYY-MM-DD format (starts with 4 digits, has dashes)
+                # Try to parse as YYYY-MM-DD first
+                if re.match(r'^\d{4}-\d{2}-\d{2}', date_str):
+                    try:
+                        cleaned_pm['date'] = parse_input_date(date_str)
+                        print(f"Converted date: {date_str} -> {cleaned_pm['date']}")
+                    except Exception as e:
+                        print(f"Warning: Could not convert date {date_str}: {e}")
+                        continue  # Skip this measurement if date conversion fails
+                # If already in correct format, validate it
+                elif not re.match(r'^\d{1,2} [A-Za-z]{3} \d{4}', date_str):
+                    # Not in expected format, try to convert anyway
+                    try:
+                        cleaned_pm['date'] = parse_input_date(date_str)
+                        print(f"Converted date (fallback): {date_str} -> {cleaned_pm['date']}")
+                    except Exception as e:
+                        print(f"Warning: Could not convert date {date_str}: {e}")
+                        continue
+            cleaned_measurements_data.append(cleaned_pm)
+        
+        physical_measurements = [PhysicalMeasurement(**pm) for pm in cleaned_measurements_data]
+        
+        # Convert physical metrics dates from YYYY-MM-DD to dd MMM yyyy format if needed
+        # Also clean numeric fields (convert empty strings to None)
+        cleaned_metrics_data = []
+        numeric_fields = [
+            'sprint_speed_ms', 'sprint_speed_kmh', 'sprint_10m_sec', 'sprint_20m_sec', 'sprint_30m_sec',
+            'vertical_jump_cm', 'standing_long_jump_cm', 'countermovement_jump_cm',
+            'agility_time_sec', 'yo_yo_test_level', 'beep_test_level',
+            'bench_press_kg', 'squat_kg', 'deadlift_kg',
+            'vo2_max', 'sit_and_reach_cm'
+        ]
+        integer_fields = ['max_heart_rate', 'resting_heart_rate']
+        
+        for pm in physical_metrics_data:
+            if not pm or not isinstance(pm, dict):
+                continue
+            cleaned_pm = {}
+            # Initialize ALL numeric fields to None first
+            for field in numeric_fields:
+                cleaned_pm[field] = None
+            for field in integer_fields:
+                cleaned_pm[field] = None
+            
+            for key, value in pm.items():
+                # Handle numeric fields - convert empty strings to None
+                if key in numeric_fields:
+                    # Check for empty string, None, or whitespace-only string
+                    if value is None or value == '' or (isinstance(value, str) and value.strip() == ''):
+                        cleaned_pm[key] = None
+                    else:
+                        try:
+                            # Try to convert to float
+                            cleaned_pm[key] = float(value)
+                        except (ValueError, TypeError):
+                            cleaned_pm[key] = None
+                # Handle integer fields - convert empty strings to None
+                elif key in integer_fields:
+                    # Check for empty string, None, or whitespace-only string
+                    if value is None or value == '' or (isinstance(value, str) and value.strip() == ''):
+                        cleaned_pm[key] = None
+                    else:
+                        try:
+                            # Try to convert to int
+                            cleaned_pm[key] = int(value)
+                        except (ValueError, TypeError):
+                            cleaned_pm[key] = None
+                # Handle date field
+                elif key == 'date' and value:
+                    date_str = str(value).strip()
+                    if date_str:
+                        # Check if date is already in correct format (dd MMM yyyy)
+                        if not re.match(r'^\d{1,2} [A-Za-z]{3} \d{4}', date_str):
+                            # Check if it's YYYY-MM-DD format
+                            if re.match(r'^\d{4}-\d{2}-\d{2}', date_str):
+                                try:
+                                    converted_date = parse_input_date(date_str)
+                                    if converted_date != date_str and re.match(r'^\d{1,2} [A-Za-z]{3} \d{4}', converted_date):
+                                        cleaned_pm[key] = converted_date
+                                    else:
+                                        print(f"Warning: Date conversion failed for {date_str}")
+                                        continue  # Skip this metric
+                                except Exception as e:
+                                    print(f"Error: Could not convert date {date_str}: {e}")
+                                    continue  # Skip this metric
+                            else:
+                                # Try to convert anyway
+                                try:
+                                    converted_date = parse_input_date(date_str)
+                                    if converted_date != date_str and re.match(r'^\d{1,2} [A-Za-z]{3} \d{4}', converted_date):
+                                        cleaned_pm[key] = converted_date
+                                    else:
+                                        print(f"Warning: Could not convert date format: {date_str}")
+                                        continue
+                                except Exception as e:
+                                    print(f"Error: Could not convert date {date_str}: {e}")
+                                    continue
+                        else:
+                            cleaned_pm[key] = date_str
+                    else:
+                        continue  # Skip if date is empty
+                else:
+                    # Copy other fields as-is (id, notes, etc.) - but skip numeric fields
+                    if key not in numeric_fields + integer_fields:
+                        cleaned_pm[key] = value
+            
+            # CRITICAL: Ensure all numeric fields are explicitly set to None (never empty strings)
+            for field in numeric_fields + integer_fields:
+                # Always set to None if missing, empty string, or invalid
+                if field not in cleaned_pm:
+                    cleaned_pm[field] = None
+                elif cleaned_pm[field] == '':
+                    cleaned_pm[field] = None
+                elif isinstance(cleaned_pm[field], str):
+                    if not cleaned_pm[field].strip():
+                        cleaned_pm[field] = None
+                    else:
+                        # Try to convert string to number
+                        try:
+                            if field in integer_fields:
+                                cleaned_pm[field] = int(cleaned_pm[field])
+                            else:
+                                cleaned_pm[field] = float(cleaned_pm[field])
+                        except (ValueError, TypeError):
+                            cleaned_pm[field] = None
+            
+            # Only add if we have a valid date
+            if 'date' in cleaned_pm and cleaned_pm['date']:
+                cleaned_metrics_data.append(cleaned_pm)
+        
+        print(f"Processed {len(cleaned_metrics_data)} physical metrics out of {len(physical_metrics_data)}")
+        
+        # AGGRESSIVE final cleanup: create completely new dicts with only valid values
+        final_cleaned_metrics = []
+        for pm in cleaned_metrics_data:
+            final_pm = {}
+            # Copy required fields
+            if 'id' in pm:
+                final_pm['id'] = pm['id']
+            if 'date' in pm and pm['date']:
+                final_pm['date'] = pm['date']
+            if 'notes' in pm:
+                final_pm['notes'] = pm.get('notes')
+            
+            # Process ALL numeric fields - explicitly convert empty strings to None
+            for field in numeric_fields:
+                value = pm.get(field)
+                if value is None:
+                    final_pm[field] = None
+                elif value == '':
+                    final_pm[field] = None
+                elif isinstance(value, str):
+                    if value.strip() == '':
+                        final_pm[field] = None
+                    else:
+                        try:
+                            final_pm[field] = float(value)
+                        except (ValueError, TypeError):
+                            final_pm[field] = None
+                elif isinstance(value, (int, float)):
+                    final_pm[field] = float(value)
+                else:
+                    final_pm[field] = None
+            
+            for field in integer_fields:
+                value = pm.get(field)
+                if value is None:
+                    final_pm[field] = None
+                elif value == '':
+                    final_pm[field] = None
+                elif isinstance(value, str):
+                    if value.strip() == '':
+                        final_pm[field] = None
+                    else:
+                        try:
+                            final_pm[field] = int(value)
+                        except (ValueError, TypeError):
+                            final_pm[field] = None
+                elif isinstance(value, int):
+                    final_pm[field] = value
+                elif isinstance(value, float):
+                    final_pm[field] = int(value)
+                else:
+                    final_pm[field] = None
+            
+            final_cleaned_metrics.append(final_pm)
+        
+        # Debug: print first metric to verify
+        if final_cleaned_metrics:
+            print(f"Final cleaned metric sample - keys: {list(final_cleaned_metrics[0].keys())}")
+            for field in ['vertical_jump_cm', 'countermovement_jump_cm', 'agility_time_sec', 'yo_yo_test_level', 'bench_press_kg']:
+                if field in final_cleaned_metrics[0]:
+                    val = final_cleaned_metrics[0][field]
+                    print(f"  {field}: {repr(val)} (type: {type(val).__name__})")
+        
+        # Create PhysicalMetrics - ONLY include fields with valid values (skip empty strings entirely)
+        physical_metrics = []
+        for i, pm in enumerate(final_cleaned_metrics):
+            try:
+                # Build dict with ONLY valid values - don't include empty strings at all
+                safe_pm = {}
+                
+                # Required fields
+                if 'id' in pm:
+                    safe_pm['id'] = pm['id']
+                if 'date' in pm and pm['date']:
+                    safe_pm['date'] = pm['date']
+                if 'notes' in pm and pm.get('notes'):
+                    safe_pm['notes'] = pm['notes']
+                
+                # Only include numeric fields if they have valid (non-empty) values
+                for field in numeric_fields:
+                    val = pm.get(field)
+                    # Skip if None, empty string, or whitespace-only string
+                    if val is None or val == '' or (isinstance(val, str) and not val.strip()):
+                        continue  # Don't include this field - Pydantic will use default None
+                    # Try to convert to float
+                    try:
+                        safe_pm[field] = float(val)
+                    except (ValueError, TypeError):
+                        continue  # Skip invalid values
+                
+                for field in integer_fields:
+                    val = pm.get(field)
+                    # Skip if None, empty string, or whitespace-only string
+                    if val is None or val == '' or (isinstance(val, str) and not val.strip()):
+                        continue  # Don't include this field - Pydantic will use default None
+                    # Try to convert to int
+                    try:
+                        safe_pm[field] = int(val)
+                    except (ValueError, TypeError):
+                        continue  # Skip invalid values
+                
+                # Create PhysicalMetrics - empty string fields won't be in the dict, so Pydantic uses None
+                physical_metrics.append(PhysicalMetrics(**safe_pm))
+            except Exception as e:
+                print(f"Error creating PhysicalMetrics for metric {i}: {e}")
+                print(f"  Problematic data: {pm}")
+                import traceback
+                traceback.print_exc()
+                # Skip this metric
+                continue
         
         # Create output directory
         output_dir = os.path.join(current_app.root_path, '..', 'output')
@@ -249,53 +674,177 @@ def generate_pdf():
         )
         
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error generating PDF: {error_details}")
+        current_app.logger.error(f"PDF generation error: {error_details}")
         return jsonify({'success': False, 'errors': [str(e)]}), 500
 
 
 @bp.route('/export')
 @login_required
 def export_data():
-    """Export all data as ZIP file"""
+    """Export all data as Excel file"""
     temp_file = None
     try:
         user_id = current_user.id
         # Get all data for this user
         data = storage.export_data(user_id)
         
-        # Create temporary ZIP file
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
+        # Create temporary Excel file
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
         
-        with zipfile.ZipFile(temp_file.name, 'w') as zip_file:
-            # Add matches data
-            zip_file.writestr('matches.json', 
-                            json.dumps(data['matches'], indent=2, ensure_ascii=False))
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill
+        
+        wb = Workbook()
+        wb.remove(wb.active)  # Remove default sheet
+        
+        # Helper function to add a sheet with data
+        def add_sheet(sheet_name, data_list, headers):
+            if not data_list:
+                return
+            ws = wb.create_sheet(title=sheet_name)
             
-            # Add settings data
-            zip_file.writestr('settings.json', 
-                            json.dumps(data['settings'], indent=2, ensure_ascii=False))
+            # Add headers with styling
+            header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+            header_font = Font(bold=True, color="FFFFFF")
             
-            # Add physical measurements data
-            zip_file.writestr('physical_measurements.json', 
-                            json.dumps(data.get('physical_measurements', []), indent=2, ensure_ascii=False))
+            for col_idx, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col_idx, value=header)
+                cell.fill = header_fill
+                cell.font = header_font
             
-            # Add training camps data
-            zip_file.writestr('training_camps.json',
-                json.dumps(data.get('training_camps', []), indent=2, ensure_ascii=False))
+            # Add data rows
+            for row_idx, item in enumerate(data_list, 2):
+                if isinstance(item, dict):
+                    for col_idx, header in enumerate(headers, 1):
+                        value = item.get(header, '')
+                        # Convert None to empty string
+                        if value is None:
+                            value = ''
+                        ws.cell(row=row_idx, column=col_idx, value=value)
+        
+        # Add Matches sheet
+        if data.get('matches'):
+            matches_headers = ['id', 'date', 'opponent', 'venue', 'result', 'goals', 'assists', 
+                             'minutes_played', 'category', 'season', 'notes', 'clean_sheets']
+            matches_data = []
+            for match in data['matches']:
+                if isinstance(match, dict):
+                    matches_data.append(match)
+                else:
+                    matches_data.append(match.model_dump() if hasattr(match, 'model_dump') else match.dict())
+            add_sheet('Matches', matches_data, matches_headers)
+        
+        # Add Settings sheet
+        if data.get('settings'):
+            settings_dict = data['settings']
+            if hasattr(settings_dict, 'model_dump'):
+                settings_dict = settings_dict.model_dump()
+            elif hasattr(settings_dict, 'dict'):
+                settings_dict = settings_dict.dict()
             
-            # Add physical metrics data
-            zip_file.writestr('physical_metrics.json',
-                json.dumps(data.get('physical_metrics', []), indent=2, ensure_ascii=False))
+            ws = wb.create_sheet(title='Settings')
+            header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+            header_font = Font(bold=True, color="FFFFFF")
             
-            # Add club history data
-            zip_file.writestr('club_history.json', 
-                            json.dumps(data.get('club_history', []), indent=2, ensure_ascii=False))
+            ws.cell(row=1, column=1, value='Setting').fill = header_fill
+            ws.cell(row=1, column=1).font = header_font
+            ws.cell(row=1, column=2, value='Value').fill = header_fill
+            ws.cell(row=1, column=2).font = header_font
+            
+            row = 2
+            for key, value in settings_dict.items():
+                if value is not None:
+                    ws.cell(row=row, column=1, value=str(key))
+                    # Handle list values
+                    if isinstance(value, list):
+                        ws.cell(row=row, column=2, value=', '.join(str(v) for v in value))
+                    else:
+                        ws.cell(row=row, column=2, value=str(value))
+                    row += 1
+        
+        # Add Physical Measurements sheet
+        if data.get('physical_measurements'):
+            measurements_headers = ['id', 'date', 'height_cm', 'weight_kg', 'notes', 'include_in_report']
+            measurements_data = []
+            for m in data['physical_measurements']:
+                if isinstance(m, dict):
+                    measurements_data.append(m)
+                else:
+                    measurements_data.append(m.model_dump() if hasattr(m, 'model_dump') else m.dict())
+            add_sheet('Physical Measurements', measurements_data, measurements_headers)
+        
+        # Add Physical Metrics sheet
+        if data.get('physical_metrics'):
+            metrics_headers = ['id', 'date', 'sprint_speed_ms', 'sprint_speed_kmh', 'sprint_10m_sec', 
+                             'sprint_20m_sec', 'sprint_30m_sec', 'vertical_jump_cm', 'standing_long_jump_cm',
+                             'countermovement_jump_cm', 'agility_time_sec', 'beep_test_level', 'vo2_max',
+                             'include_in_report']
+            metrics_data = []
+            for m in data['physical_metrics']:
+                if isinstance(m, dict):
+                    metrics_data.append(m)
+                else:
+                    metrics_data.append(m.model_dump() if hasattr(m, 'model_dump') else m.dict())
+            add_sheet('Physical Metrics', metrics_data, metrics_headers)
+        
+        # Add Achievements sheet
+        if data.get('achievements'):
+            achievements_headers = ['id', 'date', 'title', 'category', 'season', 'goals', 'assists', 
+                                   'minutes_played', 'clean_sheets', 'notes']
+            achievements_data = []
+            for a in data['achievements']:
+                if isinstance(a, dict):
+                    achievements_data.append(a)
+                else:
+                    achievements_data.append(a.model_dump() if hasattr(a, 'model_dump') else a.dict())
+            add_sheet('Achievements', achievements_data, achievements_headers)
+        
+        # Add Club History sheet
+        if data.get('club_history'):
+            club_headers = ['id', 'club_name', 'season', 'age_group', 'position', 'achievements']
+            club_data = []
+            for c in data['club_history']:
+                if isinstance(c, dict):
+                    club_data.append(c)
+                else:
+                    club_data.append(c.model_dump() if hasattr(c, 'model_dump') else c.dict())
+            add_sheet('Club History', club_data, club_headers)
+        
+        # Add Training Camps sheet
+        if data.get('training_camps'):
+            camp_headers = ['id', 'camp_name', 'organizer', 'location', 'start_date', 'end_date', 
+                          'age_group', 'focus_area']
+            camp_data = []
+            for c in data['training_camps']:
+                if isinstance(c, dict):
+                    camp_data.append(c)
+                else:
+                    camp_data.append(c.model_dump() if hasattr(c, 'model_dump') else c.dict())
+            add_sheet('Training Camps', camp_data, camp_headers)
+        
+        # Add References sheet
+        if data.get('references'):
+            ref_headers = ['id', 'name', 'position', 'organization', 'email', 'phone', 'relationship', 'notes']
+            ref_data = []
+            for r in data['references']:
+                if isinstance(r, dict):
+                    ref_data.append(r)
+                else:
+                    ref_data.append(r.model_dump() if hasattr(r, 'model_dump') else r.dict())
+            add_sheet('References', ref_data, ref_headers)
+        
+        # Save workbook
+        wb.save(temp_file.name)
         
         return send_file(temp_file.name, 
                         as_attachment=True, 
-                        download_name='FutureElite_Backup.zip',
-                        mimetype='application/zip')
+                        download_name='FutureElite_Export.xlsx',
+                        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         
-    except (IOError, OSError, json.JSONEncodeError) as e:
+    except (IOError, OSError) as e:
         if temp_file and os.path.exists(temp_file.name):
             os.unlink(temp_file.name)
         return jsonify({'success': False, 'errors': [f'Error creating export: {str(e)}']}), 500
@@ -328,50 +877,102 @@ def import_data():
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
         file.save(temp_file.name)
         
-        # Check file size (max 10MB for import)
+        # Security: Check file size (max 10MB compressed)
         file_size = os.path.getsize(temp_file.name)
         if file_size > 10 * 1024 * 1024:
             os.unlink(temp_file.name)
             return jsonify({'success': False, 'errors': ['File too large. Maximum size is 10MB']}), 400
         
+        # Security: ZIP bomb protection - check uncompressed size and file count
+        MAX_UNCOMPRESSED_SIZE = 50 * 1024 * 1024  # 50MB
+        MAX_FILES_IN_ZIP = 100
+        MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB per file
+        
         # Extract and import data
         with zipfile.ZipFile(temp_file.name, 'r') as zip_file:
+            # Security: Check number of files
+            file_list = zip_file.namelist()
+            if len(file_list) > MAX_FILES_IN_ZIP:
+                os.unlink(temp_file.name)
+                return jsonify({'success': False, 'errors': [f'Too many files in archive. Maximum is {MAX_FILES_IN_ZIP} files.']}), 400
+            
+            # Security: Check uncompressed size
+            total_size = 0
+            for file_info in zip_file.infolist():
+                total_size += file_info.file_size
+                if total_size > MAX_UNCOMPRESSED_SIZE:
+                    os.unlink(temp_file.name)
+                    return jsonify({'success': False, 'errors': [f'Archive uncompressed size too large. Maximum is {MAX_UNCOMPRESSED_SIZE // (1024*1024)}MB.']}), 400
+                if file_info.file_size > MAX_FILE_SIZE:
+                    os.unlink(temp_file.name)
+                    return jsonify({'success': False, 'errors': [f'File {file_info.filename} is too large. Maximum is {MAX_FILE_SIZE // (1024*1024)}MB per file.']}), 400
+            
+            # Security: Check compression ratio (prevent ZIP bombs)
+            if file_size > 0:
+                compression_ratio = total_size / file_size
+                if compression_ratio > 100:  # Suspicious compression ratio
+                    os.unlink(temp_file.name)
+                    return jsonify({'success': False, 'errors': ['Suspicious compression ratio detected. File may be a ZIP bomb.']}), 400
+            
+            # Read files with size limits
+            def read_zip_file_safe(zip_file, filename, max_size=MAX_FILE_SIZE):
+                """Safely read a file from ZIP with size limit"""
+                try:
+                    file_data = zip_file.read(filename)
+                    if len(file_data) > max_size:
+                        raise ValueError(f"File {filename} exceeds size limit")
+                    return file_data.decode('utf-8')
+                except KeyError:
+                    return None
+            
             # Read matches data
-            matches_data = json.loads(zip_file.read('matches.json').decode('utf-8'))
+            matches_json = read_zip_file_safe(zip_file, 'matches.json')
+            if matches_json is None:
+                os.unlink(temp_file.name)
+                return jsonify({'success': False, 'errors': ['Required file matches.json not found in archive']}), 400
+            matches_data = json.loads(matches_json)
             
             # Read settings data
-            settings_data = json.loads(zip_file.read('settings.json').decode('utf-8'))
+            settings_json = read_zip_file_safe(zip_file, 'settings.json')
+            if settings_json is None:
+                os.unlink(temp_file.name)
+                return jsonify({'success': False, 'errors': ['Required file settings.json not found in archive']}), 400
+            settings_data = json.loads(settings_json)
             
             # Read physical measurements data (if exists)
             physical_measurements_data = []
             try:
-                physical_measurements_data = json.loads(zip_file.read('physical_measurements.json').decode('utf-8'))
-            except KeyError:
-                # Old backup format without physical measurements
+                pm_json = read_zip_file_safe(zip_file, 'physical_measurements.json')
+                if pm_json:
+                    physical_measurements_data = json.loads(pm_json)
+            except (KeyError, ValueError):
                 pass
             
             # Read training camps data (if exists)
             training_camps_data = []
             try:
-                training_camps_data = json.loads(zip_file.read('training_camps.json').decode('utf-8'))
-            except KeyError:
-                # Old backup format without training camps
+                tc_json = read_zip_file_safe(zip_file, 'training_camps.json')
+                if tc_json:
+                    training_camps_data = json.loads(tc_json)
+            except (KeyError, ValueError):
                 pass
             
             # Read physical metrics data (if exists)
             physical_metrics_data = []
             try:
-                physical_metrics_data = json.loads(zip_file.read('physical_metrics.json').decode('utf-8'))
-            except KeyError:
-                # Old backup format without physical metrics
+                pm_json = read_zip_file_safe(zip_file, 'physical_metrics.json')
+                if pm_json:
+                    physical_metrics_data = json.loads(pm_json)
+            except (KeyError, ValueError):
                 pass
             
             # Read club history data (if exists)
             club_history_data = []
             try:
-                club_history_data = json.loads(zip_file.read('club_history.json').decode('utf-8'))
-            except KeyError:
-                # Old backup format without club history
+                ch_json = read_zip_file_safe(zip_file, 'club_history.json')
+                if ch_json:
+                    club_history_data = json.loads(ch_json)
+            except (KeyError, ValueError):
                 pass
         
         # Import data - assign user_id to all imported data
@@ -505,6 +1106,7 @@ def download_excel_template():
 
 
 @bp.route('/import-excel', methods=['POST'])
+@login_required
 def import_excel():
     """Import matches from Excel file - returns matches to client for saving"""
     if not EXCEL_SUPPORT:
@@ -538,9 +1140,23 @@ def import_excel():
             os.unlink(temp_file.name)
             return jsonify({'success': False, 'errors': ['File too large. Maximum size is 10MB']}), 400
         
-        # Parse Excel file
-        workbook = openpyxl.load_workbook(temp_file.name)
+        # Security: Parse Excel file in data-only mode to prevent formula injection
+        workbook = openpyxl.load_workbook(temp_file.name, data_only=True)
         sheet = workbook.active
+        
+        # Security: Helper function to sanitize cell values and prevent formula injection
+        def sanitize_cell_value(cell_value):
+            """Sanitize cell value to prevent formula injection"""
+            if cell_value is None:
+                return None
+            # Convert to string and strip
+            value = str(cell_value).strip()
+            # Security: Reject formulas (cells starting with =, +, -, @)
+            if value and value[0] in ['=', '+', '-', '@']:
+                # Log potential formula injection attempt
+                current_app.logger.warning(f"Potential formula injection detected: {value[:50]}")
+                return None  # Reject formulas
+            return value
         
         # Find header row (look for "Opponent" or similar)
         header_row = None
@@ -553,15 +1169,15 @@ def import_excel():
         if not header_row:
             header_row = 1
         
-        # Read headers - handle None values and normalize
+        # Read headers - handle None values and normalize, sanitize to prevent formula injection
         headers = []
         for cell in sheet[header_row]:
             if cell is None or cell.value is None:
                 headers.append('')
             else:
-                # Convert to string and clean up
-                header_str = str(cell.value).strip()
-                headers.append(header_str)
+                # Security: Sanitize header to prevent formula injection
+                header_str = sanitize_cell_value(cell.value)
+                headers.append(header_str if header_str else '')
         
         # Map column names to our fields (flexible matching)
         col_map = {}
@@ -655,11 +1271,11 @@ def import_excel():
                 continue
             
             try:
-                # Extract data - handle None and empty values better
+                # Extract data - handle None and empty values better, sanitize to prevent formula injection
                 opponent_idx = col_map.get('opponent')
                 if opponent_idx is not None and opponent_idx < len(row):
                     opponent_raw = row[opponent_idx]
-                    opponent = str(opponent_raw).strip() if opponent_raw is not None else ''
+                    opponent = sanitize_cell_value(opponent_raw) if opponent_raw is not None else ''
                 else:
                     opponent = ''
                 
@@ -671,28 +1287,28 @@ def import_excel():
                 if opponent.upper().startswith('INSTRUCTIONS') or opponent.upper().startswith('REQUIRED'):
                     continue
                 
-                # Extract other fields with better None handling
+                # Extract other fields with better None handling, sanitize to prevent formula injection
                 location_idx = col_map.get('location')
                 if location_idx is not None and location_idx < len(row) and row[location_idx] is not None:
-                    location = str(row[location_idx]).strip()
+                    location = sanitize_cell_value(row[location_idx]) or 'Unknown'
                 else:
                     location = 'Unknown'
                 
                 date_idx = col_map.get('date')
                 if date_idx is not None and date_idx < len(row):
-                    date_cell = row[date_idx]
+                    date_cell = sanitize_cell_value(row[date_idx])
                 else:
                     date_cell = None
                 
                 category_idx = col_map.get('category')
                 if category_idx is not None and category_idx < len(row) and row[category_idx] is not None:
-                    category = str(row[category_idx]).strip()
+                    category = sanitize_cell_value(row[category_idx]) or 'Pre-Season Friendly'
                 else:
                     category = 'Pre-Season Friendly'
                 
                 score_idx = col_map.get('score')
                 if score_idx is not None and score_idx < len(row) and row[score_idx] is not None:
-                    score = str(row[score_idx]).strip()
+                    score = sanitize_cell_value(row[score_idx])
                 else:
                     score = None
                 
@@ -716,7 +1332,7 @@ def import_excel():
                 
                 notes_idx = col_map.get('notes')
                 if notes_idx is not None and notes_idx < len(row) and row[notes_idx] is not None:
-                    notes = str(row[notes_idx]).strip()
+                    notes = sanitize_cell_value(row[notes_idx]) or ''
                 else:
                     notes = ''
                 
@@ -817,8 +1433,16 @@ def import_excel():
                 
                 # Parse category
                 try:
-                    if category and 'league' in category.lower():
-                        match_category = MatchCategory.LEAGUE
+                    if category:
+                        category_lower = category.lower()
+                        if 'league' in category_lower:
+                            match_category = MatchCategory.LEAGUE
+                        elif 'friendly' in category_lower and 'pre-season' not in category_lower:
+                            match_category = MatchCategory.FRIENDLY
+                        elif 'pre-season' in category_lower or 'pre season' in category_lower:
+                            match_category = MatchCategory.PRE_SEASON_FRIENDLY
+                        else:
+                            match_category = MatchCategory.PRE_SEASON_FRIENDLY
                     else:
                         match_category = MatchCategory.PRE_SEASON_FRIENDLY
                 except (AttributeError, TypeError):
@@ -1013,6 +1637,24 @@ def update_settings():
         # Save settings
         storage.save_settings(settings, user_id)
         
+        # If date_of_birth was provided and we have measurements, try to calculate PHV automatically
+        # Only for paid users
+        subscription = storage.get_subscription_by_user_id(user_id)
+        has_active_subscription = subscription and subscription.status == SubscriptionStatus.ACTIVE
+        
+        if settings.date_of_birth and has_active_subscription:
+            try:
+                measurements = storage.get_all_physical_measurements(user_id)
+                if len([m for m in measurements if m.height_cm is not None]) >= 2:
+                    phv_result = calculate_phv(measurements, settings.date_of_birth)
+                    if phv_result:
+                        settings.phv_date = phv_result.get('phv_date')
+                        settings.phv_age = phv_result.get('phv_age')
+                        storage.save_settings(settings, user_id)
+            except Exception as phv_error:
+                # PHV calculation failed - not critical, just log it
+                print(f"PHV auto-calculation failed: {phv_error}")
+        
         return jsonify({'success': True})
         
     except (ValueError, TypeError, KeyError) as e:
@@ -1034,21 +1676,47 @@ def upload_photo():
         if file.filename == '':
             return jsonify({'success': False, 'errors': ['No file selected']}), 400
         
-        # Validate file type
+        # Security: Validate file type by extension
         allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
         filename = secure_filename(file.filename)
         if '.' not in filename or filename.rsplit('.', 1)[1].lower() not in allowed_extensions:
             return jsonify({'success': False, 'errors': ['Invalid file type. Allowed: PNG, JPG, JPEG, GIF, WEBP']}), 400
         
+        # Security: Read file content for MIME type validation
+        file_content = file.read()
+        file.seek(0)  # Reset for save
+        
+        # Security: Validate MIME type if python-magic is available
+        if MAGIC_AVAILABLE:
+            mime_type = magic.from_buffer(file_content, mime=True)
+            allowed_mimes = {'image/png', 'image/jpeg', 'image/gif', 'image/webp'}
+            if mime_type not in allowed_mimes:
+                return jsonify({'success': False, 'errors': ['Invalid file type. File content does not match extension.']}), 400
+        
+        # Security: Validate image can be opened and verified
+        if PIL_AVAILABLE:
+            try:
+                img = Image.open(file)
+                img.verify()
+                file.seek(0)  # Reset again for save
+            except Exception:
+                return jsonify({'success': False, 'errors': ['Invalid image file. File may be corrupted.']}), 400
+        
         # Create photos directory if it doesn't exist
         photos_dir = os.path.join(current_app.root_path, '..', 'data', 'photos')
         os.makedirs(photos_dir, exist_ok=True)
         
-        # Generate unique filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Security: Generate cryptographically random filename to prevent enumeration
         ext = filename.rsplit('.', 1)[1].lower()
-        new_filename = f"player_photo_{timestamp}.{ext}"
+        random_token = secrets.token_hex(16)
+        new_filename = f"player_photo_{random_token}.{ext}"
         filepath = os.path.join(photos_dir, new_filename)
+        
+        # Security: Ensure filepath is within photos directory (prevent path traversal)
+        photos_dir_abs = os.path.abspath(photos_dir)
+        filepath_abs = os.path.abspath(filepath)
+        if not filepath_abs.startswith(photos_dir_abs):
+            return jsonify({'success': False, 'errors': ['Invalid file path']}), 400
         
         # Save file
         file.save(filepath)
@@ -1149,6 +1817,12 @@ def create_physical_measurement():
     """Create a new physical measurement"""
     try:
         user_id = current_user.id
+        
+        # Check subscription and limits
+        has_access, limit, current_count, error_msg = check_subscription_and_limit(user_id, 'physical_measurements')
+        if not has_access:
+            return jsonify({'success': False, 'errors': [error_msg], 'limit_reached': True, 'current_count': current_count, 'limit': limit}), 403
+        
         data = request.get_json()
         
         # Validate required fields
@@ -1170,6 +1844,7 @@ def create_physical_measurement():
         measurement = PhysicalMeasurement(
             date=data['date'],
             height_cm=float(data['height_cm']) if data.get('height_cm') is not None else None,
+            include_in_report=data.get('include_in_report', True),  # Default to True
             weight_kg=float(data['weight_kg']) if data.get('weight_kg') is not None else None,
             notes=data.get('notes')
         )
@@ -1193,6 +1868,7 @@ def create_physical_measurement():
         return jsonify({
             'success': True,
             'measurement_id': measurement_id,
+            'measurement': measurement.model_dump(),  # Return the saved measurement with converted date
             'phv_calculated': phv_result is not None,
             'phv': phv_result
         })
@@ -1221,12 +1897,18 @@ def update_physical_measurement(measurement_id):
             data['date'] = parse_input_date(data['date'])
         
         # Update measurement object
+        # Handle include_in_report - default to True if not set in existing measurement
+        include_in_report = data.get('include_in_report')
+        if include_in_report is None:
+            include_in_report = getattr(existing_measurement, 'include_in_report', True)
+        
         updated_measurement = PhysicalMeasurement(
             id=measurement_id,
             date=data.get('date', existing_measurement.date),
             height_cm=float(data['height_cm']) if data.get('height_cm') else existing_measurement.height_cm,
             weight_kg=float(data['weight_kg']) if data.get('weight_kg') else existing_measurement.weight_kg,
-            notes=data.get('notes', existing_measurement.notes)
+            notes=data.get('notes', existing_measurement.notes),
+            include_in_report=include_in_report
         )
         
         # Save updated measurement
@@ -1247,6 +1929,7 @@ def update_physical_measurement(measurement_id):
         
         return jsonify({
             'success': True,
+            'measurement': updated_measurement.model_dump(),  # Return the updated measurement with converted date
             'phv_calculated': phv_result is not None,
             'phv': phv_result
         })
@@ -1349,6 +2032,18 @@ def calculate_phv_endpoint():
         }), 500
 
 
+@bp.route('/player-profile')
+def player_profile():
+    """Player Profile page - data loaded client-side"""
+    # Return empty/default data - actual data will be loaded client-side
+    default_settings = {
+        'club_name': '',
+        'player_name': '',
+        'season_year': ''
+    }
+    return render_template('player_profile.html', settings=default_settings)
+
+
 @bp.route('/physical-data')
 def physical_data():
     """Physical Data page - data loaded client-side"""
@@ -1362,21 +2057,87 @@ def physical_data():
 
 
 @bp.route('/api/physical-data/analysis', methods=['POST'])
+@login_required
 def physical_data_analysis():
     """Get comprehensive physical data analysis including PHV, predicted height, and elite comparisons - accepts data from client"""
     try:
-        # Get data from request (client-side storage)
+        user_id = current_user.id
+        
+        # Get settings from server (most up-to-date)
+        settings = storage.load_settings(user_id)
+        
+        # Get data from request (client-side storage for measurements and metrics)
         data = request.get_json() if request.is_json else {}
-        settings_data = data.get('settings', {})
         measurements_data = data.get('measurements', [])
         physical_metrics_data = data.get('physical_metrics', [])
+        
+        # If client provided settings and server settings don't have date_of_birth, try client settings
+        # This handles the case where settings were just saved but not yet synced
+        client_settings_data = data.get('settings', {})
+        if not settings.date_of_birth and client_settings_data.get('date_of_birth'):
+            # Merge client settings with server settings, prioritizing client for date_of_birth
+            settings_dict = settings.model_dump()
+            settings_dict['date_of_birth'] = client_settings_data.get('date_of_birth')
+            settings = AppSettings(**settings_dict)
+        
+        # Helper function to clean numeric values (convert empty strings to None)
+        def clean_numeric_value(value):
+            if value is None or value == '' or value == 'None':
+                return None
+            try:
+                if isinstance(value, str):
+                    value = value.strip()
+                    if value == '':
+                        return None
+                return float(value) if '.' in str(value) else int(value)
+            except (ValueError, TypeError):
+                return None
+        
+        # Clean physical metrics data before validation
+        cleaned_metrics_data = []
+        for pm in physical_metrics_data:
+            cleaned_pm = {}
+            for key, value in pm.items():
+                # Handle numeric fields
+                if key in ['sprint_speed_ms', 'sprint_speed_kmh', 'sprint_10m_sec', 'sprint_20m_sec', 
+                          'sprint_30m_sec', 'vertical_jump_cm', 'standing_long_jump_cm', 
+                          'countermovement_jump_cm', 'agility_time_sec', 'yo_yo_test_level', 
+                          'beep_test_level', 'bench_press_kg', 'squat_kg', 'deadlift_kg', 
+                          'vo2_max', 'sit_and_reach_cm']:
+                    cleaned_pm[key] = clean_numeric_value(value)
+                elif key in ['max_heart_rate', 'resting_heart_rate']:
+                    # Integer fields
+                    cleaned_value = clean_numeric_value(value)
+                    cleaned_pm[key] = int(cleaned_value) if cleaned_value is not None else None
+                else:
+                    # Non-numeric fields (id, date, notes, etc.)
+                    cleaned_pm[key] = value if value else None
+            cleaned_metrics_data.append(cleaned_pm)
         
         # Convert to model objects
         from .models import AppSettings, PhysicalMeasurement, PhysicalMetrics
         
-        settings = AppSettings(**settings_data) if settings_data else AppSettings()
-        measurements = [PhysicalMeasurement(**m) for m in measurements_data]
-        physical_metrics = [PhysicalMetrics(**pm) for pm in physical_metrics_data]
+        # Settings already loaded from server above
+        
+        # Convert measurement dates from YYYY-MM-DD to dd MMM yyyy format if needed
+        cleaned_measurements_data = []
+        for m in measurements_data:
+            cleaned_m = m.copy()
+            # Check if date is in YYYY-MM-DD format and convert
+            if 'date' in cleaned_m and cleaned_m['date']:
+                date_str = str(cleaned_m['date']).strip()
+                if '-' in date_str and len(date_str) == 10 and date_str.count('-') == 2:
+                    try:
+                        # Convert from YYYY-MM-DD to dd MMM yyyy
+                        cleaned_m['date'] = parse_input_date(date_str)
+                    except Exception as e:
+                        # If conversion fails, skip this measurement or use original
+                        print(f"Warning: Could not convert date {date_str}: {e}")
+                        continue
+            cleaned_measurements_data.append(cleaned_m)
+        
+        measurements = [PhysicalMeasurement(**m) for m in cleaned_measurements_data]
+        physical_metrics = [PhysicalMetrics(**pm) for pm in cleaned_metrics_data]
         
         if not settings.date_of_birth:
             return jsonify({
@@ -1549,6 +2310,12 @@ def create_achievement():
     """Create a new achievement"""
     try:
         user_id = current_user.id
+        
+        # Check subscription and limits
+        has_access, limit, current_count, error_msg = check_subscription_and_limit(user_id, 'achievements')
+        if not has_access:
+            return jsonify({'success': False, 'errors': [error_msg], 'limit_reached': True, 'current_count': current_count, 'limit': limit}), 403
+        
         data = request.get_json()
         
         # Validate required fields
@@ -1569,6 +2336,21 @@ def create_achievement():
             except Exception as e:
                 return jsonify({'success': False, 'errors': [f'Invalid date format: {str(e)}']}), 400
         
+        # Handle position-specific numeric fields
+        goals = None
+        if 'goals' in data and data['goals'] is not None and data['goals'] != '':
+            try:
+                goals = int(data['goals'])
+            except (ValueError, TypeError):
+                goals = None
+        
+        clean_sheets = None
+        if 'clean_sheets' in data and data['clean_sheets'] is not None and data['clean_sheets'] != '':
+            try:
+                clean_sheets = int(data['clean_sheets'])
+            except (ValueError, TypeError):
+                clean_sheets = None
+        
         # Create achievement object
         achievement = Achievement(
             title=data['title'].strip(),
@@ -1576,7 +2358,9 @@ def create_achievement():
             date=data['date'],
             season=data.get('season'),
             description=data.get('description'),
-            notes=data.get('notes')
+            notes=data.get('notes'),
+            goals=goals,
+            clean_sheets=clean_sheets
         )
         
         # Save achievement
@@ -1610,6 +2394,27 @@ def update_achievement(achievement_id):
         if 'date' in data and '-' in str(data['date']) and len(str(data['date'])) == 10:
             data['date'] = parse_input_date(data['date'])
         
+        # Handle position-specific numeric fields
+        goals = existing_achievement.goals
+        if 'goals' in data:
+            if data['goals'] is None or data['goals'] == '':
+                goals = None
+            else:
+                try:
+                    goals = int(data['goals'])
+                except (ValueError, TypeError):
+                    goals = None
+        
+        clean_sheets = existing_achievement.clean_sheets
+        if 'clean_sheets' in data:
+            if data['clean_sheets'] is None or data['clean_sheets'] == '':
+                clean_sheets = None
+            else:
+                try:
+                    clean_sheets = int(data['clean_sheets'])
+                except (ValueError, TypeError):
+                    clean_sheets = None
+        
         # Update achievement object
         updated_achievement = Achievement(
             id=achievement_id,
@@ -1618,7 +2423,9 @@ def update_achievement(achievement_id):
             date=data.get('date', existing_achievement.date),
             season=data.get('season', existing_achievement.season),
             description=data.get('description', existing_achievement.description),
-            notes=data.get('notes', existing_achievement.notes)
+            notes=data.get('notes', existing_achievement.notes),
+            goals=goals,
+            clean_sheets=clean_sheets
         )
         
         # Save updated achievement
@@ -1647,10 +2454,65 @@ def delete_achievement(achievement_id):
 
 
 @bp.route('/scout-pdf', methods=['POST'])
+@login_required
 def generate_scout_pdf_route():
     """Generate scout-friendly PDF report - accepts data from client"""
     try:
+        # Check subscription status - try multiple methods
+        subscription = storage.get_subscription_by_user_id(current_user.id)
+        
+        # If no subscription found by user_id, check if there's exactly one active subscription
+        # This handles cases where user_id format changed (e.g., client-side ID vs server-side ID)
+        if not subscription:
+            subscriptions = storage.load_subscriptions()
+            active_subs = [s for s in subscriptions if s.get('status', '').lower() == 'active']
+            
+            # If there's exactly one active subscription, it's likely for the current user
+            # Update it to use the correct user_id
+            if len(active_subs) == 1:
+                sub_data = active_subs[0]
+                try:
+                    # Create subscription object and update user_id
+                    if 'status' in sub_data and isinstance(sub_data['status'], str):
+                        sub_data['status'] = SubscriptionStatus(sub_data['status'].lower())
+                    subscription = Subscription(**sub_data)
+                    subscription.user_id = current_user.id
+                    storage.save_subscription(subscription)
+                    current_app.logger.info(f"Updated subscription user_id from {sub_data.get('user_id')} to {current_user.id}")
+                except Exception as e:
+                    current_app.logger.error(f"Error updating subscription: {e}")
+                    subscription = None
+        
+        # Debug logging
+        current_app.logger.info(f"Scout PDF generation request for user {current_user.id}")
+        current_app.logger.info(f"Subscription found: {subscription is not None}")
+        if subscription:
+            current_app.logger.info(f"Subscription status: {subscription.status}, type: {type(subscription.status)}")
+            current_app.logger.info(f"Subscription status == ACTIVE: {subscription.status == SubscriptionStatus.ACTIVE}")
+            current_app.logger.info(f"Subscription status value: {subscription.status.value if hasattr(subscription.status, 'value') else subscription.status}")
+        
+        # Check if subscription is active - simplified check
+        is_active = False
+        if subscription:
+            # Get status value (works for both enum and string)
+            status_value = subscription.status.value if hasattr(subscription.status, 'value') else str(subscription.status)
+            is_active = status_value.lower() == SubscriptionStatus.ACTIVE.value.lower()
+            current_app.logger.info(f"Status value: {status_value}, ACTIVE value: {SubscriptionStatus.ACTIVE.value}, is_active: {is_active}")
+        
+        if not subscription or not is_active:
+            current_app.logger.warning(f"Scout PDF generation blocked for user {current_user.id}: subscription={subscription is not None}, is_active={is_active}")
+            return jsonify({
+                'success': False,
+                'errors': ['Scout report generation is a premium feature. Please subscribe to unlock this feature.'],
+                'debug': {
+                    'has_subscription': subscription is not None,
+                    'status': subscription.status if subscription else None,
+                    'user_id': current_user.id
+                }
+            }), 403
+        
         data = request.get_json() if request.is_json else {}
+        user_id = current_user.id
         
         # Get data from request (client-side storage)
         matches_data = data.get('matches', [])
@@ -1660,6 +2522,7 @@ def generate_scout_pdf_route():
         club_history_data = data.get('club_history', [])
         training_camps_data = data.get('training_camps', [])
         physical_metrics_data = data.get('physical_metrics', [])
+        references_data = data.get('references', [])
         period = data.get('period', 'all_time')
         
         # Validate period
@@ -1667,16 +2530,320 @@ def generate_scout_pdf_route():
         if period not in valid_periods:
             period = 'all_time'
         
+        # Load settings from server (most up-to-date, includes player profile data)
+        # Merge with client settings to ensure we have all data
+        try:
+            server_settings = storage.load_settings(user_id)
+            if server_settings:
+                # Merge server settings (source of truth) with client settings
+                # Server settings take priority, but client settings can fill in gaps
+                server_dict = server_settings.model_dump()
+                # Only update with client settings that are not None/empty in server settings
+                # AND the client value is not None/empty
+                for key, value in settings_data.items():
+                    if (key not in server_dict or 
+                        server_dict[key] is None or 
+                        server_dict[key] == '' or
+                        (isinstance(server_dict[key], list) and len(server_dict[key]) == 0)):
+                        # Only use client value if it's not None/empty
+                        if value is not None and value != '' and not (isinstance(value, list) and len(value) == 0):
+                            server_dict[key] = value
+                settings_data = server_dict
+        except Exception as e:
+            # If loading from server fails, use client settings
+            print(f"Warning: Could not load settings from server: {e}")
+            pass
+        
         # Convert data to model objects
-        from .models import Match, AppSettings, PhysicalMeasurement, PhysicalMetrics, Achievement, ClubHistory, TrainingCamp
+        from .models import Match, AppSettings, PhysicalMeasurement, PhysicalMetrics, Achievement, ClubHistory, TrainingCamp, Reference
         
         matches = [Match(**m) for m in matches_data]
         settings = AppSettings(**settings_data) if settings_data else AppSettings()
-        physical_measurements = [PhysicalMeasurement(**pm) for pm in physical_measurements_data]
-        achievements = [Achievement(**a) for a in achievements_data]
+        
+        # Convert physical measurement dates from YYYY-MM-DD to dd MMM yyyy format if needed
+        cleaned_measurements_data = []
+        for pm in physical_measurements_data:
+            if not pm or not isinstance(pm, dict):
+                continue
+            cleaned_pm = pm.copy()
+            if 'date' in cleaned_pm and cleaned_pm['date']:
+                date_str = str(cleaned_pm['date']).strip()
+                if date_str:
+                    # Check if date is already in correct format (dd MMM yyyy)
+                    if not re.match(r'^\d{1,2} [A-Za-z]{3} \d{4}', date_str):
+                        # Not in correct format, try to convert
+                        # Check if it's YYYY-MM-DD format
+                        if re.match(r'^\d{4}-\d{2}-\d{2}', date_str):
+                            try:
+                                converted_date = parse_input_date(date_str)
+                                # Verify conversion worked (should be in dd MMM yyyy format)
+                                if converted_date != date_str and re.match(r'^\d{1,2} [A-Za-z]{3} \d{4}', converted_date):
+                                    cleaned_pm['date'] = converted_date
+                                    print(f"Converted date: {date_str} -> {cleaned_pm['date']}")
+                                else:
+                                    print(f"Warning: Date conversion returned unexpected format: {date_str} -> {converted_date}")
+                                    continue
+                            except Exception as e:
+                                print(f"Error: Could not convert date {date_str}: {e}")
+                                continue  # Skip this measurement if date conversion fails
+                        else:
+                            # Try to convert anyway (might be another format)
+                            try:
+                                converted_date = parse_input_date(date_str)
+                                if converted_date != date_str and re.match(r'^\d{1,2} [A-Za-z]{3} \d{4}', converted_date):
+                                    cleaned_pm['date'] = converted_date
+                                    print(f"Converted date (fallback): {date_str} -> {cleaned_pm['date']}")
+                                else:
+                                    print(f"Warning: Could not convert date format: {date_str}")
+                                    continue
+                            except Exception as e:
+                                print(f"Error: Could not convert date {date_str}: {e}")
+                                continue
+            cleaned_measurements_data.append(cleaned_pm)
+        
+        print(f"Processed {len(cleaned_measurements_data)} measurements out of {len(physical_measurements_data)}")
+        physical_measurements = [PhysicalMeasurement(**pm) for pm in cleaned_measurements_data]
+        
+        # Convert achievement dates from YYYY-MM-DD to dd MMM yyyy format if needed
+        cleaned_achievements_data = []
+        for a in achievements_data:
+            cleaned_a = a.copy()
+            if 'date' in cleaned_a and cleaned_a['date']:
+                date_str = str(cleaned_a['date']).strip()
+                # Check if date is in YYYY-MM-DD format and convert
+                if '-' in date_str and len(date_str) == 10 and date_str.count('-') == 2:
+                    try:
+                        cleaned_a['date'] = parse_input_date(date_str)
+                    except Exception as e:
+                        print(f"Warning: Could not convert date {date_str}: {e}")
+                        continue  # Skip this achievement if date conversion fails
+            cleaned_achievements_data.append(cleaned_a)
+        
+        achievements = [Achievement(**a) for a in cleaned_achievements_data]
         club_history = [ClubHistory(**ch) for ch in club_history_data]
         training_camps = [TrainingCamp(**tc) for tc in training_camps_data]
-        physical_metrics = [PhysicalMetrics(**pm) for pm in physical_metrics_data]
+        
+        # Convert physical metrics dates from YYYY-MM-DD to dd MMM yyyy format if needed
+        # Also clean numeric fields (convert empty strings to None)
+        cleaned_metrics_data = []
+        numeric_fields = [
+            'sprint_speed_ms', 'sprint_speed_kmh', 'sprint_10m_sec', 'sprint_20m_sec', 'sprint_30m_sec',
+            'vertical_jump_cm', 'standing_long_jump_cm', 'countermovement_jump_cm',
+            'agility_time_sec', 'yo_yo_test_level', 'beep_test_level',
+            'bench_press_kg', 'squat_kg', 'deadlift_kg',
+            'vo2_max', 'sit_and_reach_cm'
+        ]
+        integer_fields = ['max_heart_rate', 'resting_heart_rate']
+        
+        for pm in physical_metrics_data:
+            if not pm or not isinstance(pm, dict):
+                continue
+            cleaned_pm = {}
+            # Initialize ALL numeric fields to None first
+            for field in numeric_fields:
+                cleaned_pm[field] = None
+            for field in integer_fields:
+                cleaned_pm[field] = None
+            
+            for key, value in pm.items():
+                # Handle numeric fields - convert empty strings to None
+                if key in numeric_fields:
+                    # Check for empty string, None, or whitespace-only string
+                    if value is None or value == '' or (isinstance(value, str) and value.strip() == ''):
+                        cleaned_pm[key] = None
+                    else:
+                        try:
+                            # Try to convert to float
+                            cleaned_pm[key] = float(value)
+                        except (ValueError, TypeError):
+                            cleaned_pm[key] = None
+                # Handle integer fields - convert empty strings to None
+                elif key in integer_fields:
+                    # Check for empty string, None, or whitespace-only string
+                    if value is None or value == '' or (isinstance(value, str) and value.strip() == ''):
+                        cleaned_pm[key] = None
+                    else:
+                        try:
+                            # Try to convert to int
+                            cleaned_pm[key] = int(value)
+                        except (ValueError, TypeError):
+                            cleaned_pm[key] = None
+                # Handle date field
+                elif key == 'date' and value:
+                    date_str = str(value).strip()
+                    if date_str:
+                        # Check if date is already in correct format (dd MMM yyyy)
+                        if not re.match(r'^\d{1,2} [A-Za-z]{3} \d{4}', date_str):
+                            # Check if it's YYYY-MM-DD format
+                            if re.match(r'^\d{4}-\d{2}-\d{2}', date_str):
+                                try:
+                                    converted_date = parse_input_date(date_str)
+                                    if converted_date != date_str and re.match(r'^\d{1,2} [A-Za-z]{3} \d{4}', converted_date):
+                                        cleaned_pm[key] = converted_date
+                                    else:
+                                        print(f"Warning: Date conversion failed for {date_str}")
+                                        continue  # Skip this metric
+                                except Exception as e:
+                                    print(f"Error: Could not convert date {date_str}: {e}")
+                                    continue  # Skip this metric
+                            else:
+                                # Try to convert anyway
+                                try:
+                                    converted_date = parse_input_date(date_str)
+                                    if converted_date != date_str and re.match(r'^\d{1,2} [A-Za-z]{3} \d{4}', converted_date):
+                                        cleaned_pm[key] = converted_date
+                                    else:
+                                        print(f"Warning: Could not convert date format: {date_str}")
+                                        continue
+                                except Exception as e:
+                                    print(f"Error: Could not convert date {date_str}: {e}")
+                                    continue
+                        else:
+                            cleaned_pm[key] = date_str
+                    else:
+                        continue  # Skip if date is empty
+                else:
+                    # Copy other fields as-is (id, notes, etc.) - but skip numeric fields
+                    if key not in numeric_fields + integer_fields:
+                        cleaned_pm[key] = value
+            
+            # CRITICAL: Ensure all numeric fields are explicitly set to None (never empty strings)
+            for field in numeric_fields + integer_fields:
+                # Always set to None if missing, empty string, or invalid
+                if field not in cleaned_pm:
+                    cleaned_pm[field] = None
+                elif cleaned_pm[field] == '':
+                    cleaned_pm[field] = None
+                elif isinstance(cleaned_pm[field], str):
+                    if not cleaned_pm[field].strip():
+                        cleaned_pm[field] = None
+                    else:
+                        # Try to convert string to number
+                        try:
+                            if field in integer_fields:
+                                cleaned_pm[field] = int(cleaned_pm[field])
+                            else:
+                                cleaned_pm[field] = float(cleaned_pm[field])
+                        except (ValueError, TypeError):
+                            cleaned_pm[field] = None
+            
+            # Only add if we have a valid date
+            if 'date' in cleaned_pm and cleaned_pm['date']:
+                cleaned_metrics_data.append(cleaned_pm)
+        
+        print(f"Processed {len(cleaned_metrics_data)} physical metrics out of {len(physical_metrics_data)}")
+        
+        # AGGRESSIVE final cleanup: create completely new dicts with only valid values
+        final_cleaned_metrics = []
+        for pm in cleaned_metrics_data:
+            final_pm = {}
+            # Copy required fields
+            if 'id' in pm:
+                final_pm['id'] = pm['id']
+            if 'date' in pm and pm['date']:
+                final_pm['date'] = pm['date']
+            if 'notes' in pm:
+                final_pm['notes'] = pm.get('notes')
+            
+            # Process ALL numeric fields - explicitly convert empty strings to None
+            for field in numeric_fields:
+                value = pm.get(field)
+                if value is None:
+                    final_pm[field] = None
+                elif value == '':
+                    final_pm[field] = None
+                elif isinstance(value, str):
+                    if value.strip() == '':
+                        final_pm[field] = None
+                    else:
+                        try:
+                            final_pm[field] = float(value)
+                        except (ValueError, TypeError):
+                            final_pm[field] = None
+                elif isinstance(value, (int, float)):
+                    final_pm[field] = float(value)
+                else:
+                    final_pm[field] = None
+            
+            for field in integer_fields:
+                value = pm.get(field)
+                if value is None:
+                    final_pm[field] = None
+                elif value == '':
+                    final_pm[field] = None
+                elif isinstance(value, str):
+                    if value.strip() == '':
+                        final_pm[field] = None
+                    else:
+                        try:
+                            final_pm[field] = int(value)
+                        except (ValueError, TypeError):
+                            final_pm[field] = None
+                elif isinstance(value, int):
+                    final_pm[field] = value
+                elif isinstance(value, float):
+                    final_pm[field] = int(value)
+                else:
+                    final_pm[field] = None
+            
+            final_cleaned_metrics.append(final_pm)
+        
+        # Debug: print first metric to verify
+        if final_cleaned_metrics:
+            print(f"Final cleaned metric sample - keys: {list(final_cleaned_metrics[0].keys())}")
+            for field in ['vertical_jump_cm', 'countermovement_jump_cm', 'agility_time_sec', 'yo_yo_test_level', 'bench_press_kg']:
+                if field in final_cleaned_metrics[0]:
+                    val = final_cleaned_metrics[0][field]
+                    print(f"  {field}: {repr(val)} (type: {type(val).__name__})")
+        
+        # Create PhysicalMetrics - ONLY include fields with valid values (skip empty strings entirely)
+        physical_metrics = []
+        for i, pm in enumerate(final_cleaned_metrics):
+            try:
+                # Build dict with ONLY valid values - don't include empty strings at all
+                safe_pm = {}
+                
+                # Required fields
+                if 'id' in pm:
+                    safe_pm['id'] = pm['id']
+                if 'date' in pm and pm['date']:
+                    safe_pm['date'] = pm['date']
+                if 'notes' in pm and pm.get('notes'):
+                    safe_pm['notes'] = pm['notes']
+                
+                # Only include numeric fields if they have valid (non-empty) values
+                for field in numeric_fields:
+                    val = pm.get(field)
+                    # Skip if None, empty string, or whitespace-only string
+                    if val is None or val == '' or (isinstance(val, str) and not val.strip()):
+                        continue  # Don't include this field - Pydantic will use default None
+                    # Try to convert to float
+                    try:
+                        safe_pm[field] = float(val)
+                    except (ValueError, TypeError):
+                        continue  # Skip invalid values
+                
+                for field in integer_fields:
+                    val = pm.get(field)
+                    # Skip if None, empty string, or whitespace-only string
+                    if val is None or val == '' or (isinstance(val, str) and not val.strip()):
+                        continue  # Don't include this field - Pydantic will use default None
+                    # Try to convert to int
+                    try:
+                        safe_pm[field] = int(val)
+                    except (ValueError, TypeError):
+                        continue  # Skip invalid values
+                
+                # Create PhysicalMetrics - empty string fields won't be in the dict, so Pydantic uses None
+                physical_metrics.append(PhysicalMetrics(**safe_pm))
+            except Exception as e:
+                print(f"Error creating PhysicalMetrics for metric {i}: {e}")
+                print(f"  Problematic data: {pm}")
+                import traceback
+                traceback.print_exc()
+                # Skip this metric
+                continue
+        references = [Reference(**r) for r in references_data]
         
         # Create output directory
         output_dir = os.path.join(current_app.root_path, '..', 'output')
@@ -1691,6 +2858,7 @@ def generate_scout_pdf_route():
             physical_measurements,
             training_camps,
             physical_metrics,
+            references,
             output_dir,
             period=period
         )
@@ -1704,6 +2872,10 @@ def generate_scout_pdf_route():
         )
         
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error generating scout PDF: {error_details}")
+        current_app.logger.error(f"Scout PDF generation error: {error_details}")
         return jsonify({'success': False, 'errors': [str(e)]}), 500
 
 
@@ -2000,6 +3172,12 @@ def create_physical_metric():
     """Create a new physical metric entry"""
     try:
         user_id = current_user.id
+        
+        # Check subscription and limits
+        has_access, limit, current_count, error_msg = check_subscription_and_limit(user_id, 'physical_metrics')
+        if not has_access:
+            return jsonify({'success': False, 'errors': [error_msg], 'limit_reached': True, 'current_count': current_count, 'limit': limit}), 403
+        
         data = request.get_json()
         
         # Validate required fields
@@ -2031,11 +3209,25 @@ def create_physical_metric():
             except (ValueError, TypeError):
                 return None
         
+        # Auto-convert sprint speed: if m/s is provided, calculate km/h; if only km/h, calculate m/s
+        sprint_speed_ms = to_float_or_none(data.get('sprint_speed_ms'))
+        sprint_speed_kmh = to_float_or_none(data.get('sprint_speed_kmh'))
+        
+        if sprint_speed_ms and not sprint_speed_kmh:
+            # Calculate km/h from m/s
+            sprint_speed_kmh = sprint_speed_ms * 3.6
+        elif sprint_speed_kmh and not sprint_speed_ms:
+            # Calculate m/s from km/h
+            sprint_speed_ms = sprint_speed_kmh / 3.6
+        elif sprint_speed_ms and sprint_speed_kmh:
+            # Both provided - prefer m/s and recalculate km/h for consistency
+            sprint_speed_kmh = sprint_speed_ms * 3.6
+        
         # Create physical metric object
         metric = PhysicalMetrics(
             date=date_str,
-            sprint_speed_ms=to_float_or_none(data.get('sprint_speed_ms')),
-            sprint_speed_kmh=to_float_or_none(data.get('sprint_speed_kmh')),
+            sprint_speed_ms=sprint_speed_ms,
+            sprint_speed_kmh=sprint_speed_kmh,
             sprint_10m_sec=to_float_or_none(data.get('sprint_10m_sec')),
             sprint_20m_sec=to_float_or_none(data.get('sprint_20m_sec')),
             sprint_30m_sec=to_float_or_none(data.get('sprint_30m_sec')),
@@ -2052,7 +3244,8 @@ def create_physical_metric():
             max_heart_rate=to_int_or_none(data.get('max_heart_rate')),
             resting_heart_rate=to_int_or_none(data.get('resting_heart_rate')),
             sit_and_reach_cm=to_float_or_none(data.get('sit_and_reach_cm')),
-            notes=data.get('notes')
+            notes=data.get('notes'),
+            include_in_report=data.get('include_in_report', True)  # Default to True
         )
         
         # Save metric entry
@@ -2107,12 +3300,26 @@ def update_physical_metric(metric_id):
             except (ValueError, TypeError):
                 return default
         
+        # Auto-convert sprint speed: if m/s is provided, calculate km/h; if only km/h, calculate m/s
+        sprint_speed_ms = to_float_or_none(data.get('sprint_speed_ms'), existing_metric.sprint_speed_ms)
+        sprint_speed_kmh = to_float_or_none(data.get('sprint_speed_kmh'), existing_metric.sprint_speed_kmh)
+        
+        if sprint_speed_ms and not sprint_speed_kmh:
+            # Calculate km/h from m/s
+            sprint_speed_kmh = sprint_speed_ms * 3.6
+        elif sprint_speed_kmh and not sprint_speed_ms:
+            # Calculate m/s from km/h
+            sprint_speed_ms = sprint_speed_kmh / 3.6
+        elif sprint_speed_ms and sprint_speed_kmh:
+            # Both provided - prefer m/s and recalculate km/h for consistency
+            sprint_speed_kmh = sprint_speed_ms * 3.6
+        
         # Update metric object
         metric = PhysicalMetrics(
             id=metric_id,
             date=date_str,
-            sprint_speed_ms=to_float_or_none(data.get('sprint_speed_ms'), existing_metric.sprint_speed_ms),
-            sprint_speed_kmh=to_float_or_none(data.get('sprint_speed_kmh'), existing_metric.sprint_speed_kmh),
+            sprint_speed_ms=sprint_speed_ms,
+            sprint_speed_kmh=sprint_speed_kmh,
             sprint_10m_sec=to_float_or_none(data.get('sprint_10m_sec'), existing_metric.sprint_10m_sec),
             sprint_20m_sec=to_float_or_none(data.get('sprint_20m_sec'), existing_metric.sprint_20m_sec),
             sprint_30m_sec=to_float_or_none(data.get('sprint_30m_sec'), existing_metric.sprint_30m_sec),
@@ -2129,7 +3336,8 @@ def update_physical_metric(metric_id):
             max_heart_rate=to_int_or_none(data.get('max_heart_rate'), existing_metric.max_heart_rate),
             resting_heart_rate=to_int_or_none(data.get('resting_heart_rate'), existing_metric.resting_heart_rate),
             sit_and_reach_cm=to_float_or_none(data.get('sit_and_reach_cm'), existing_metric.sit_and_reach_cm),
-            notes=data.get('notes', existing_metric.notes)
+            notes=data.get('notes', existing_metric.notes),
+            include_in_report=data.get('include_in_report', getattr(existing_metric, 'include_in_report', True))
         )
         
         # Save updated metric
@@ -2153,3 +3361,16 @@ def delete_physical_metric(metric_id):
         return jsonify({'success': True})
     else:
         return jsonify({'success': False, 'errors': ['Physical metric not found']}), 404
+
+
+@bp.route('/references')
+def references_page():
+    """References management page - data loaded client-side"""
+    default_settings = {
+        'club_name': '',
+        'player_name': '',
+        'season_year': ''
+    }
+    return render_template('references.html', 
+                         settings=default_settings,
+                         references=[])

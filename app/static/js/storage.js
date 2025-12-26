@@ -6,7 +6,7 @@
 class ClientStorage {
     constructor() {
         this.dbName = 'FutureEliteDB';
-        this.dbVersion = 1;
+        this.dbVersion = 2; // Incremented to add references object store
         this.db = null;
     }
 
@@ -17,60 +17,87 @@ class ClientStorage {
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(this.dbName, this.dbVersion);
 
-            request.onerror = () => reject(request.error);
+            request.onerror = () => {
+                console.error('IndexedDB open error:', request.error);
+                reject(request.error);
+            };
+            
             request.onsuccess = () => {
                 this.db = request.result;
+                console.log('IndexedDB opened successfully, version:', this.db.version);
                 resolve(this.db);
             };
 
             request.onupgradeneeded = (event) => {
-                const db = event.target.result;
+                try {
+                    const db = event.target.result;
+                    const oldVersion = event.oldVersion || 0;
+                    const newVersion = event.newVersion;
 
-                // Create object stores
-                if (!db.objectStoreNames.contains('matches')) {
-                    const matchesStore = db.createObjectStore('matches', { keyPath: 'id' });
-                    matchesStore.createIndex('user_id', 'user_id', { unique: false });
-                    matchesStore.createIndex('date', 'date', { unique: false });
-                }
+                    console.log(`Upgrading database from version ${oldVersion} to ${newVersion}`);
 
-                if (!db.objectStoreNames.contains('settings')) {
-                    db.createObjectStore('settings', { keyPath: 'user_id' });
-                }
+                    // Create object stores (only if they don't exist)
+                    if (!db.objectStoreNames.contains('matches')) {
+                        const matchesStore = db.createObjectStore('matches', { keyPath: 'id' });
+                        matchesStore.createIndex('user_id', 'user_id', { unique: false });
+                        matchesStore.createIndex('date', 'date', { unique: false });
+                    }
 
-                if (!db.objectStoreNames.contains('physical_measurements')) {
-                    const pmStore = db.createObjectStore('physical_measurements', { keyPath: 'id' });
-                    pmStore.createIndex('user_id', 'user_id', { unique: false });
-                }
+                    if (!db.objectStoreNames.contains('settings')) {
+                        db.createObjectStore('settings', { keyPath: 'user_id' });
+                    }
 
-                if (!db.objectStoreNames.contains('achievements')) {
-                    const achStore = db.createObjectStore('achievements', { keyPath: 'id' });
-                    achStore.createIndex('user_id', 'user_id', { unique: false });
-                }
+                    if (!db.objectStoreNames.contains('physical_measurements')) {
+                        const pmStore = db.createObjectStore('physical_measurements', { keyPath: 'id' });
+                        pmStore.createIndex('user_id', 'user_id', { unique: false });
+                    }
 
-                if (!db.objectStoreNames.contains('club_history')) {
-                    const chStore = db.createObjectStore('club_history', { keyPath: 'id' });
-                    chStore.createIndex('user_id', 'user_id', { unique: false });
-                }
+                    if (!db.objectStoreNames.contains('achievements')) {
+                        const achStore = db.createObjectStore('achievements', { keyPath: 'id' });
+                        achStore.createIndex('user_id', 'user_id', { unique: false });
+                    }
 
-                if (!db.objectStoreNames.contains('training_camps')) {
-                    const tcStore = db.createObjectStore('training_camps', { keyPath: 'id' });
-                    tcStore.createIndex('user_id', 'user_id', { unique: false });
-                }
+                    if (!db.objectStoreNames.contains('club_history')) {
+                        const chStore = db.createObjectStore('club_history', { keyPath: 'id' });
+                        chStore.createIndex('user_id', 'user_id', { unique: false });
+                    }
 
-                if (!db.objectStoreNames.contains('physical_metrics')) {
-                    const pmetricsStore = db.createObjectStore('physical_metrics', { keyPath: 'id' });
-                    pmetricsStore.createIndex('user_id', 'user_id', { unique: false });
-                }
+                    if (!db.objectStoreNames.contains('training_camps')) {
+                        const tcStore = db.createObjectStore('training_camps', { keyPath: 'id' });
+                        tcStore.createIndex('user_id', 'user_id', { unique: false });
+                    }
 
-                if (!db.objectStoreNames.contains('users')) {
-                    const usersStore = db.createObjectStore('users', { keyPath: 'id' });
-                    usersStore.createIndex('username', 'username', { unique: true });
-                }
+                    if (!db.objectStoreNames.contains('physical_metrics')) {
+                        const pmetricsStore = db.createObjectStore('physical_metrics', { keyPath: 'id' });
+                        pmetricsStore.createIndex('user_id', 'user_id', { unique: false });
+                    }
 
-                if (!db.objectStoreNames.contains('subscriptions')) {
-                    const subStore = db.createObjectStore('subscriptions', { keyPath: 'user_id' });
-                    subStore.createIndex('stripe_subscription_id', 'stripe_subscription_id', { unique: false });
+                    if (!db.objectStoreNames.contains('users')) {
+                        const usersStore = db.createObjectStore('users', { keyPath: 'id' });
+                        usersStore.createIndex('username', 'username', { unique: true });
+                    }
+
+                    if (!db.objectStoreNames.contains('subscriptions')) {
+                        const subStore = db.createObjectStore('subscriptions', { keyPath: 'user_id' });
+                        subStore.createIndex('stripe_subscription_id', 'stripe_subscription_id', { unique: false });
+                    }
+
+                    // Add references object store (new in version 2)
+                    if (!db.objectStoreNames.contains('references')) {
+                        const refStore = db.createObjectStore('references', { keyPath: 'id' });
+                        refStore.createIndex('user_id', 'user_id', { unique: false });
+                        console.log('Created references object store');
+                    }
+                    
+                    console.log('Database upgrade completed successfully');
+                } catch (error) {
+                    console.error('Error during database upgrade:', error);
+                    reject(error);
                 }
+            };
+            
+            request.onblocked = () => {
+                console.warn('IndexedDB upgrade blocked - close other tabs/windows');
             };
         });
     }
@@ -102,32 +129,65 @@ class ClientStorage {
 
     async _getAll(storeName, userId = null) {
         return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([storeName], 'readonly');
-            const store = transaction.objectStore(storeName);
-            
-            // If userId is provided, use index for better performance and strict filtering
-            if (userId) {
-                const index = store.index('user_id');
-                const request = index.getAll(userId);
+            try {
+                if (!this.db) {
+                    reject(new Error('Database not initialized'));
+                    return;
+                }
                 
-                request.onsuccess = () => {
-                    const items = request.result || [];
-                    // Double-check: only return items with exact user_id match
-                    const filtered = items.filter(item => item && item.user_id === userId);
-                    resolve(filtered);
+                if (!this.db.objectStoreNames.contains(storeName)) {
+                    console.error(`Object store '${storeName}' does not exist`);
+                    reject(new Error(`Object store '${storeName}' does not exist`));
+                    return;
+                }
+                
+                const transaction = this.db.transaction([storeName], 'readonly');
+                const store = transaction.objectStore(storeName);
+                
+                // If userId is provided, use index for better performance and strict filtering
+                if (userId) {
+                    if (!store.indexNames.contains('user_id')) {
+                        console.error(`Index 'user_id' does not exist in store '${storeName}'`);
+                        reject(new Error(`Index 'user_id' does not exist`));
+                        return;
+                    }
+                    
+                    const index = store.index('user_id');
+                    const request = index.getAll(userId);
+                    
+                    request.onsuccess = () => {
+                        const items = request.result || [];
+                        // Double-check: only return items with exact user_id match
+                        const filtered = items.filter(item => item && item.user_id === userId);
+                        resolve(filtered);
+                    };
+                    
+                    request.onerror = () => {
+                        console.error(`Error getting all from ${storeName}:`, request.error);
+                        reject(request.error);
+                    };
+                } else {
+                    // If no userId, get all but this should rarely be used
+                    const request = store.getAll();
+                    
+                    request.onsuccess = () => {
+                        const items = request.result || [];
+                        resolve(items);
+                    };
+                    
+                    request.onerror = () => {
+                        console.error(`Error getting all from ${storeName}:`, request.error);
+                        reject(request.error);
+                    };
+                }
+                
+                transaction.onerror = () => {
+                    console.error(`Transaction error in _getAll:`, transaction.error);
+                    reject(transaction.error);
                 };
-                
-                request.onerror = () => reject(request.error);
-            } else {
-                // If no userId, get all but this should rarely be used
-                const request = store.getAll();
-                
-                request.onsuccess = () => {
-                    const items = request.result || [];
-                    resolve(items);
-                };
-                
-                request.onerror = () => reject(request.error);
+            } catch (error) {
+                console.error('Error in _getAll:', error);
+                reject(error);
             }
         });
     }
@@ -167,13 +227,44 @@ class ClientStorage {
 
     async _getByIndex(storeName, indexName, value) {
         return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction([storeName], 'readonly');
-            const store = transaction.objectStore(storeName);
-            const index = store.index(indexName);
-            const request = index.getAll(value);
+            try {
+                if (!this.db) {
+                    reject(new Error('Database not initialized'));
+                    return;
+                }
+                
+                if (!this.db.objectStoreNames.contains(storeName)) {
+                    console.error(`Object store '${storeName}' does not exist`);
+                    reject(new Error(`Object store '${storeName}' does not exist`));
+                    return;
+                }
+                
+                const transaction = this.db.transaction([storeName], 'readonly');
+                const store = transaction.objectStore(storeName);
+                
+                if (!store.indexNames.contains(indexName)) {
+                    console.error(`Index '${indexName}' does not exist in store '${storeName}'`);
+                    reject(new Error(`Index '${indexName}' does not exist`));
+                    return;
+                }
+                
+                const index = store.index(indexName);
+                const request = index.getAll(value);
 
-            request.onsuccess = () => resolve(request.result || []);
-            request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result || []);
+                request.onerror = () => {
+                    console.error(`Error getting by index: ${request.error}`);
+                    reject(request.error);
+                };
+                
+                transaction.onerror = () => {
+                    console.error(`Transaction error: ${transaction.error}`);
+                    reject(transaction.error);
+                };
+            } catch (error) {
+                console.error('Error in _getByIndex:', error);
+                reject(error);
+            }
         });
     }
 
@@ -392,8 +483,24 @@ class ClientStorage {
     }
 
     async getUserByUsername(username) {
-        const users = await this._getByIndex('users', 'username', username);
-        return users.length > 0 ? users[0] : null;
+        try {
+            console.log('Looking up user by username:', username);
+            if (!this.db) {
+                throw new Error('Database not initialized');
+            }
+            
+            if (!this.db.objectStoreNames.contains('users')) {
+                console.error('Users object store does not exist');
+                return null;
+            }
+            
+            const users = await this._getByIndex('users', 'username', username);
+            console.log('Found users:', users.length);
+            return users.length > 0 ? users[0] : null;
+        } catch (error) {
+            console.error('Error in getUserByUsername:', error);
+            throw error;
+        }
     }
 
     async getUserById(userId) {
@@ -407,39 +514,26 @@ class ClientStorage {
         return await this._save('users', user);
     }
 
-    // Simple password hashing (using a basic approach - in production, use a proper library)
-    async hashPassword(password) {
-        // Use Web Crypto API for hashing
-        const encoder = new TextEncoder();
-        const data = encoder.encode(password);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-
+    // SECURITY FIX: Removed insecure client-side password hashing
+    // Passwords are now hashed server-side only using secure methods (scrypt via werkzeug)
+    // Client sends plain password over HTTPS to server for hashing
+    
+    // Legacy method kept for backward compatibility but no longer used
+    // TODO: Remove after migration period if not needed
     async verifyPassword(user, password) {
-        const passwordHash = await this.hashPassword(password);
-        return user.password_hash === passwordHash;
+        // SECURITY: This method is deprecated - password verification happens server-side
+        // This is kept only for backward compatibility with existing client-side code
+        // In practice, login should go through server endpoint which handles verification
+        console.warn('verifyPassword called - this should use server-side authentication');
+        // Return false to force server-side auth
+        return false;
     }
 
     async createUser(username, password, email = null) {
-        // Check if username exists
-        const existing = await this.getUserByUsername(username);
-        if (existing) {
-            return null;
-        }
-
-        const passwordHash = await this.hashPassword(password);
-        const user = {
-            id: 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-            username: username,
-            password_hash: passwordHash,
-            email: email,
-            created_at: new Date().toISOString()
-        };
-
-        await this.saveUser(user);
-        return user;
+        // SECURITY: User creation should happen server-side via /register endpoint
+        // This method is kept for backward compatibility but should not be used
+        console.warn('createUser called - this should use server-side registration');
+        throw new Error('User creation must be done through server endpoint /register');
     }
 
     // ========== Export/Import ==========
@@ -452,6 +546,7 @@ class ClientStorage {
             physical_measurements: await this.getAllPhysicalMeasurements(uid),
             achievements: await this.getAllAchievements(uid),
             club_history: await this.getAllClubHistory(uid),
+            references: await this.getAllReferences(uid),
             training_camps: await this.getAllTrainingCamps(uid),
             physical_metrics: await this.getAllPhysicalMetrics(uid)
         };
@@ -503,6 +598,14 @@ class ClientStorage {
             for (const tc of data.training_camps) {
                 tc.user_id = uid;
                 await this.saveTrainingCamp(tc);
+            }
+        }
+
+        // Import references
+        if (data.references && Array.isArray(data.references)) {
+            for (const ref of data.references) {
+                ref.user_id = uid;
+                await this.saveReference(ref);
             }
         }
 
@@ -620,6 +723,37 @@ class ClientStorage {
             throw new Error('User ID required');
         }
         return await this._delete('subscriptions', uid);
+    }
+
+    // ========== References ==========
+
+    async getAllReferences(userId = null) {
+        const uid = userId || this.getCurrentUserId();
+        if (!uid) {
+            return [];
+        }
+        const references = await this._getAll('references', uid);
+        return references.filter(r => r && r.user_id === uid);
+    }
+
+    async saveReference(reference) {
+        const userId = this.getCurrentUserId();
+        if (!userId) {
+            throw new Error('User must be logged in to save reference');
+        }
+        reference.user_id = userId; // Always set to current user
+        if (!reference.id) {
+            reference.id = 'ref_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+        if (!reference.created_at) {
+            reference.created_at = new Date().toISOString();
+        }
+        reference.updated_at = new Date().toISOString();
+        return await this._save('references', reference);
+    }
+
+    async deleteReference(referenceId) {
+        return await this._delete('references', referenceId);
     }
 }
 

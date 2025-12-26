@@ -89,6 +89,7 @@
                 <table class="min-w-full divide-y divide-gray-200" id="measurementsTable">
                     <thead class="bg-gray-50">
                         <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Include in Report</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Height (cm)</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weight (kg)</th>
@@ -98,7 +99,7 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200" id="measurementsTableBody">
                         <tr>
-                            <td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">Loading measurements...</td>
+                            <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">Loading measurements...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -149,16 +150,51 @@ async function loadAnalysis() {
         document.getElementById('mainContent').classList.add('hidden');
         document.getElementById('errorState').classList.add('hidden');
         
-        // Get data from client storage
-        const settings = await clientStorage.loadSettings();
-        const measurements = await clientStorage.getAllPhysicalMeasurements();
-        const physical_metrics = await clientStorage.getAllPhysicalMetrics();
+        // Load data from server first (most up-to-date with correct date format)
+        let settings = await clientStorage.loadSettings(); // Keep for fallback
+        let measurements = [];
+        let physical_metrics = [];
+        
+        // Try to get latest settings from server
+        try {
+            const serverSettings = await apiCall('/api/settings');
+            if (serverSettings.success && serverSettings.settings) {
+                settings = serverSettings.settings;
+                // Sync to client storage
+                await clientStorage.saveSettings(settings);
+            }
+        } catch (e) {
+            console.warn('Could not load settings from server, using client storage:', e);
+        }
+        
+        // Try to get latest measurements from server
+        try {
+            const serverMeasurements = await apiCall('/api/physical-measurements');
+            if (serverMeasurements.success && serverMeasurements.measurements) {
+                measurements = serverMeasurements.measurements;
+                // Sync to client storage
+                for (const m of measurements) {
+                    try {
+                        await clientStorage.savePhysicalMeasurement(m);
+                    } catch (e) {
+                        console.warn('Failed to sync measurement to client storage:', e);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Could not load measurements from server, using client storage:', e);
+            measurements = await clientStorage.getAllPhysicalMeasurements();
+        }
+        
+        // Load physical metrics from client storage (no server endpoint yet)
+        physical_metrics = await clientStorage.getAllPhysicalMetrics();
         
         // Send data to server for analysis
+        // Server will load settings from server storage, but we send client settings as fallback
         const data = await apiCall('/api/physical-data/analysis', {
             method: 'POST',
             body: JSON.stringify({
-                settings: settings,
+                settings: settings, // Fallback if server settings don't have date_of_birth
                 measurements: measurements,
                 physical_metrics: physical_metrics
             })
@@ -473,28 +509,66 @@ async function loadMeasurements() {
             return;
         }
         
-        // Load measurements from client storage
-        const measurements = await clientStorage.getAllPhysicalMeasurements();
+        // Load measurements from server first (most up-to-date with correct date format)
+        let measurements = [];
+        try {
+            const serverData = await apiCall('/api/physical-measurements');
+            if (serverData.success && serverData.measurements) {
+                measurements = serverData.measurements;
+                // Sync to client storage
+                for (const m of measurements) {
+                    try {
+                        await clientStorage.savePhysicalMeasurement(m);
+                    } catch (e) {
+                        console.warn('Failed to sync measurement to client storage:', e);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Could not load measurements from server, using client storage:', e);
+            measurements = await clientStorage.getAllPhysicalMeasurements();
+        }
+        
         const tbody = document.getElementById('measurementsTableBody');
         
         if (measurements.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-sm text-gray-500">No measurements yet. Add your first measurement above.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">No measurements yet. Add your first measurement above.</td></tr>';
             return;
         }
         
         // Sort by date (newest first)
+        // Handle both "dd MMM yyyy" and "YYYY-MM-DD" formats
         measurements.sort((a, b) => {
             try {
-                const dateA = new Date(a.date.split(' ').reverse().join('-'));
-                const dateB = new Date(b.date.split(' ').reverse().join('-'));
+                let dateA, dateB;
+                // Check if date is in "dd MMM yyyy" format
+                if (a.date.includes(' ')) {
+                    dateA = new Date(a.date.split(' ').reverse().join('-'));
+                } else {
+                    dateA = new Date(a.date);
+                }
+                if (b.date.includes(' ')) {
+                    dateB = new Date(b.date.split(' ').reverse().join('-'));
+                } else {
+                    dateB = new Date(b.date);
+                }
                 return dateB - dateA;
             } catch {
                 return 0;
             }
         });
         
-        tbody.innerHTML = measurements.map(m => `
+        tbody.innerHTML = measurements.map(m => {
+            const includeInReport = m.include_in_report !== false; // Default to true if not set
+            return `
             <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                    <input type="checkbox" 
+                           class="h-4 w-4 text-qadsiah-red focus:ring-qadsiah-red border-gray-300 rounded measurement-checkbox" 
+                           data-measurement-id="${m.id}"
+                           ${includeInReport ? 'checked' : ''}
+                           title="Include in PDF report">
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${m.date || ''}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${m.height_cm ? parseFloat(m.height_cm).toFixed(1) : '-'}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${m.weight_kg ? parseFloat(m.weight_kg).toFixed(1) : '-'}</td>
@@ -503,16 +577,141 @@ async function loadMeasurements() {
                     <button onclick="deleteMeasurement('${m.id}')" class="text-red-600 hover:text-red-900">Delete</button>
                 </td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
+        
+        // Attach event listeners to checkboxes after DOM is created
+        document.querySelectorAll('.measurement-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const measurementId = this.getAttribute('data-measurement-id');
+                updateMeasurementReportFlag(measurementId, this.checked);
+            });
+        });
     } catch (error) {
         console.error('Error loading measurements:', error);
         const tbody = document.getElementById('measurementsTableBody');
-        tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-sm text-red-500">Error loading measurements</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-sm text-red-500">Error loading measurements</td></tr>';
     }
 }
 
 // Add new measurement
+// Free tier limits
+const FREE_TIER_LIMITS = {
+    matches: 5,
+    achievements: 1,
+    physical_measurements: 2,
+    physical_metrics: 2,
+    references: 1
+};
+
+// Check if user can add more of a resource type
+async function checkResourceLimit(resourceType) {
+    const hasAccess = await checkSubscriptionAccess();
+    if (hasAccess) {
+        return { canAdd: true, limit: null, current: null };
+    }
+    
+    const limit = FREE_TIER_LIMITS[resourceType];
+    if (!limit) {
+        return { canAdd: true, limit: null, current: null };
+    }
+    
+    await ensureStorageReady();
+    let current = 0;
+    
+    try {
+        if (resourceType === 'matches') {
+            const matches = await clientStorage.getAllMatches();
+            current = matches.length;
+        } else if (resourceType === 'achievements') {
+            const achievements = await clientStorage.getAllAchievements();
+            current = achievements.length;
+        } else if (resourceType === 'physical_measurements') {
+            const measurements = await clientStorage.getAllPhysicalMeasurements();
+            current = measurements.length;
+        } else if (resourceType === 'physical_metrics') {
+            const metrics = await clientStorage.getAllPhysicalMetrics();
+            current = metrics.length;
+        } else if (resourceType === 'references') {
+            const references = await clientStorage.getAllReferences();
+            current = references.length;
+        }
+    } catch (e) {
+        console.error('Error checking resource limit:', e);
+    }
+    
+    return {
+        canAdd: current < limit,
+        limit: limit,
+        current: current,
+        resourceType: resourceType
+    };
+}
+
+// Show limit reached message
+function showLimitReachedMessage(resourceType, limit, current) {
+    const resourceNames = {
+        matches: 'matches',
+        achievements: 'achievements',
+        physical_measurements: 'measurements',
+        physical_metrics: 'performance metrics',
+        references: 'references'
+    };
+    
+    const name = resourceNames[resourceType] || resourceType;
+    const message = `Free tier limit reached: ${limit} ${name}. You currently have ${current} ${name}. Subscribe to unlock unlimited entries.`;
+    
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50';
+    modal.innerHTML = `
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">Free Tier Limit</h3>
+                    <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="mb-4">
+                    <p class="text-sm text-gray-600 mb-4">${message}</p>
+                    <p class="text-sm text-gray-500 mb-2">Subscribe to unlock:</p>
+                    <ul class="list-disc list-inside text-sm text-gray-600 space-y-1">
+                        <li>Unlimited ${name}</li>
+                        <li>PDF report generation</li>
+                        <li>PHV calculation</li>
+                        <li>All premium features</li>
+                    </ul>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+                        Cancel
+                    </button>
+                    <button onclick="window.location.href='/subscription'" class="px-4 py-2 text-sm font-medium text-white bg-qadsiah-red rounded-md hover:bg-red-700">
+                        View Plans
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+}
+
 async function addMeasurement() {
+    // Check limit before adding
+    const limitCheck = await checkResourceLimit('physical_measurements');
+    if (!limitCheck.canAdd) {
+        showLimitReachedMessage('physical_measurements', limitCheck.limit, limitCheck.current);
+        return;
+    }
+    
     const dateInput = document.getElementById('measurementDate');
     const heightInput = document.getElementById('measurementHeight');
     const weightInput = document.getElementById('measurementWeight');
@@ -568,6 +767,49 @@ async function addMeasurement() {
         hideLoading();
         console.error('Error adding measurement:', error);
         showToast(error.message, 'error');
+    }
+}
+
+// Update measurement report flag
+async function updateMeasurementReportFlag(id, includeInReport) {
+    try {
+        // Get current measurement
+        const measurements = await clientStorage.getAllPhysicalMeasurements();
+        const measurement = measurements.find(m => m.id === id);
+        
+        if (!measurement) {
+            console.error('Measurement not found:', id);
+            return;
+        }
+        
+        // Update the flag
+        measurement.include_in_report = includeInReport;
+        
+        // Save to server
+        const result = await apiCall(`/api/physical-measurements/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(measurement)
+        });
+        
+        if (result.success) {
+            // Sync to client storage
+            await clientStorage.savePhysicalMeasurement(measurement);
+        } else {
+            // Revert checkbox on error
+            const checkbox = document.querySelector(`input[data-measurement-id="${id}"]`);
+            if (checkbox) {
+                checkbox.checked = !includeInReport;
+            }
+            showToast('Error updating measurement', 'error');
+        }
+    } catch (error) {
+        console.error('Error updating measurement report flag:', error);
+        // Revert checkbox on error
+        const checkbox = document.querySelector(`input[data-measurement-id="${id}"]`);
+        if (checkbox) {
+            checkbox.checked = !includeInReport;
+        }
+        showToast('Error updating measurement', 'error');
     }
 }
 

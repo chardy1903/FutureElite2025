@@ -47,9 +47,11 @@
                         <a href="/dashboard" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Dashboard</a>
                         <a href="/matches" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Matches</a>
                         <a href="/achievements" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Achievements</a>
+                        <a href="/player-profile" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Profile</a>
                         <a href="/physical-data" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Physical</a>
                         <a href="/physical-metrics" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Performance</a>
                         <a href="/settings" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Settings</a>
+                        <a href="/references" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">References</a>
                         <a href="/subscription" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Subscription</a>
                     </div>
                 </div>
@@ -143,17 +145,56 @@
 
         // API helper functions
         async function apiCall(url, options = {}) {
-            const defaultOptions = {
-                headers: {
-                    'Content-Type': 'application/json',
+            const method = (options.method || 'GET').toUpperCase();
+            const isStateChanging = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+            
+            // Security: Add CSRF token for state-changing requests
+            const headers = {
+                'Content-Type': 'application/json',
+                ...(options.headers || {})
+            };
+            
+            if (isStateChanging) {
+                try {
+                    const csrfToken = await csrfManager.getToken();
+                    if (csrfToken) {
+                        headers['X-CSRFToken'] = csrfToken;
+                    }
+                } catch (error) {
+                    console.warn('Failed to get CSRF token:', error);
+                    // Continue - server will reject with 400 if CSRF required
                 }
+            }
+            
+            const defaultOptions = {
+                headers: headers,
+                credentials: 'include' // Always include cookies for session
             };
             
             const mergedOptions = { ...defaultOptions, ...options };
+            // Ensure credentials is set
+            mergedOptions.credentials = 'include';
             
             try {
                 const response = await fetch(url, mergedOptions);
                 const data = await response.json();
+                
+                // If CSRF error, try to refresh token and retry once
+                if (response.status === 400 && data.errors && 
+                    data.errors.some(e => e.toLowerCase().includes('csrf'))) {
+                    console.warn('CSRF token expired, refreshing...');
+                    csrfManager.clearToken();
+                    const newToken = await csrfManager.getToken();
+                    if (newToken) {
+                        mergedOptions.headers['X-CSRFToken'] = newToken;
+                        const retryResponse = await fetch(url, mergedOptions);
+                        const retryData = await retryResponse.json();
+                        if (!retryResponse.ok) {
+                            throw new Error(retryData.errors ? retryData.errors.join(', ') : 'Request failed');
+                        }
+                        return retryData;
+                    }
+                }
                 
                 if (!response.ok) {
                     throw new Error(data.errors ? data.errors.join(', ') : 'Request failed');
@@ -220,6 +261,7 @@
             switch(category) {
                 case 'Pre-Season Friendly': return 'bg-blue-100 text-blue-800';
                 case 'League': return 'bg-green-100 text-green-800';
+                case 'Friendly': return 'bg-purple-100 text-purple-800';
                 default: return 'bg-gray-100 text-gray-800';
             }
         }
@@ -257,6 +299,7 @@
     </script>
 
     <!-- Client-side storage and API -->
+    <script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
     <script src="{{ url_for('static', filename='js/storage.js') }}"></script>
     <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
     <script src="{{ url_for('static', filename='js/api.js') }}"></script>

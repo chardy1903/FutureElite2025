@@ -145,13 +145,31 @@ def calculate_phv(
             valid_measurements[i + 1]
         )
         if velocity:
-            velocities.append(velocity)
+            # Filter out unrealistic velocities from very short intervals
+            # Minimum 30 days between measurements for reliable velocity calculation
+            if velocity['days'] >= 30:
+                # Cap velocity at reasonable maximum (15 cm/year for boys)
+                # Very high velocities are usually measurement errors or very short intervals
+                if velocity['velocity_cm_per_year'] <= 15.0:
+                    velocities.append(velocity)
+                else:
+                    # If velocity is too high, it's likely a measurement error
+                    # Skip this interval
+                    continue
     
     if not velocities:
         return None
     
     # Find maximum velocity (PHV)
+    # Cap at reasonable maximum (12 cm/year is typical peak for boys)
     max_velocity = max(velocities, key=lambda v: v['velocity_cm_per_year'])
+    
+    # Validate and cap PHV velocity at realistic maximum
+    if max_velocity['velocity_cm_per_year'] > 12.0:
+        # If calculated PHV is unrealistically high, cap it at 12 cm/year
+        # This prevents prediction errors from measurement outliers
+        max_velocity['velocity_cm_per_year'] = min(max_velocity['velocity_cm_per_year'], 12.0)
+        max_velocity['velocity_cm_per_day'] = max_velocity['velocity_cm_per_year'] / 365.25
     
     # Calculate PHV date (midpoint of the interval with max velocity)
     phv_date = max_velocity['midpoint_date']
@@ -363,8 +381,16 @@ def calculate_predicted_adult_height(
                 else:
                     remaining_velocity = phv_velocity * 0.5  # Pre-PHV growth
             
+            # Cap remaining velocity at reasonable maximum (5 cm/year max after PHV)
+            remaining_velocity = min(remaining_velocity, 5.0)
+            
             predicted_growth = remaining_velocity * years_remaining
             predicted_height_velocity = current_height + predicted_growth
+            
+            # Cap predicted height at realistic maximum (220 cm / 7'2.5")
+            # This prevents unrealistic predictions from data errors
+            predicted_height_velocity = min(predicted_height_velocity, 220.0)
+            
             predictions['growth_velocity_method'] = {
                 'predicted_height_cm': round(predicted_height_velocity, 1),
                 'confidence': 'high' if len(valid_measurements) >= 4 else 'medium',
@@ -391,6 +417,8 @@ def calculate_predicted_adult_height(
         
         if khamis_factor > 0:
             predicted_height_khamis = current_height / khamis_factor
+            # Cap at realistic maximum
+            predicted_height_khamis = min(predicted_height_khamis, 220.0)
             predictions['khamis_roche_method'] = {
                 'predicted_height_cm': round(predicted_height_khamis, 1),
                 'confidence': 'medium',
@@ -418,9 +446,15 @@ def calculate_predicted_adult_height(
                 # Apply deceleration: growth slows as approaching adult height
                 # Use exponential decay model
                 deceleration_factor = 0.7 ** min(years_to_18, 3)  # Decelerate over next 3 years
+                # Cap average velocity at reasonable maximum
+                avg_velocity = min(avg_velocity, 8.0)
+                
                 projected_velocity = avg_velocity * deceleration_factor
                 predicted_growth = projected_velocity * years_to_18
                 predicted_height_curve = current_height + predicted_growth
+                
+                # Cap at realistic maximum
+                predicted_height_curve = min(predicted_height_curve, 220.0)
                 
                 predictions['growth_curve_method'] = {
                     'predicted_height_cm': round(predicted_height_curve, 1),
@@ -453,6 +487,13 @@ def calculate_predicted_adult_height(
         # Fallback: simple average
         heights = [p['predicted_height_cm'] for p in predictions.values()]
         final_prediction = sum(heights) / len(heights)
+    
+    # Cap final prediction at realistic maximum (220 cm / 7'2.5")
+    # This prevents unrealistic predictions from any calculation method
+    final_prediction = min(final_prediction, 220.0)
+    
+    # Also ensure minimum reasonable height (150 cm / 4'11")
+    final_prediction = max(final_prediction, 150.0)
     
     return {
         'predicted_adult_height_cm': round(final_prediction, 1),

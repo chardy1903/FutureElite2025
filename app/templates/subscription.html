@@ -6,13 +6,32 @@
 <div class="px-4 py-6 sm:px-0">
     <!-- Header -->
     <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900">Subscription Management</h1>
-        <p class="mt-2 text-lg text-gray-600">Manage your FutureElite subscription</p>
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Subscription Management</h1>
+                <p class="mt-2 text-lg text-gray-600">Manage your FutureElite subscription</p>
+            </div>
+            <div class="flex items-center space-x-2">
+                <label class="text-sm font-medium text-gray-700">Currency:</label>
+                <select id="currencySelector" onchange="updateCurrency()" class="border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red px-3 py-2">
+                    <option value="usd">USD ($)</option>
+                    <option value="gbp">GBP (£)</option>
+                    <option value="eur">EUR (€)</option>
+                    <option value="aed">AED (د.إ)</option>
+                    <option value="sar">SAR (﷼)</option>
+                </select>
+            </div>
+        </div>
     </div>
 
     <!-- Current Subscription Status -->
     <div id="subscriptionStatus" class="bg-white shadow rounded-lg mb-8 p-6">
-        <h2 class="text-xl font-semibold text-gray-900 mb-4">Current Subscription</h2>
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold text-gray-900">Current Subscription</h2>
+            <button onclick="syncSubscriptionFromStripe()" class="text-sm text-qadsiah-red hover:text-red-700 font-medium">
+                Sync from Stripe
+            </button>
+        </div>
         <div id="statusContent">
             <p class="text-gray-500">Loading...</p>
         </div>
@@ -24,7 +43,7 @@
         <div class="bg-white shadow rounded-lg p-6">
             <h3 class="text-2xl font-bold text-gray-900 mb-2">Monthly</h3>
             <div class="mb-4">
-                <span class="text-4xl font-bold text-qadsiah-red">$9.99</span>
+                <span class="text-4xl font-bold text-qadsiah-red" id="monthlyPrice">$9.99</span>
                 <span class="text-gray-600">/month</span>
             </div>
             <ul class="mb-6 space-y-2 text-sm text-gray-600">
@@ -65,11 +84,11 @@
             </div>
             <h3 class="text-2xl font-bold text-gray-900 mb-2">Annual</h3>
             <div class="mb-4">
-                <span class="text-4xl font-bold text-qadsiah-red">$99.99</span>
+                <span class="text-4xl font-bold text-qadsiah-red" id="annualPrice">$99.99</span>
                 <span class="text-gray-600">/year</span>
             </div>
             <div class="mb-2">
-                <span class="text-sm text-gray-500 line-through">$119.88</span>
+                <span class="text-sm text-gray-500 line-through" id="annualOriginalPrice">$119.88</span>
                 <span class="text-sm text-green-600 font-semibold ml-2">Save 17%</span>
             </div>
             <ul class="mb-6 space-y-2 text-sm text-gray-600">
@@ -129,12 +148,32 @@ async function loadSubscriptionStatus() {
         }
         
         const userId = clientStorage.getCurrentUserId();
-        const subscription = await clientStorage.getSubscription(userId);
+        
+        // Load from server first (source of truth)
+        let subscription = null;
+        try {
+            const response = await fetch('/api/subscription/status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ user_id: userId })
+            });
+            const data = await response.json();
+            if (data.success && data.subscription) {
+                subscription = data.subscription;
+                // Sync to client storage
+                await clientStorage.saveSubscription(subscription);
+            }
+        } catch (e) {
+            console.warn('Could not load subscription from server, using client storage:', e);
+            subscription = await clientStorage.getSubscription(userId);
+        }
         
         const statusContent = document.getElementById('statusContent');
         const manageDiv = document.getElementById('manageSubscription');
         
-        if (subscription && subscription.status === 'active') {
+        if (subscription && (subscription.has_access || subscription.status === 'active')) {
             statusContent.innerHTML = `
                 <div class="flex items-center justify-between">
                     <div>
@@ -180,6 +219,40 @@ async function loadSubscriptionStatus() {
     }
 }
 
+// Currency conversion rates (approximate)
+const CURRENCY_RATES = {
+    usd: { monthly: 9.99, annual: 99.99, symbol: '$', originalAnnual: 119.88 },
+    gbp: { monthly: 7.99, annual: 79.99, symbol: '£', originalAnnual: 95.88 },
+    eur: { monthly: 9.49, annual: 94.99, symbol: '€', originalAnnual: 113.88 },
+    aed: { monthly: 36.99, annual: 369.99, symbol: 'د.إ', originalAnnual: 443.88 },
+    sar: { monthly: 37.49, annual: 374.99, symbol: '﷼', originalAnnual: 449.88 }
+};
+
+// Update prices based on selected currency
+function updateCurrency() {
+    const currency = document.getElementById('currencySelector').value;
+    const rates = CURRENCY_RATES[currency];
+    
+    if (rates) {
+        document.getElementById('monthlyPrice').textContent = `${rates.symbol}${rates.monthly.toFixed(2)}`;
+        document.getElementById('annualPrice').textContent = `${rates.symbol}${rates.annual.toFixed(2)}`;
+        document.getElementById('annualOriginalPrice').textContent = `${rates.symbol}${rates.originalAnnual.toFixed(2)}`;
+        
+        // Store selected currency
+        localStorage.setItem('preferredCurrency', currency);
+    }
+}
+
+// Load saved currency preference
+function loadCurrencyPreference() {
+    const savedCurrency = localStorage.getItem('preferredCurrency') || 'usd';
+    const selector = document.getElementById('currencySelector');
+    if (selector) {
+        selector.value = savedCurrency;
+        updateCurrency();
+    }
+}
+
 // Subscribe to a plan
 async function subscribe(planType) {
     try {
@@ -193,6 +266,7 @@ async function subscribe(planType) {
         
         const userId = clientStorage.getCurrentUserId();
         const username = clientAuth.getCurrentUsername();
+        const currency = document.getElementById('currencySelector').value || 'usd';
         
         showLoading('Creating checkout session...');
         
@@ -204,6 +278,7 @@ async function subscribe(planType) {
             body: JSON.stringify({
                 user_id: userId,
                 plan_type: planType,
+                currency: currency,
                 email: null // You can get email from settings if available
             })
         });
@@ -238,7 +313,24 @@ async function openCustomerPortal() {
         await ensureStorageReady();
         
         const userId = clientStorage.getCurrentUserId();
-        const subscription = await clientStorage.getSubscription(userId);
+        
+        // Load from server first
+        let subscription = null;
+        try {
+            const response = await fetch('/api/subscription/status', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ user_id: userId })
+            });
+            const data = await response.json();
+            if (data.success && data.subscription) {
+                subscription = data.subscription;
+            }
+        } catch (e) {
+            subscription = await clientStorage.getSubscription(userId);
+        }
         
         if (!subscription || !subscription.stripe_customer_id) {
             showToast('No active subscription found', 'error');
@@ -281,15 +373,57 @@ async function openCustomerPortal() {
     }
 }
 
+// Sync subscription from Stripe manually
+async function syncSubscriptionFromStripe() {
+    try {
+        await ensureStorageReady();
+        
+        if (!clientAuth.isAuthenticated()) {
+            showToast('Please log in', 'error');
+            return;
+        }
+        
+        const userId = clientStorage.getCurrentUserId();
+        showLoading('Syncing subscription from Stripe...');
+        
+        // Call a sync endpoint that will check Stripe for this user's subscriptions
+        const response = await fetch('/api/subscription/sync', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ user_id: userId })
+        });
+        
+        const result = await response.json();
+        hideLoading();
+        
+        if (result.success) {
+            showToast('Subscription synced successfully!', 'success');
+            await loadSubscriptionStatus();
+        } else {
+            showToast(result.errors?.join(', ') || 'Failed to sync subscription', 'error');
+        }
+    } catch (error) {
+        hideLoading();
+        console.error('Error syncing subscription:', error);
+        showToast('Error syncing subscription: ' + error.message, 'error');
+    }
+}
+
 // Load status on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadSubscriptionStatus();
+    loadCurrencyPreference();
     
     // Check for success/cancel parameters
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('success') === 'true') {
-        showToast('Subscription activated successfully!', 'success');
-        loadSubscriptionStatus();
+        // Wait a moment for server to process, then reload
+        setTimeout(async () => {
+            await loadSubscriptionStatus();
+            showToast('Subscription activated successfully!', 'success');
+        }, 1500);
     } else if (urlParams.get('canceled') === 'true') {
         showToast('Subscription canceled', 'info');
     }

@@ -7,7 +7,7 @@
     <!-- Header -->
     <div class="mb-8">
         <h1 class="text-3xl font-bold text-gray-900">Settings</h1>
-        <p class="mt-2 text-lg text-gray-600">Configure app settings and player physical data</p>
+        <p class="mt-2 text-lg text-gray-600">Configure app settings, appearance, and basic information</p>
     </div>
 
     <form id="settingsForm" onsubmit="saveSettings(event)" class="space-y-8">
@@ -38,72 +38,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Player Information -->
-        <div class="bg-white shadow rounded-lg p-6">
-            <h2 class="text-xl font-semibold text-gray-900 mb-4">Player Information</h2>
-            <p class="text-sm text-gray-600 mb-4">Basic player data used for calculations and analysis</p>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-                    <input type="date" id="date_of_birth" name="date_of_birth" value="" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
-                    <p class="mt-1 text-xs text-gray-500">Required for calculating age and PHV. Historical measurements can be managed on the Physical Data page.</p>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Current Height (cm)</label>
-                    <input type="number" step="0.1" name="height_cm" value="{{ settings.height_cm or '' }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red" placeholder="e.g., 165.5">
-                    <p class="mt-1 text-xs text-gray-500">Current snapshot. For historical tracking, use Physical Data page.</p>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Current Weight (kg)</label>
-                    <input type="number" step="0.1" name="weight_kg" value="{{ settings.weight_kg or '' }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red" placeholder="e.g., 55.5">
-                    <p class="mt-1 text-xs text-gray-500">Current snapshot. For historical tracking, use Physical Data page.</p>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Peak Height Velocity (PHV) Date</label>
-                    <input type="date" id="phv_date" name="phv_date" value="" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
-                    <p class="mt-1 text-xs text-gray-500">Auto-calculated from historical measurements, or can be manually set</p>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">PHV Age (years)</label>
-                    <input type="number" step="0.1" name="phv_age" value="{{ settings.phv_age | round(1) if settings.phv_age else '' }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red" placeholder="e.g., 13.5">
-                    <p class="mt-1 text-xs text-gray-500">Auto-calculated from historical measurements</p>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Position</label>
-                    <select name="position" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
-                        <option value="">Select position</option>
-                        <option value="Goalkeeper" {% if settings.position == 'Goalkeeper' %}selected{% endif %}>Goalkeeper</option>
-                        <option value="Defender" {% if settings.position == 'Defender' %}selected{% endif %}>Defender</option>
-                        <option value="Midfielder" {% if settings.position == 'Midfielder' %}selected{% endif %}>Midfielder</option>
-                        <option value="Forward" {% if settings.position == 'Forward' %}selected{% endif %}>Forward</option>
-                        <option value="Winger" {% if settings.position == 'Winger' %}selected{% endif %}>Winger</option>
-                        <option value="Attacking Midfielder" {% if settings.position == 'Attacking Midfielder' %}selected{% endif %}>Attacking Midfielder</option>
-                        <option value="Defensive Midfielder" {% if settings.position == 'Defensive Midfielder' %}selected{% endif %}>Defensive Midfielder</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Dominant Foot</label>
-                    <select name="dominant_foot" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
-                        <option value="">Select foot</option>
-                        <option value="Left" {% if settings.dominant_foot == 'Left' %}selected{% endif %}>Left</option>
-                        <option value="Right" {% if settings.dominant_foot == 'Right' %}selected{% endif %}>Right</option>
-                        <option value="Both" {% if settings.dominant_foot == 'Both' %}selected{% endif %}>Both</option>
-                    </select>
-                </div>
-            </div>
-            
-            <!-- PHV Calculation Status -->
-            <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg" id="phvStatus">
-                <h3 class="text-sm font-semibold text-blue-900 mb-2">PHV Calculation Status</h3>
-                <p class="text-xs text-blue-700" id="phvStatusText">Loading...</p>
-                <button type="button" onclick="calculatePHV()" class="mt-2 text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
-                    Calculate PHV Now
-                </button>
-                <p class="mt-2 text-xs text-blue-600">Note: Add historical measurements on the <a href="/physical-data" class="underline">Physical Data</a> page to enable PHV calculation.</p>
-            </div>
-        </div>
     </form>
 
     <!-- Appearance Settings (back inside settings form) -->
@@ -113,11 +47,11 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Primary Color</label>
-                    <input type="color" name="primary_color" value="{{ settings.primary_color }}" class="mt-1 block w-full h-10 border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                    <input type="color" name="primary_color" value="{{ settings.primary_color or '#B22222' }}" class="mt-1 block w-full h-10 border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Header Color</label>
-                    <input type="color" name="header_color" value="{{ settings.header_color }}" class="mt-1 block w-full h-10 border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
+                    <input type="color" name="header_color" value="{{ settings.header_color or '#1F2937' }}" class="mt-1 block w-full h-10 border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Footer Text</label>
@@ -129,26 +63,8 @@
         <!-- Player Media & Links -->
         <div class="bg-white shadow rounded-lg p-6 mt-8">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">Player Media & Links</h2>
-            <p class="text-sm text-gray-600 mb-4">Add player photo, highlight reels, and social media links for the scout report</p>
+            <p class="text-sm text-gray-600 mb-4">Add highlight reels and social media links for the scout report. Player photo can be managed on the <a href="/player-profile" class="text-blue-600 underline">Player Profile</a> page.</p>
             
-            <!-- Photo Upload -->
-            <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Player Photo</label>
-                <div class="flex items-center space-x-4">
-                    <input type="file" id="photoUpload" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" class="hidden">
-                    <button type="button" onclick="document.getElementById('photoUpload').click()" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors">
-                        Choose Photo
-                    </button>
-                    <span id="photoStatus" class="text-sm text-gray-600">
-                        {% if settings.player_photo_path %}Photo uploaded{% else %}No photo selected{% endif %}
-                    </span>
-                    {% if settings.player_photo_path %}
-                    <button type="button" onclick="removePhoto()" class="text-red-600 text-sm hover:text-red-800">Remove</button>
-                    {% endif %}
-                </div>
-                <p class="mt-2 text-xs text-gray-500">Supported formats: PNG, JPG, JPEG, GIF, WEBP</p>
-            </div>
-
             <!-- Social Media -->
             <div class="mb-6">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Social Media URLs</label>
@@ -178,65 +94,6 @@
 
 {% block scripts %}
 <script>
-// Photo upload handler
-document.getElementById('photoUpload')?.addEventListener('change', async function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    const formData = new FormData();
-    formData.append('photo', file);
-    
-    try {
-        showLoading('Uploading photo...');
-        const response = await fetch('/api/upload-photo', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const data = await response.json();
-        hideLoading();
-        
-        if (data.success) {
-            document.getElementById('photoStatus').textContent = 'Photo uploaded';
-            showToast('Photo uploaded successfully!', 'success');
-            setTimeout(() => window.location.reload(), 1000);
-        } else {
-            showToast(data.errors?.[0] || 'Error uploading photo', 'error');
-        }
-    } catch (error) {
-        hideLoading();
-        showToast('Error uploading photo: ' + error.message, 'error');
-    }
-});
-
-// Remove photo
-async function removePhoto() {
-    if (!confirm('Remove the uploaded photo?')) return;
-    
-    try {
-        const settings = await apiCall('/api/settings');
-        if (settings.success) {
-            const updatedSettings = {
-                ...settings.settings,
-                player_photo_path: null
-            };
-            
-            showLoading('Removing photo...');
-            await apiCall('/settings', {
-                method: 'POST',
-                body: JSON.stringify(updatedSettings)
-            });
-            
-            hideLoading();
-            showToast('Photo removed', 'success');
-            setTimeout(() => window.location.reload(), 1000);
-        }
-    } catch (error) {
-        hideLoading();
-        showToast('Error removing photo: ' + error.message, 'error');
-    }
-}
-
 // Add highlight reel input
 function addHighlightReel() {
     const container = document.getElementById('highlightReelsContainer');
@@ -267,8 +124,19 @@ async function loadSettingsData() {
             return;
         }
         
-        // Load settings from client storage
-        const settings = await clientStorage.loadSettings();
+        // Load settings from server first (most up-to-date), then fallback to client storage
+        let settings = {};
+        try {
+            const serverData = await apiCall('/api/settings');
+            if (serverData.success && serverData.settings) {
+                settings = serverData.settings;
+                // Sync to client storage
+                await clientStorage.saveSettings(settings);
+            }
+        } catch (e) {
+            console.warn('Could not load settings from server, using client storage:', e);
+            settings = await clientStorage.loadSettings();
+        }
         
         // Populate form fields
         if (settings.season_year) document.querySelector('input[name="season_year"]').value = settings.season_year;
@@ -277,21 +145,18 @@ async function loadSettingsData() {
         if (settings.league_name) document.querySelector('input[name="league_name"]').value = settings.league_name;
         if (settings.contact_email) document.querySelector('input[name="contact_email"]').value = settings.contact_email;
         
-        // Date fields - convert from "dd MMM yyyy" to "YYYY-MM-DD"
-        if (settings.date_of_birth) {
-            const dobDate = convertDateToInput(settings.date_of_birth);
-            document.getElementById('date_of_birth').value = dobDate;
+        // Set color inputs with defaults if empty
+        const primaryColorInput = document.querySelector('input[name="primary_color"]');
+        const headerColorInput = document.querySelector('input[name="header_color"]');
+        if (primaryColorInput) {
+            primaryColorInput.value = settings.primary_color || '#B22222';
         }
-        if (settings.phv_date) {
-            const phvDate = convertDateToInput(settings.phv_date);
-            document.getElementById('phv_date').value = phvDate;
+        if (headerColorInput) {
+            headerColorInput.value = settings.header_color || '#1F2937';
         }
         
-        if (settings.height_cm) document.querySelector('input[name="height_cm"]').value = settings.height_cm;
-        if (settings.weight_kg) document.querySelector('input[name="weight_kg"]').value = settings.weight_kg;
-        if (settings.phv_age) document.querySelector('input[name="phv_age"]').value = settings.phv_age;
-        if (settings.position) document.querySelector('select[name="position"]').value = settings.position;
-        if (settings.dominant_foot) document.querySelector('select[name="dominant_foot"]').value = settings.dominant_foot;
+        // Note: Player information fields (date_of_birth, height, weight, position, etc.) 
+        // are no longer on this page - they're on the Player Profile page
         
         // Load highlight reel URLs
         if (settings.highlight_reel_urls && Array.isArray(settings.highlight_reel_urls)) {
@@ -307,9 +172,6 @@ async function loadSettingsData() {
                 container.appendChild(div);
             });
         }
-        
-        // Update PHV status
-        updatePHVStatus(settings);
         
     } catch (error) {
         console.error('Error loading settings:', error);
@@ -335,115 +197,9 @@ function convertDateToInput(dateStr) {
     return '';
 }
 
-// Update PHV status display
-function updatePHVStatus(settings) {
-    const statusDiv = document.getElementById('phvStatus');
-    const statusText = document.getElementById('phvStatusText');
-    
-    if (settings.phv_date && settings.phv_age) {
-        statusDiv.className = 'mt-6 p-4 bg-green-50 border border-green-200 rounded-lg';
-        statusText.innerHTML = `
-            <strong>PHV Calculated:</strong> ${settings.phv_date} (Age: ${settings.phv_age.toFixed(1)} years)<br>
-            <span class="text-xs text-green-700">This was calculated from your historical measurements. You can manually adjust it above if needed.</span>
-        `;
-    } else if (settings.date_of_birth) {
-        statusDiv.className = 'mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg';
-        statusText.innerHTML = `
-            <strong>PHV Not Yet Calculated</strong><br>
-            <span class="text-xs text-yellow-700">Add at least 2 historical height measurements on the Physical Data page to calculate PHV automatically.</span>
-        `;
-    } else {
-        statusDiv.className = 'mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg';
-        statusText.innerHTML = `
-            <strong>Date of Birth Required</strong><br>
-            <span class="text-xs text-blue-700">Please enter your date of birth above to enable PHV calculation.</span>
-        `;
-    }
-}
-
 document.addEventListener('DOMContentLoaded', function() {
     loadSettingsData();
 });
-
-// Update PHV status
-async function updatePHVStatus() {
-    try {
-        const data = await apiCall('/api/phv/calculate');
-        
-        const statusText = document.getElementById('phvStatusText');
-        const statusDiv = document.getElementById('phvStatus');
-        
-        if (data.success) {
-            const phv = data.phv;
-            const validation = data.validation;
-            
-            if (phv) {
-                statusText.innerHTML = `
-                    <strong>PHV Calculated:</strong><br>
-                    Date: ${phv.phv_date}<br>
-                    Age: ${phv.phv_age?.toFixed(1)} years<br>
-                    Velocity: ${phv.phv_velocity_cm_per_year?.toFixed(1)} cm/year<br>
-                    <span class="text-xs">Based on ${phv.calculation_based_on_measurements} measurements</span>
-                `;
-                statusDiv.className = 'mt-6 p-4 bg-green-50 border border-green-200 rounded-lg';
-            } else {
-                // PHV couldn't be calculated but validation passed (rare case)
-                const message = validation?.message || 'Need at least 2 height measurements to calculate PHV. Add historical measurements on the Physical Data page.';
-                statusText.innerHTML = `<strong>PHV Status:</strong><br>${message}`;
-                if (validation?.recommendation) {
-                    statusText.innerHTML += `<br><span class="text-xs text-yellow-700">${validation.recommendation}</span>`;
-                }
-                statusDiv.className = 'mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg';
-            }
-            
-            if (validation?.warning) {
-                statusText.innerHTML += `<br><span class="text-xs text-yellow-700">⚠️ ${validation.recommendation || ''}</span>`;
-            }
-        } else {
-            // Error occurred
-            const errorMessage = data.errors?.[0] || data.validation?.message || 'Unable to calculate PHV';
-            statusText.innerHTML = `<strong>PHV Calculation Error:</strong><br>${errorMessage}`;
-            if (data.validation?.recommendation) {
-                statusText.innerHTML += `<br><span class="text-xs text-red-700">💡 ${data.validation.recommendation}</span>`;
-            }
-            statusDiv.className = 'mt-6 p-4 bg-red-50 border border-red-200 rounded-lg';
-        }
-    } catch (error) {
-        console.error('Error updating PHV status:', error);
-        const statusText = document.getElementById('phvStatusText');
-        const statusDiv = document.getElementById('phvStatus');
-        statusText.innerHTML = `<strong>Error:</strong><br>${error.message || 'Error loading PHV status'}`;
-        statusDiv.className = 'mt-6 p-4 bg-red-50 border border-red-200 rounded-lg';
-    }
-}
-
-// Calculate PHV manually
-async function calculatePHV() {
-    try {
-        showLoading('Calculating PHV...');
-        
-        const data = await apiCall('/api/phv/calculate');
-        
-        if (data.success) {
-            hideLoading();
-            updatePHVStatus();
-            
-            if (data.phv) {
-                showToast(`PHV calculated: ${data.phv.phv_age?.toFixed(1)} years on ${data.phv.phv_date}`, 'success');
-                setTimeout(() => window.location.reload(), 1500);
-            } else {
-                showToast(data.validation?.message || 'Unable to calculate PHV. Add more measurements.', 'warning');
-            }
-        } else {
-            hideLoading();
-            showToast(data.errors?.[0] || 'Error calculating PHV', 'error');
-        }
-    } catch (error) {
-        hideLoading();
-        console.error('Error calculating PHV:', error);
-        showToast('Error calculating PHV', 'error');
-    }
-}
 
 async function saveSettings(event) {
     event.preventDefault();
@@ -490,37 +246,13 @@ async function saveSettings(event) {
     // Don't send player_photo_path in form data - it's managed separately via upload
     // Backend will preserve existing value if not provided
     
-    // Handle empty date fields as null
-    if (data.date_of_birth === '') {
-        data.date_of_birth = null;
-    }
-    if (data.phv_date === '') {
-        data.phv_date = null;
-    }
-    // Note: Date fields are sent in YYYY-MM-DD format and converted by backend
-    
-    // Convert numeric fields (handle empty strings as null)
-    const numericFields = ['height_cm', 'weight_kg', 'phv_age'];
-    numericFields.forEach(field => {
-        if (data[field] === '' || data[field] === null) {
-            data[field] = null;
-        } else {
-            data[field] = parseFloat(data[field]);
-        }
-    });
-    
-    // Handle empty strings as null for optional fields
-    const optionalFields = ['position', 'dominant_foot'];
-    optionalFields.forEach(field => {
-        if (data[field] === '') {
-            data[field] = null;
-        }
-    });
+    // Note: Player information fields (date_of_birth, height_cm, weight_kg, position, etc.)
+    // are no longer saved from this page - they're saved from the Player Profile page
     
     try {
         showLoading('Saving settings...');
         
-        await apiCall('/settings', {
+        const result = await apiCall('/settings', {
             method: 'POST',
             body: JSON.stringify(data)
         });
@@ -534,6 +266,7 @@ async function saveSettings(event) {
     } catch (error) {
         hideLoading();
         console.error('Error saving settings:', error);
+        showToast('Error saving settings: ' + (error.message || 'Unknown error'), 'error');
     }
 }
 </script>

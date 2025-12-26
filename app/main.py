@@ -9,10 +9,12 @@ distribution, or use of this software, via any medium, is strictly prohibited.
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_login import LoginManager
 import os
+import sys
 import webbrowser
 import threading
 import time
 from pathlib import Path
+from datetime import timedelta
 
 # Load environment variables from .env file
 try:
@@ -29,16 +31,61 @@ from .models import Match, MatchCategory, MatchResult, AppSettings
 from .utils import parse_input_date
 from .auth import UserSession
 
+# Security imports
+try:
+    from flask_wtf.csrf import CSRFProtect
+    CSRF_AVAILABLE = True
+except ImportError:
+    CSRF_AVAILABLE = False
+    CSRFProtect = None
+
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    LIMITER_AVAILABLE = True
+except ImportError:
+    LIMITER_AVAILABLE = False
+    Limiter = None
+    get_remote_address = None
+
+try:
+    from flask_talisman import Talisman
+    TALISMAN_AVAILABLE = True
+except ImportError:
+    TALISMAN_AVAILABLE = False
+    Talisman = None
+
 
 def create_app():
     """Create and configure the Flask application"""
     app = Flask(__name__)
     
     # Configuration
-    # SECRET_KEY should be set via environment variable in production
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'futureelite-2025-dev-only')
+    # SECRET_KEY must be set via environment variable - no default fallback
+    secret_key = os.environ.get('SECRET_KEY', '').strip()
+    if not secret_key:
+        raise RuntimeError(
+            "SECRET_KEY environment variable must be set. "
+            "Generate a secure key with: python -c 'import secrets; print(secrets.token_hex(32))'"
+        )
+    if len(secret_key) < 32:
+        raise RuntimeError(
+            f"SECRET_KEY must be at least 32 characters. Current length: {len(secret_key)}. "
+            "Generate a secure key with: python -c 'import secrets; print(secrets.token_hex(32))'"
+        )
+    app.config['SECRET_KEY'] = secret_key
     app.config['JSON_AS_ASCII'] = False
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+    
+    # Security: Disable template auto-reload in production
+    app.config['TEMPLATES_AUTO_RELOAD'] = os.environ.get('FLASK_ENV') != 'production'
+    
+    # Secure session cookie configuration
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    # Only set Secure=True in production (HTTPS required)
+    app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
     
     # Initialize Flask-Login
     login_manager = LoginManager()
@@ -55,24 +102,102 @@ def create_app():
             return UserSession(user)
         return None
     
+    # Security: Initialize CSRF protection
+    if CSRF_AVAILABLE:
+        csrf = CSRFProtect(app)
+        # Security: Exempt Stripe webhook from CSRF (external service, verified by signature)
+        csrf.exempt('subscription.stripe_webhook')
+        app.logger.info("CSRF protection enabled (webhook exempted)")
+    else:
+        app.logger.warning("flask-wtf not installed - CSRF protection disabled")
+    
+    # Security: Initialize rate limiting
+    if LIMITER_AVAILABLE:
+        limiter = Limiter(
+            app=app,
+            key_func=get_remote_address,
+            default_limits=["200 per day", "50 per hour"],
+            storage_uri="memory://"  # In-memory storage (TODO: Use Redis in production)
+        )
+        app.extensions['limiter'] = limiter
+        app.logger.info("Rate limiting enabled")
+    else:
+        app.logger.warning("flask-limiter not installed - rate limiting disabled")
+        limiter = None
+    
+    # Security: Initialize security headers
+    if TALISMAN_AVAILABLE:
+        is_production = os.environ.get('FLASK_ENV') == 'production'
+        Talisman(
+            app,
+            force_https=is_production,
+            strict_transport_security=is_production,
+            strict_transport_security_max_age=31536000,
+            strict_transport_security_include_subdomains=True,
+            strict_transport_security_preload=False,  # Set True after HSTS preload approval
+            content_security_policy={
+                'default-src': "'self'",
+                'script-src': "'self' https://cdn.tailwindcss.com 'unsafe-inline'",  # unsafe-inline needed for Tailwind
+                'style-src': "'self' 'unsafe-inline' https://cdn.tailwindcss.com",
+                'img-src': "'self' data: https:",
+                'font-src': "'self' data:",
+                'connect-src': "'self'",
+            },
+            frame_options='DENY',
+            content_type_nosniff=True,
+            referrer_policy='strict-origin-when-cross-origin'
+        )
+        app.logger.info("Security headers enabled")
+    else:
+        app.logger.warning("flask-talisman not installed - security headers disabled")
+    
+    # Security: Handle reverse proxy headers (X-Forwarded-*)
+    # Required when deployed behind nginx, Apache, or load balancer
+    try:
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        num_proxies = int(os.environ.get('PROXY_FIX_NUM_PROXIES', '1'))
+        if num_proxies > 0:
+            app.wsgi_app = ProxyFix(app.wsgi_app, x_for=num_proxies, x_proto=num_proxies, x_host=num_proxies)
+            app.logger.info(f"ProxyFix enabled with {num_proxies} proxy(ies)")
+    except ImportError:
+        app.logger.warning("werkzeug ProxyFix not available - proxy headers may not be handled correctly")
+    except Exception as e:
+        app.logger.warning(f"ProxyFix configuration error: {e}")
+    
     # Register blueprints
     app.register_blueprint(bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(subscription_bp)
     
+    # Production: Health check endpoint
+    @app.route('/health', methods=['GET'])
+    def health_check():
+        """Health check endpoint for load balancers and monitoring"""
+        return jsonify({
+            'status': 'healthy',
+            'service': 'FutureElite'
+        }), 200
+    
+    # Security: Add endpoint to get CSRF token for JSON API clients
+    if CSRF_AVAILABLE:
+        @app.route('/api/csrf-token', methods=['GET'])
+        def get_csrf_token():
+            """Get CSRF token for JSON API requests"""
+            from flask_wtf.csrf import generate_csrf
+            return jsonify({'csrf_token': generate_csrf()})
+    
     # Add error handler for API routes to return JSON instead of HTML
     @app.errorhandler(500)
     def handle_500_error(e):
-        """Return JSON for API errors"""
+        """Return JSON for API errors - sanitized to prevent information leakage"""
         if request.path.startswith('/api/'):
+            # Log full error details server-side for debugging
             import traceback
-            error_details = str(e)
-            # Try to get more details from the exception
-            if hasattr(e, 'original_exception'):
-                error_details = str(e.original_exception)
+            app.logger.error(f"500 error on {request.path}: {e}", exc_info=True)
+            # Return generic error message to client
             return jsonify({
                 'success': False,
-                'errors': [f'Internal server error: {error_details}']
+                'errors': ['An internal error occurred. Please try again later.']
             }), 500
         # For non-API routes, return default HTML error page
         return e
@@ -211,17 +336,30 @@ def open_browser():
 
 
 def main():
-    """Main entry point"""
+    """Main entry point - Development only"""
+    # Security: Prevent running Flask dev server in production
+    flask_env = os.environ.get('FLASK_ENV', '').strip().lower()
+    if flask_env == 'production':
+        print("ERROR: Flask development server cannot run in production mode.")
+        print("Use gunicorn or another production WSGI server instead:")
+        print("  gunicorn -c gunicorn.conf.py wsgi:app")
+        print("Or use the wsgi.py entry point:")
+        print("  gunicorn wsgi:app")
+        sys.exit(1)
+    
     app = create_app()
     
-    # Open browser in a separate thread
+    # Open browser in a separate thread (development only)
     browser_thread = threading.Thread(target=open_browser)
     browser_thread.daemon = True
     browser_thread.start()
     
-    print("FutureElite starting...")
+    print("FutureElite starting in DEVELOPMENT mode...")
     print("Opening browser at http://127.0.0.1:8080")
     print("Press Ctrl+C to stop the application")
+    print()
+    print("WARNING: This is the development server. For production, use:")
+    print("  gunicorn -c gunicorn.conf.py wsgi:app")
     
     try:
         # Use port 8080 to avoid conflict with AirPlay Receiver

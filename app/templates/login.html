@@ -43,6 +43,17 @@
 </div>
 
 <script>
+// Wait for storage to be ready before allowing login
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        await ensureStorageReady();
+        console.log('Storage ready for login');
+    } catch (error) {
+        console.error('Failed to initialize storage:', error);
+        alert('Failed to initialize database. Please refresh the page. If the problem persists, try clearing your browser cache.');
+    }
+});
+
 document.getElementById('loginForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
@@ -50,8 +61,17 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     const username = formData.get('username');
     const password = formData.get('password');
     
+    if (!username || !password) {
+        showToast('Please enter both username and password', 'error');
+        return;
+    }
+    
     try {
         showLoading('Logging in...');
+        
+        // Ensure storage is ready
+        await ensureStorageReady();
+        
         const result = await clientAuth.login(username, password);
         
         if (result.success) {
@@ -63,6 +83,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
         }
     } catch (error) {
         hideLoading();
+        console.error('Login error:', error);
         showToast(error.message || 'Login failed', 'error');
     }
 });

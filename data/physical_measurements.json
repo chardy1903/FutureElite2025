@@ -13,6 +13,7 @@
     "height_cm": 167.0,
     "weight_kg": 48.0,
     "notes": null,
+    "include_in_report": false,
     "user_id": "20251115_221430"
   },
   {
@@ -21,6 +22,7 @@
     "height_cm": 164.0,
     "weight_kg": null,
     "notes": null,
+    "include_in_report": false,
     "user_id": "20251115_221430"
   },
   {
@@ -29,6 +31,7 @@
     "height_cm": 161.5,
     "weight_kg": 44.3,
     "notes": null,
+    "include_in_report": true,
     "user_id": "20251115_221430"
   },
   {
@@ -37,6 +40,7 @@
     "height_cm": 160.0,
     "weight_kg": null,
     "notes": null,
+    "include_in_report": true,
     "user_id": "20251115_221430"
   },
   {
@@ -45,6 +49,33 @@
     "height_cm": 148.0,
     "weight_kg": null,
     "notes": null,
+    "include_in_report": false,
+    "user_id": "20251115_221430"
+  },
+  {
+    "id": "20251223_212549",
+    "date": "01 Nov 2022",
+    "height_cm": 148.0,
+    "weight_kg": null,
+    "notes": null,
+    "user_id": "20251115_221430"
+  },
+  {
+    "id": "20251223_212622",
+    "date": "01 Dec 2024",
+    "height_cm": 160.0,
+    "weight_kg": null,
+    "notes": null,
+    "include_in_report": false,
+    "user_id": "20251115_221430"
+  },
+  {
+    "id": "20251223_212734",
+    "date": "15 Aug 2025",
+    "height_cm": 167.64,
+    "weight_kg": null,
+    "notes": null,
+    "include_in_report": false,
     "user_id": "20251115_221430"
   }
 ]
