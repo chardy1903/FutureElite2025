@@ -243,6 +243,19 @@ def create_app():
     @app.errorhandler(400)
     def handle_400_error(e):
         """Return JSON for 400 errors on JSON requests (including CSRF)"""
+        # Skip CSRF errors for exempted routes (login/register should be exempt)
+        if request.endpoint in ['auth.login', 'auth.register']:
+            # These routes should be exempt - if we get here, something is wrong
+            # But don't return CSRF error, return generic error instead
+            error_description = str(e.description) if hasattr(e, 'description') else str(e)
+            if 'CSRF' in error_description or 'csrf' in error_description.lower():
+                app.logger.error(f"CSRF error on exempted route {request.path}: {error_description}")
+                # Return generic error instead of CSRF-specific message
+                return jsonify({
+                    'success': False,
+                    'errors': ['Authentication error. Please try again.']
+                }), 400
+        
         # Check if this is a JSON request
         content_type = request.headers.get('Content-Type', '')
         is_json_request = (
