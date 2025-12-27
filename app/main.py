@@ -103,11 +103,10 @@ def create_app():
         return None
     
     # Security: Initialize CSRF protection
+    csrf = None
     if CSRF_AVAILABLE:
         csrf = CSRFProtect(app)
-        # Security: Exempt Stripe webhook from CSRF (external service, verified by signature)
-        csrf.exempt('subscription.stripe_webhook')
-        app.logger.info("CSRF protection enabled (webhook exempted)")
+        app.logger.info("CSRF protection enabled")
     else:
         app.logger.warning("flask-wtf not installed - CSRF protection disabled")
     
@@ -167,6 +166,13 @@ def create_app():
     app.register_blueprint(bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(subscription_bp)
+    
+    # Security: Exempt Stripe webhook from CSRF (external service, verified by signature)
+    # Must be done AFTER blueprint registration so the endpoint exists
+    if CSRF_AVAILABLE:
+        from .subscription_routes import stripe_webhook
+        csrf.exempt(stripe_webhook)
+        app.logger.info("Stripe webhook exempted from CSRF protection")
     
     # Production: Health check endpoint
     @app.route('/health', methods=['GET'])
