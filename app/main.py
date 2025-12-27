@@ -210,25 +210,28 @@ def create_app():
             raise
     
     # Security: Add before_request hook to manually skip CSRF for auth endpoints
-    # This MUST run before Flask-WTF's CSRF check, so we use prepend=True
-    # Flask-WTF checks exemptions by looking at view function or endpoint in _exempt_views
+    # Flask-WTF's CSRF check runs in its own before_request hook
+    # We need to ensure our exemptions are in place BEFORE that runs
+    # Use prepend=True to ensure this runs before Flask-WTF's hook
     if CSRF_AVAILABLE and csrf:
         @app.before_request
         def skip_csrf_for_auth():
-            """Manually skip CSRF validation for auth endpoints - runs BEFORE Flask-WTF's check"""
+            """Manually skip CSRF validation for auth endpoints"""
             # Check if this is an auth endpoint that should be exempt
             if request.endpoint in ['auth.login', 'auth.register']:
                 # Manually add to exempt views set (Flask-WTF checks this)
                 try:
                     # Flask-WTF stores exempt views in _exempt_views set
                     if hasattr(csrf, '_exempt_views'):
-                        # Add endpoint name
+                        # Add endpoint name (string)
                         csrf._exempt_views.add(request.endpoint)
                         # Also add the view function if we can get it
                         if request.endpoint and request.endpoint in app.view_functions:
                             view_func = app.view_functions[request.endpoint]
                             csrf._exempt_views.add(view_func)
-                    app.logger.debug(f"Manually exempted {request.endpoint} from CSRF")
+                            app.logger.debug(f"Added {request.endpoint} and view_func to _exempt_views")
+                    else:
+                        app.logger.error(f"CRITICAL: CSRFProtect has no _exempt_views attribute!")
                 except Exception as e:
                     app.logger.error(f"CRITICAL: Could not manually exempt {request.endpoint} from CSRF: {e}", exc_info=True)
     
