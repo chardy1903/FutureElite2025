@@ -77,8 +77,9 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
         if (result.success) {
             hideLoading();
             showToast('Login successful!', 'success');
+            // Redirect to dashboard (the actual app) instead of homepage
             setTimeout(() => {
-                window.location.href = '/';
+                window.location.href = '/dashboard';
             }, 500);
         }
     } catch (error) {
