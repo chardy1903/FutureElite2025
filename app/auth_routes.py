@@ -139,18 +139,27 @@ def register():
         user_session = UserSession(user)
         login_user(user_session, remember=True)
         
-        # Security: Prevent session fixation by clearing and recreating session
+        # Security: Prevent session fixation by clearing session before login
         from flask import session
         session.permanent = True
         # Clear old session data to prevent fixation attacks
         session.clear()
-        # Re-login to get new session ID
+        
+        # Re-login to get new session ID (after clearing session)
         login_user(user_session, remember=True)
         
-        if request.is_json:
-            return jsonify({'success': True, 'redirect': url_for('main.dashboard')})
+        # Get redirect URL - handle errors gracefully
+        try:
+            redirect_url = url_for('main.dashboard')
+        except Exception as e:
+            current_app.logger.error(f"Error generating dashboard URL: {e}", exc_info=True)
+            # Fallback to hardcoded path if url_for fails
+            redirect_url = '/dashboard'
         
-        return redirect(url_for('main.dashboard'))
+        if request.is_json:
+            return jsonify({'success': True, 'redirect': redirect_url})
+        
+        return redirect(redirect_url)
     
     return render_template('register.html')
 
