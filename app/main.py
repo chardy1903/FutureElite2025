@@ -116,55 +116,60 @@ def create_app():
         # Flask-WTF checks exemptions in its before_request hook, but exempt() isn't working
         # reliably with decorated blueprint routes. We'll patch the exemption check directly.
         if hasattr(csrf, '_exempt_views'):
-            # Store original _exempt_views set
-            original_exempt_views = csrf._exempt_views.copy() if hasattr(csrf._exempt_views, 'copy') else set(csrf._exempt_views)
-            
-            # Create a custom set-like object that always returns True for auth endpoints
-            # Must be fully compatible with set operations Flask-WTF might use
-            class ExemptViewsSet:
-                def __init__(self, original_set):
-                    self._original = original_set
-                    self._auth_endpoints = {'auth.login', 'auth.register'}
+            try:
+                # Store original _exempt_views set
+                original_exempt_views = csrf._exempt_views
                 
-                def __contains__(self, item):
-                    # Always return True for auth endpoints
-                    if isinstance(item, str) and item in self._auth_endpoints:
-                        return True
-                    # Check original set for other items
-                    return item in self._original
+                # Create a custom set-like object that always returns True for auth endpoints
+                # Must be fully compatible with set operations Flask-WTF might use
+                class ExemptViewsSet:
+                    def __init__(self, original_set):
+                        self._original = original_set
+                        self._auth_endpoints = {'auth.login', 'auth.register'}
+                    
+                    def __contains__(self, item):
+                        # Always return True for auth endpoints
+                        if isinstance(item, str) and item in self._auth_endpoints:
+                            return True
+                        # Check original set for other items
+                        try:
+                            return item in self._original
+                        except Exception:
+                            return False
+                    
+                    def add(self, item):
+                        self._original.add(item)
+                    
+                    def remove(self, item):
+                        self._original.remove(item)
+                    
+                    def discard(self, item):
+                        self._original.discard(item)
+                    
+                    def __iter__(self):
+                        return iter(self._original)
+                    
+                    def __len__(self):
+                        return len(self._original)
+                    
+                    def __repr__(self):
+                        return repr(self._original)
+                    
+                    def copy(self):
+                        return ExemptViewsSet(self._original.copy())
+                    
+                    def clear(self):
+                        self._original.clear()
+                    
+                    def update(self, other):
+                        self._original.update(other)
                 
-                def add(self, item):
-                    self._original.add(item)
-                
-                def remove(self, item):
-                    self._original.remove(item)
-                
-                def discard(self, item):
-                    self._original.discard(item)
-                
-                def __iter__(self):
-                    return iter(self._original)
-                
-                def __len__(self):
-                    return len(self._original)
-                
-                def __repr__(self):
-                    return repr(self._original)
-                
-                def copy(self):
-                    return ExemptViewsSet(self._original.copy())
-                
-                def clear(self):
-                    self._original.clear()
-                
-                def update(self, other):
-                    self._original.update(other)
-            
-            # Replace _exempt_views with our custom set
-            # Store original to preserve it
-            original_exempt_views = csrf._exempt_views
-            csrf._exempt_views = ExemptViewsSet(original_exempt_views)
-            app.logger.info("CSRF protection enabled (auth endpoints patched to always be exempt)")
+                # Replace _exempt_views with our custom set
+                csrf._exempt_views = ExemptViewsSet(original_exempt_views)
+                app.logger.info("CSRF protection enabled (auth endpoints patched to always be exempt)")
+            except Exception as e:
+                app.logger.error(f"Failed to patch CSRF _exempt_views: {e}", exc_info=True)
+                app.logger.info("CSRF protection enabled (patching failed, using default exemptions)")
         else:
             app.logger.warning("CSRFProtect has no _exempt_views attribute - patching may not work")
             app.logger.info("CSRF protection enabled")
