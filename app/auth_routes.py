@@ -7,14 +7,6 @@ from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash
 import time
 
-# CSRF exemption for auth endpoints (entry points, rate-limited, require credentials)
-try:
-    from flask_wtf.csrf import csrf_exempt
-except ImportError:
-    # If flask-wtf not available, create a no-op decorator
-    def csrf_exempt(f):
-        return f
-
 from .storage import StorageManager
 from .auth import UserSession
 
@@ -49,7 +41,6 @@ def rate_limit_if_available(limit_str):
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
-@csrf_exempt  # Exempt from CSRF - entry point, rate-limited, requires credentials
 @rate_limit_if_available("10 per minute")
 def login():
     """Login page"""
@@ -108,7 +99,6 @@ def login():
 
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
-@csrf_exempt  # Exempt from CSRF - entry point, rate-limited, requires credentials
 @rate_limit_if_available("5 per minute")
 def register():
     """Registration page"""

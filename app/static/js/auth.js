@@ -26,10 +26,15 @@ const clientAuth = {
             });
 
             // Check if response is JSON before parsing
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
                 const text = await response.text();
-                throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}`);
+                console.error('Non-JSON response from login:', {
+                    status: response.status,
+                    contentType: contentType,
+                    body: text.substring(0, 200)
+                });
+                throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 100)}`);
             }
 
             const result = await response.json();
@@ -71,10 +76,15 @@ const clientAuth = {
             });
 
             // Check if response is JSON before parsing
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
                 const text = await response.text();
-                throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}`);
+                console.error('Non-JSON response from register:', {
+                    status: response.status,
+                    contentType: contentType,
+                    body: text.substring(0, 200)
+                });
+                throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 100)}`);
             }
 
             const result = await response.json();

@@ -172,24 +172,35 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(subscription_bp)
     
-    # Security: Ensure auth endpoints and webhook are exempt from CSRF (backup to decorator)
-    # This ensures exemption works even if decorator order causes issues
+    # Security: Exempt auth endpoints and webhook from CSRF
+    # Must be done AFTER blueprint registration so endpoints exist
+    # Auth endpoints are entry points (no session yet), rate-limited, and require credentials
+    # Webhook is verified by Stripe signature instead
     if CSRF_AVAILABLE and csrf:
         try:
-            from .auth_routes import login, register
-            from .subscription_routes import stripe_webhook
-            # Exempt auth endpoints (entry points, rate-limited, require credentials)
-            # Try both function reference and endpoint name for reliability
-            csrf.exempt(login)
-            csrf.exempt(register)
+            # Exempt by endpoint name string (works even when functions are wrapped by decorators)
+            # This is the most reliable method for blueprint routes with multiple decorators
             csrf.exempt('auth.login')
             csrf.exempt('auth.register')
-            # Exempt webhook (verified by Stripe signature)
-            csrf.exempt(stripe_webhook)
             csrf.exempt('subscription.stripe_webhook')
-            app.logger.info("Auth endpoints and webhook CSRF exemption confirmed")
+            
+            # Also try function reference as backup (may not work if wrapped by rate limiter)
+            try:
+                from .auth_routes import login, register
+                from .subscription_routes import stripe_webhook
+                csrf.exempt(login)
+                csrf.exempt(register)
+                csrf.exempt(stripe_webhook)
+            except Exception:
+                # Function reference exemption failed (likely due to decorator wrapping)
+                # Endpoint name exemptions above should be sufficient
+                pass
+            
+            app.logger.info("CSRF exemptions applied: auth.login, auth.register, subscription.stripe_webhook")
         except Exception as e:
-            app.logger.warning(f"Could not exempt routes from CSRF: {e}")
+            app.logger.error(f"CRITICAL: Failed to exempt routes from CSRF: {e}", exc_info=True)
+            # This is critical - if exemptions fail, auth won't work
+            raise
     
     # Production: Health check endpoint
     @app.route('/health', methods=['GET'])
