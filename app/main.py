@@ -108,6 +108,9 @@ def create_app():
         csrf = CSRFProtect(app)
         # Store csrf in app.extensions for access in blueprints
         app.extensions['csrf'] = csrf
+        # Configure CSRF to accept tokens from headers (for JSON API requests)
+        app.config['WTF_CSRF_CHECK_DEFAULT'] = True
+        app.config['WTF_CSRF_TIME_LIMIT'] = None  # No time limit
         app.logger.info("CSRF protection enabled")
     else:
         app.logger.warning("flask-wtf not installed - CSRF protection disabled")
@@ -224,13 +227,50 @@ def create_app():
         # For non-API routes, return default HTML error page
         return e
     
+    # Handle 400 errors (including CSRF) for JSON requests
+    @app.errorhandler(400)
+    def handle_400_error(e):
+        """Return JSON for 400 errors on JSON requests (including CSRF)"""
+        # Check if this is a JSON request
+        content_type = request.headers.get('Content-Type', '')
+        is_json_request = (
+            'application/json' in content_type or
+            request.path.startswith('/api/') or
+            request.path in ['/login', '/register']
+        )
+        
+        if is_json_request:
+            # Check if this is a CSRF error by examining the description
+            error_description = str(e.description) if hasattr(e, 'description') else str(e)
+            if 'CSRF' in error_description or 'csrf' in error_description.lower():
+                app.logger.warning(f"CSRF error on {request.path}: {error_description}")
+                return jsonify({
+                    'success': False,
+                    'errors': ['CSRF token missing or invalid. Please refresh the page and try again.']
+                }), 400
+            # Generic 400 error for JSON requests
+            return jsonify({
+                'success': False,
+                'errors': [error_description if error_description else 'Bad request']
+            }), 400
+        # For form submissions, return default HTML error
+        return e
+    
     # Security: Handle CSRF errors for JSON requests
     if CSRF_AVAILABLE:
         from flask_wtf.csrf import CSRFError
         @app.errorhandler(CSRFError)
         def handle_csrf_error(e):
             """Return JSON for CSRF errors on JSON requests"""
-            if request.is_json or request.path.startswith('/api/') or request.path in ['/login', '/register']:
+            # Check if this is a JSON request by Content-Type header or path
+            content_type = request.headers.get('Content-Type', '')
+            is_json_request = (
+                'application/json' in content_type or
+                request.path.startswith('/api/') or
+                request.path in ['/login', '/register']
+            )
+            
+            if is_json_request:
                 app.logger.warning(f"CSRF error on {request.path}: {e.description}")
                 return jsonify({
                     'success': False,
