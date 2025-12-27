@@ -169,6 +169,17 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(subscription_bp)
     
+    # Security: Ensure Stripe webhook is exempt from CSRF (backup to decorator)
+    # This ensures exemption works even if decorator order causes issues
+    if CSRF_AVAILABLE and csrf:
+        try:
+            from .subscription_routes import stripe_webhook
+            # Exempt by function reference (works with multiple route decorators)
+            csrf.exempt(stripe_webhook)
+            app.logger.info("Stripe webhook CSRF exemption confirmed")
+        except Exception as e:
+            app.logger.warning(f"Could not exempt webhook from CSRF: {e}")
+    
     # Production: Health check endpoint
     @app.route('/health', methods=['GET'])
     def health_check():
