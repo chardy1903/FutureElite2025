@@ -45,61 +45,73 @@ def rate_limit_if_available(limit_str):
 def login():
     """Login page"""
     if request.method == 'POST':
-        data = request.get_json() if request.is_json else request.form.to_dict()
-        
-        username = data.get('username', '').strip()
-        password = data.get('password', '')
-        
-        if not username or not password:
-            if request.is_json:
-                return jsonify({'success': False, 'errors': ['Username and password are required']}), 400
-            flash('Username and password are required', 'error')
-            return render_template('login.html')
-        
-        # Get user
-        user = storage.get_user_by_username(username)
-        
-        # Security: Prevent timing attacks and account enumeration
-        # Always perform password check (even with dummy hash) to prevent timing differences
-        dummy_hash = "$2b$12$dummyhashfordummyuserpreventingtimingattacks"
-        if not user:
-            # Simulate password check with dummy hash to prevent timing attacks
-            check_password_hash(dummy_hash, password)
-            time.sleep(0.1)  # Add small delay to prevent timing-based enumeration
-            if request.is_json:
-                return jsonify({'success': False, 'errors': ['Invalid username or password']}), 401
-            flash('Invalid username or password', 'error')
-            return render_template('login.html')
-        
-        # Verify password
-        if not storage.verify_password(user, password):
-            if request.is_json:
-                return jsonify({'success': False, 'errors': ['Invalid username or password']}), 401
-            flash('Invalid username or password', 'error')
-            return render_template('login.html')
-        
-        # Security: Prevent session fixation by clearing session before login
-        from flask import session
-        session.permanent = True
-        # Clear old session data to prevent fixation attacks
-        session.clear()
-        
-        # Create user session and login (after clearing session)
-        user_session = UserSession(user)
-        login_user(user_session, remember=True)
-        
-        # Get redirect URL - handle errors gracefully
         try:
-            redirect_url = url_for('main.dashboard')
+            data = request.get_json() if request.is_json else request.form.to_dict()
+            
+            username = data.get('username', '').strip()
+            password = data.get('password', '')
+            
+            if not username or not password:
+                if request.is_json:
+                    return jsonify({'success': False, 'errors': ['Username and password are required']}), 400
+                flash('Username and password are required', 'error')
+                return render_template('login.html')
+            
+            # Get user
+            user = storage.get_user_by_username(username)
+            
+            # Security: Prevent timing attacks and account enumeration
+            # Always perform password check (even with dummy hash) to prevent timing differences
+            dummy_hash = "$2b$12$dummyhashfordummyuserpreventingtimingattacks"
+            if not user:
+                # Simulate password check with dummy hash to prevent timing attacks
+                check_password_hash(dummy_hash, password)
+                time.sleep(0.1)  # Add small delay to prevent timing-based enumeration
+                if request.is_json:
+                    return jsonify({'success': False, 'errors': ['Invalid username or password']}), 401
+                flash('Invalid username or password', 'error')
+                return render_template('login.html')
+            
+            # Verify password
+            if not storage.verify_password(user, password):
+                if request.is_json:
+                    return jsonify({'success': False, 'errors': ['Invalid username or password']}), 401
+                flash('Invalid username or password', 'error')
+                return render_template('login.html')
+            
+            # Security: Prevent session fixation by clearing session before login
+            from flask import session
+            session.permanent = True
+            # Clear old session data to prevent fixation attacks
+            session.clear()
+            
+            # Create user session and login (after clearing session)
+            user_session = UserSession(user)
+            login_user(user_session, remember=True)
+            
+            # Get redirect URL - handle errors gracefully
+            try:
+                redirect_url = url_for('main.dashboard')
+            except Exception as e:
+                current_app.logger.error(f"Error generating dashboard URL: {e}", exc_info=True)
+                # Fallback to hardcoded path if url_for fails
+                redirect_url = '/dashboard'
+            
+            if request.is_json:
+                return jsonify({'success': True, 'redirect': redirect_url})
+            
+            return redirect(redirect_url)
         except Exception as e:
-            current_app.logger.error(f"Error generating dashboard URL: {e}", exc_info=True)
-            # Fallback to hardcoded path if url_for fails
-            redirect_url = '/dashboard'
-        
-        if request.is_json:
-            return jsonify({'success': True, 'redirect': redirect_url})
-        
-        return redirect(redirect_url)
+            # Catch any unexpected errors and return proper JSON response
+            current_app.logger.error(f"Unexpected error in login route: {e}", exc_info=True)
+            if request.is_json:
+                return jsonify({
+                    'success': False,
+                    'errors': ['An internal error occurred. Please try again later.']
+                }), 500
+            # For form submissions, flash error and re-render
+            flash('An error occurred. Please try again.', 'error')
+            return render_template('login.html'), 500
     
     return render_template('login.html')
 
