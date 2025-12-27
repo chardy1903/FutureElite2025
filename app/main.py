@@ -179,10 +179,14 @@ def create_app():
             from .auth_routes import login, register
             from .subscription_routes import stripe_webhook
             # Exempt auth endpoints (entry points, rate-limited, require credentials)
+            # Try both function reference and endpoint name for reliability
             csrf.exempt(login)
             csrf.exempt(register)
+            csrf.exempt('auth.login')
+            csrf.exempt('auth.register')
             # Exempt webhook (verified by Stripe signature)
             csrf.exempt(stripe_webhook)
+            csrf.exempt('subscription.stripe_webhook')
             app.logger.info("Auth endpoints and webhook CSRF exemption confirmed")
         except Exception as e:
             app.logger.warning(f"Could not exempt routes from CSRF: {e}")
