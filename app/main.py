@@ -111,7 +111,45 @@ def create_app():
         # Configure CSRF to accept tokens from headers (for JSON API requests)
         app.config['WTF_CSRF_CHECK_DEFAULT'] = True
         app.config['WTF_CSRF_TIME_LIMIT'] = None  # No time limit
-        app.logger.info("CSRF protection enabled")
+        
+        # CRITICAL FIX: Patch Flask-WTF's _exempt_views check to always allow auth endpoints
+        # Flask-WTF checks exemptions in its before_request hook, but exempt() isn't working
+        # reliably with decorated blueprint routes. We'll patch the exemption check directly.
+        if hasattr(csrf, '_exempt_views'):
+            # Store original _exempt_views set
+            original_exempt_views = csrf._exempt_views.copy() if hasattr(csrf._exempt_views, 'copy') else set(csrf._exempt_views)
+            
+            # Create a custom set-like object that always returns True for auth endpoints
+            class ExemptViewsSet:
+                def __init__(self, original_set):
+                    self._original = original_set
+                    self._auth_endpoints = {'auth.login', 'auth.register'}
+                
+                def __contains__(self, item):
+                    # Always return True for auth endpoints
+                    if isinstance(item, str) and item in self._auth_endpoints:
+                        return True
+                    # Check original set for other items
+                    return item in self._original
+                
+                def add(self, item):
+                    self._original.add(item)
+                
+                def __iter__(self):
+                    return iter(self._original)
+                
+                def __len__(self):
+                    return len(self._original)
+                
+                def copy(self):
+                    return ExemptViewsSet(self._original.copy())
+            
+            # Replace _exempt_views with our custom set
+            csrf._exempt_views = ExemptViewsSet(csrf._exempt_views)
+            app.logger.info("CSRF protection enabled (auth endpoints patched to always be exempt)")
+        else:
+            app.logger.warning("CSRFProtect has no _exempt_views attribute - patching may not work")
+            app.logger.info("CSRF protection enabled")
     else:
         app.logger.warning("flask-wtf not installed - CSRF protection disabled")
     
