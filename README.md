@@ -287,6 +287,61 @@ Potential features for future versions:
 - Match calendar integration
 - Team management features
 
+## 🚀 Render Deployment
+
+This application is configured for deployment on [Render](https://render.com) as a Python web service.
+
+### Render Configuration
+
+When creating a new Web Service on Render, use these exact settings:
+
+- **Environment**: `Python 3`
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `gunicorn -c gunicorn.conf.py wsgi:app`
+- **Root Directory**: *(leave blank)*
+
+### Environment Variables
+
+Set the following environment variables in Render's dashboard:
+
+**Required:**
+- `SECRET_KEY` - Flask secret key (minimum 32 characters). Generate with: `python -c "import secrets; print(secrets.token_hex(32))"`
+- `FLASK_ENV` - Set to `production`
+
+**Required if using Stripe:**
+- `STRIPE_SECRET_KEY` - Your Stripe secret key (starts with `sk_live_` or `sk_test_`)
+- `STRIPE_PUBLISHABLE_KEY` - Your Stripe publishable key (starts with `pk_live_` or `pk_test_`)
+- `STRIPE_WEBHOOK_SECRET` - Webhook signing secret (starts with `whsec_`)
+- `STRIPE_MONTHLY_PRICE_ID` - Monthly subscription price ID (starts with `price_`)
+- `STRIPE_ANNUAL_PRICE_ID` - Annual subscription price ID (starts with `price_`)
+
+**Optional:**
+- `PROXY_FIX_NUM_PROXIES` - Number of proxies in front (default: `1`)
+
+See `env.example` for a complete list of environment variables.
+
+### Deployment Steps
+
+1. **Connect your GitHub repository** to Render
+2. **Create a new Web Service** and select your repository
+3. **Configure the service** with the settings above
+4. **Set environment variables** in the Render dashboard
+5. **Deploy** - Render will automatically build and deploy your application
+
+### Webhook Configuration
+
+If using Stripe, configure your webhook endpoint in Stripe Dashboard:
+- **Webhook URL**: `https://your-app-name.onrender.com/stripe/webhook`
+- **Events to listen to**: 
+  - `checkout.session.completed`
+  - `customer.subscription.created`
+  - `customer.subscription.updated`
+  - `customer.subscription.deleted`
+
+### Health Check
+
+The application includes a health check endpoint at `/health` for monitoring.
+
 ## 📄 License
 
 **Copyright (c) 2025 [Your Name]. All Rights Reserved.**

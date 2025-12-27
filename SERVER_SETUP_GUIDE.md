@@ -354,3 +354,4 @@ curl ifconfig.me
 1. Configure DNS in GoDaddy (`GODADDY_DNS_SETUP.md`)
 2. Deploy application (`QUICK_DEPLOY_CHECKLIST.md`)
 
+
