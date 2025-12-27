@@ -224,6 +224,21 @@ def create_app():
         # For non-API routes, return default HTML error page
         return e
     
+    # Security: Handle CSRF errors for JSON requests
+    if CSRF_AVAILABLE:
+        from flask_wtf.csrf import CSRFError
+        @app.errorhandler(CSRFError)
+        def handle_csrf_error(e):
+            """Return JSON for CSRF errors on JSON requests"""
+            if request.is_json or request.path.startswith('/api/') or request.path in ['/login', '/register']:
+                app.logger.warning(f"CSRF error on {request.path}: {e.description}")
+                return jsonify({
+                    'success': False,
+                    'errors': ['CSRF token missing or invalid. Please refresh the page and try again.']
+                }), 400
+            # For form submissions, return default HTML error
+            return e
+    
     # Initialize storage and sample data
     storage = StorageManager()
     _initialize_sample_data(storage)

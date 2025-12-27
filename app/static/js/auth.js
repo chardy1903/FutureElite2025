@@ -15,14 +15,28 @@ const clientAuth = {
         try {
             // SECURITY: Send plain password to server over HTTPS for secure server-side verification
             // Server uses werkzeug's scrypt-based password hashing
+            // Get CSRF token for the request
+            const csrfToken = await csrfManager.getToken();
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+            if (csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+            
             const response = await fetch('/login', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: headers,
                 credentials: 'include', // Include cookies for session
                 body: JSON.stringify({ username, password })
             });
+
+            // Check if response is JSON before parsing
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}`);
+            }
 
             const result = await response.json();
             
@@ -52,14 +66,28 @@ const clientAuth = {
                 throw new Error('Password must be at least 6 characters');
             }
 
+            // Get CSRF token for the request
+            const csrfToken = await csrfManager.getToken();
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+            if (csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+
             const response = await fetch('/register', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: headers,
                 credentials: 'include', // Include cookies for session
                 body: JSON.stringify({ username, password, email })
             });
+
+            // Check if response is JSON before parsing
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                throw new Error(`Server returned non-JSON response: ${text.substring(0, 100)}`);
+            }
 
             const result = await response.json();
             
