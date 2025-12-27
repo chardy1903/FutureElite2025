@@ -144,7 +144,6 @@ def create_app():
                 'connect-src': "'self'",
             },
             frame_options='DENY',
-            content_type_nosniff=True,
             referrer_policy='strict-origin-when-cross-origin'
         )
         app.logger.info("Security headers enabled")
