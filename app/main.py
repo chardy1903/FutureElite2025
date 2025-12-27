@@ -120,6 +120,7 @@ def create_app():
             original_exempt_views = csrf._exempt_views.copy() if hasattr(csrf._exempt_views, 'copy') else set(csrf._exempt_views)
             
             # Create a custom set-like object that always returns True for auth endpoints
+            # Must be fully compatible with set operations Flask-WTF might use
             class ExemptViewsSet:
                 def __init__(self, original_set):
                     self._original = original_set
@@ -135,17 +136,34 @@ def create_app():
                 def add(self, item):
                     self._original.add(item)
                 
+                def remove(self, item):
+                    self._original.remove(item)
+                
+                def discard(self, item):
+                    self._original.discard(item)
+                
                 def __iter__(self):
                     return iter(self._original)
                 
                 def __len__(self):
                     return len(self._original)
                 
+                def __repr__(self):
+                    return repr(self._original)
+                
                 def copy(self):
                     return ExemptViewsSet(self._original.copy())
+                
+                def clear(self):
+                    self._original.clear()
+                
+                def update(self, other):
+                    self._original.update(other)
             
             # Replace _exempt_views with our custom set
-            csrf._exempt_views = ExemptViewsSet(csrf._exempt_views)
+            # Store original to preserve it
+            original_exempt_views = csrf._exempt_views
+            csrf._exempt_views = ExemptViewsSet(original_exempt_views)
             app.logger.info("CSRF protection enabled (auth endpoints patched to always be exempt)")
         else:
             app.logger.warning("CSRFProtect has no _exempt_views attribute - patching may not work")
@@ -298,10 +316,19 @@ def create_app():
     @app.errorhandler(500)
     def handle_500_error(e):
         """Return JSON for API errors - sanitized to prevent information leakage"""
-        if request.path.startswith('/api/'):
-            # Log full error details server-side for debugging
-            import traceback
-            app.logger.error(f"500 error on {request.path}: {e}", exc_info=True)
+        # Log full error details server-side for debugging
+        import traceback
+        app.logger.error(f"500 error on {request.path}: {e}", exc_info=True)
+        
+        # Return JSON for JSON requests or auth endpoints
+        content_type = request.headers.get('Content-Type', '')
+        is_json_request = (
+            'application/json' in content_type or
+            request.path.startswith('/api/') or
+            request.path in ['/login', '/register']
+        )
+        
+        if is_json_request:
             # Return generic error message to client
             return jsonify({
                 'success': False,

@@ -78,16 +78,14 @@ def login():
             flash('Invalid username or password', 'error')
             return render_template('login.html')
         
-        # Create user session and login
-        user_session = UserSession(user)
-        login_user(user_session, remember=True)
-        
-        # Security: Prevent session fixation by clearing and recreating session
+        # Security: Prevent session fixation by clearing session before login
         from flask import session
         session.permanent = True
         # Clear old session data to prevent fixation attacks
         session.clear()
-        # Re-login to get new session ID
+        
+        # Create user session and login (after clearing session)
+        user_session = UserSession(user)
         login_user(user_session, remember=True)
         
         if request.is_json:
