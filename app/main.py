@@ -323,14 +323,27 @@ def create_app():
         """Return JSON for API errors - sanitized to prevent information leakage"""
         # Log full error details server-side for debugging
         import traceback
-        app.logger.error(f"500 error on {request.path}: {e}", exc_info=True)
+        try:
+            path = request.path if hasattr(request, 'path') else 'unknown'
+            app.logger.error(f"500 error on {path}: {e}", exc_info=True)
+        except Exception:
+            app.logger.error(f"500 error: {e}", exc_info=True)
+        
+        # Always try to return JSON for auth endpoints, even if request context is broken
+        try:
+            path = request.path if hasattr(request, 'path') else ''
+            content_type = request.headers.get('Content-Type', '') if hasattr(request, 'headers') else ''
+        except Exception:
+            path = ''
+            content_type = ''
         
         # Return JSON for JSON requests or auth endpoints
-        content_type = request.headers.get('Content-Type', '')
         is_json_request = (
             'application/json' in content_type or
-            request.path.startswith('/api/') or
-            request.path in ['/login', '/register']
+            path.startswith('/api/') or
+            path in ['/login', '/register'] or
+            '/login' in str(path) or
+            '/register' in str(path)
         )
         
         if is_json_request:
