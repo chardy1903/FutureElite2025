@@ -91,9 +91,9 @@ def login():
         login_user(user_session, remember=True)
         
         if request.is_json:
-            return jsonify({'success': True, 'redirect': url_for('main.homepage')})
+            return jsonify({'success': True, 'redirect': url_for('main.dashboard')})
         
-        return redirect(url_for('main.homepage'))
+        return redirect(url_for('main.dashboard'))
     
     return render_template('login.html')
 
