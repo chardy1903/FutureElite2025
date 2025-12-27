@@ -9,6 +9,14 @@ import os
 import json
 from typing import Optional
 
+# CSRF exemption for webhook (external service verified by signature)
+try:
+    from flask_wtf.csrf import csrf_exempt
+except ImportError:
+    # If flask-wtf not available, create a no-op decorator
+    def csrf_exempt(f):
+        return f
+
 # Try to import stripe, but make it optional
 try:
     import stripe
@@ -304,9 +312,8 @@ def create_portal_session():
 
 @subscription_bp.route('/api/subscription/webhook', methods=['POST'])
 @subscription_bp.route('/stripe/webhook', methods=['POST'])  # Alias for Render/Stripe configuration
+@csrf_exempt  # Exempt from CSRF - verified by Stripe signature instead
 def stripe_webhook():
-    # CSRF exemption: This endpoint is exempt because it's verified by Stripe signature instead
-    # Exemption is applied in main.py after blueprint registration
     # Security: Basic rate limiting for webhook endpoint (if limiter available)
     # Note: Stripe webhooks should be verified by signature, but rate limiting adds defense in depth
     try:
