@@ -88,10 +88,18 @@ def login():
         user_session = UserSession(user)
         login_user(user_session, remember=True)
         
-        if request.is_json:
-            return jsonify({'success': True, 'redirect': url_for('main.dashboard')})
+        # Get redirect URL - handle errors gracefully
+        try:
+            redirect_url = url_for('main.dashboard')
+        except Exception as e:
+            current_app.logger.error(f"Error generating dashboard URL: {e}", exc_info=True)
+            # Fallback to hardcoded path if url_for fails
+            redirect_url = '/dashboard'
         
-        return redirect(url_for('main.dashboard'))
+        if request.is_json:
+            return jsonify({'success': True, 'redirect': redirect_url})
+        
+        return redirect(redirect_url)
     
     return render_template('login.html')
 
