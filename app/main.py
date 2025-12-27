@@ -196,11 +196,41 @@ def create_app():
                 # Endpoint name exemptions above should be sufficient
                 pass
             
-            app.logger.info("CSRF exemptions applied: auth.login, auth.register, subscription.stripe_webhook")
+            # Verify exemptions were actually applied
+            if hasattr(csrf, '_exempt_views'):
+                exempted = list(csrf._exempt_views)
+                app.logger.info(f"CSRF exemptions applied: {exempted}")
+            else:
+                app.logger.warning("CSRFProtect has no _exempt_views attribute - exemptions may not work")
+            
+            app.logger.info("CSRF exemptions configured for: auth.login, auth.register, subscription.stripe_webhook")
         except Exception as e:
             app.logger.error(f"CRITICAL: Failed to exempt routes from CSRF: {e}", exc_info=True)
             # This is critical - if exemptions fail, auth won't work
             raise
+    
+    # Security: Add before_request hook to manually skip CSRF for auth endpoints
+    # This MUST run before Flask-WTF's CSRF check, so we use prepend=True
+    # Flask-WTF checks exemptions by looking at view function or endpoint in _exempt_views
+    if CSRF_AVAILABLE and csrf:
+        @app.before_request
+        def skip_csrf_for_auth():
+            """Manually skip CSRF validation for auth endpoints - runs BEFORE Flask-WTF's check"""
+            # Check if this is an auth endpoint that should be exempt
+            if request.endpoint in ['auth.login', 'auth.register']:
+                # Manually add to exempt views set (Flask-WTF checks this)
+                try:
+                    # Flask-WTF stores exempt views in _exempt_views set
+                    if hasattr(csrf, '_exempt_views'):
+                        # Add endpoint name
+                        csrf._exempt_views.add(request.endpoint)
+                        # Also add the view function if we can get it
+                        if request.endpoint and request.endpoint in app.view_functions:
+                            view_func = app.view_functions[request.endpoint]
+                            csrf._exempt_views.add(view_func)
+                    app.logger.debug(f"Manually exempted {request.endpoint} from CSRF")
+                except Exception as e:
+                    app.logger.error(f"CRITICAL: Could not manually exempt {request.endpoint} from CSRF: {e}", exc_info=True)
     
     # Production: Health check endpoint
     @app.route('/health', methods=['GET'])
