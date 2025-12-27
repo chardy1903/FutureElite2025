@@ -15,33 +15,12 @@ const clientAuth = {
         try {
             // SECURITY: Send plain password to server over HTTPS for secure server-side verification
             // Server uses werkzeug's scrypt-based password hashing
-            // Get CSRF token for the request
-            let csrfToken;
-            try {
-                csrfToken = await csrfManager.getToken();
-                if (!csrfToken) {
-                    console.warn('CSRF token is empty, retrying fetch...');
-                    csrfManager.clearToken();
-                    csrfToken = await csrfManager.getToken();
-                }
-            } catch (error) {
-                console.error('Failed to get CSRF token:', error);
-                throw new Error('Failed to get CSRF token. Please refresh the page and try again.');
-            }
-            
-            const headers = {
-                'Content-Type': 'application/json',
-            };
-            if (csrfToken) {
-                headers['X-CSRFToken'] = csrfToken;
-                console.debug('CSRF token included in request');
-            } else {
-                console.warn('No CSRF token available for request');
-            }
-            
+            // Note: Login endpoint is exempt from CSRF (entry point, rate-limited, requires credentials)
             const response = await fetch('/login', {
                 method: 'POST',
-                headers: headers,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
                 credentials: 'include', // Include cookies for session
                 body: JSON.stringify({ username, password })
             });
@@ -81,18 +60,12 @@ const clientAuth = {
                 throw new Error('Password must be at least 6 characters');
             }
 
-            // Get CSRF token for the request
-            const csrfToken = await csrfManager.getToken();
-            const headers = {
-                'Content-Type': 'application/json',
-            };
-            if (csrfToken) {
-                headers['X-CSRFToken'] = csrfToken;
-            }
-
+            // Note: Register endpoint is exempt from CSRF (entry point, rate-limited, requires credentials)
             const response = await fetch('/register', {
                 method: 'POST',
-                headers: headers,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
                 credentials: 'include', // Include cookies for session
                 body: JSON.stringify({ username, password, email })
             });
