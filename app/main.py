@@ -82,10 +82,33 @@ def create_app():
     
     # Secure session cookie configuration
     app.config['SESSION_COOKIE_HTTPONLY'] = True
-    # Only set Secure=True in production (HTTPS required)
-    app.config['SESSION_COOKIE_SECURE'] = os.environ.get('FLASK_ENV') == 'production'
+    
+    # Detect if we're in local development (localhost/127.0.0.1)
+    # Default to Secure=True unless we're definitely in local development
+    flask_env = os.environ.get('FLASK_ENV', '').strip().lower()
+    is_production_env = flask_env == 'production'
+    
+    # Check for local development indicators
+    is_local_dev = (
+        flask_env == 'development' or
+        os.environ.get('FLASK_DEBUG', '').lower() in ('true', '1', 'on') or
+        'localhost' in os.environ.get('HOST', '').lower() or
+        '127.0.0.1' in os.environ.get('HOST', '')
+    )
+    
+    # Set Secure=True unless we're definitely in local development
+    # This ensures session cookies work correctly in production (HTTPS)
+    # Even if FLASK_ENV is not explicitly set to 'production'
+    app.config['SESSION_COOKIE_SECURE'] = not is_local_dev
+    
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+    
+    # Log cookie configuration for debugging
+    if is_local_dev:
+        app.logger.info("Session cookies configured for local development (Secure=False)")
+    else:
+        app.logger.info("Session cookies configured for production (Secure=True)")
     
     # Initialize Flask-Login
     login_manager = LoginManager()
