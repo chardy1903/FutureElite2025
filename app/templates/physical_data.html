@@ -108,9 +108,9 @@
     </div>
 
     <!-- Information Needed State -->
-    <div id="errorState" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-6">
+    <div id="infoState" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-6">
         <h3 class="text-lg font-semibold text-blue-900 mb-2">Additional Information Needed</h3>
-        <p id="errorMessage" class="text-blue-700"></p>
+        <p id="infoMessage" class="text-blue-700"></p>
         <button onclick="loadAnalysis()" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
             Retry
         </button>
@@ -148,7 +148,7 @@ async function loadAnalysis() {
         
         document.getElementById('loadingState').classList.remove('hidden');
         document.getElementById('mainContent').classList.add('hidden');
-        document.getElementById('errorState').classList.add('hidden');
+        document.getElementById('infoState').classList.add('hidden');
         
         // Load data from server first (most up-to-date with correct date format)
         let settings = await clientStorage.loadSettings(); // Keep for fallback
@@ -208,13 +208,18 @@ async function loadAnalysis() {
             document.getElementById('loadingState').classList.add('hidden');
             document.getElementById('mainContent').classList.remove('hidden');
         } else {
-            throw new Error(data.errors?.[0] || 'Failed to load analysis');
+            // Get user-friendly message from server or use default
+            const message = data.errors?.[0] || 'Unable to load analysis at this time';
+            throw new Error(message);
         }
     } catch (error) {
         console.error('Error loading analysis:', error);
         document.getElementById('loadingState').classList.add('hidden');
-        document.getElementById('errorState').classList.remove('hidden');
-        document.getElementById('errorMessage').textContent = error.message;
+        document.getElementById('infoState').classList.remove('hidden');
+        // Clean up any "error" language from the message
+        let displayMessage = error.message || 'Additional information is needed to display this analysis';
+        displayMessage = displayMessage.replace(/^Error:?\s*/i, '').replace(/error/gi, 'issue');
+        document.getElementById('infoMessage').textContent = displayMessage;
     }
 }
 
@@ -590,7 +595,7 @@ async function loadMeasurements() {
     } catch (error) {
         console.error('Error loading measurements:', error);
         const tbody = document.getElementById('measurementsTableBody');
-        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-sm text-red-500">Error loading measurements</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">Unable to load measurements at this time</td></tr>';
     }
 }
 
