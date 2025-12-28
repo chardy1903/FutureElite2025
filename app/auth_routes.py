@@ -125,11 +125,13 @@ def login():
 def register():
     """Registration page"""
     if request.method == 'POST':
-        data = request.get_json() if request.is_json else request.form.to_dict()
-        
-        username = data.get('username', '').strip()
-        password = data.get('password', '')
-        email = data.get('email', '').strip() or None
+            data = request.get_json() if request.is_json else request.form.to_dict()
+            
+            username = data.get('username', '').strip()
+            password = data.get('password', '')
+            # Handle email - it might be None, empty string, or a value
+            email_value = data.get('email')
+            email = email_value.strip() if email_value else None
         
         if not username or not password:
             if request.is_json:
