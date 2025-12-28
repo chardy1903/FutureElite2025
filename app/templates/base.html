@@ -208,6 +208,30 @@
             
             try {
                 const response = await fetch(url, mergedOptions);
+                
+                // Check if response is JSON before parsing
+                const contentType = response.headers.get('content-type') || '';
+                const isJson = contentType.includes('application/json');
+                
+                if (!isJson) {
+                    // Response is HTML (likely an error page or redirect)
+                    const text = await response.text();
+                    console.error('Non-JSON response from API:', {
+                        url: url,
+                        status: response.status,
+                        contentType: contentType,
+                        preview: text.substring(0, 200)
+                    });
+                    
+                    // If it's a redirect to login, handle authentication
+                    if (response.status === 401 || response.status === 403 || text.includes('login')) {
+                        throw new Error('Please log in to continue');
+                    }
+                    
+                    // Generic error for HTML responses
+                    throw new Error(`Server returned an unexpected response (${response.status}). Please try again.`);
+                }
+                
                 const data = await response.json();
                 
                 // If CSRF error, try to refresh token and retry once
@@ -219,6 +243,10 @@
                     if (newToken) {
                         mergedOptions.headers['X-CSRFToken'] = newToken;
                         const retryResponse = await fetch(url, mergedOptions);
+                        const retryContentType = retryResponse.headers.get('content-type') || '';
+                        if (!retryContentType.includes('application/json')) {
+                            throw new Error('Authentication required. Please log in again.');
+                        }
                         const retryData = await retryResponse.json();
                         if (!retryResponse.ok) {
                             throw new Error(retryData.errors ? retryData.errors.join(', ') : 'Request failed');
@@ -233,8 +261,20 @@
                 
                 return data;
             } catch (error) {
+                // Don't show toast for authentication errors - let the page handle it
+                if (error.message && error.message.includes('log in')) {
+                    console.warn('Authentication required:', error.message);
+                    // Redirect to login if not already there
+                    if (!window.location.pathname.includes('/login')) {
+                        window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname);
+                    }
+                    throw error;
+                }
                 console.error('API Error:', error);
-                showToast(error.message, 'error');
+                // Only show toast for non-authentication errors
+                if (error.message && !error.message.includes('log in') && !error.message.includes('Authentication')) {
+                    showToast(error.message, 'error');
+                }
                 throw error;
             }
         }
