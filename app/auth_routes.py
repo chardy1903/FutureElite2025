@@ -8,6 +8,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 import time
 import os
 import smtplib
+import secrets
+from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -334,4 +336,200 @@ def logout():
     """Logout"""
     logout_user()
     return redirect(url_for('auth.login'))
+
+
+@auth_bp.route('/forgot-password', methods=['GET', 'POST'])
+@rate_limit_if_available("5 per hour")
+def forgot_password():
+    """Forgot password page - request password reset"""
+    if request.method == 'POST':
+        try:
+            data = request.get_json() if request.is_json else request.form.to_dict()
+            email_or_username = data.get('email_or_username', '').strip()
+            
+            if not email_or_username:
+                if request.is_json:
+                    return jsonify({'success': False, 'errors': ['Email or username is required']}), 400
+                flash('Email or username is required', 'error')
+                return render_template('forgot_password.html')
+            
+            # Try to find user by email or username
+            user = storage.get_user_by_email(email_or_username)
+            if not user:
+                user = storage.get_user_by_username(email_or_username)
+            
+            if not user:
+                # Don't reveal if user exists or not (security best practice)
+                if request.is_json:
+                    return jsonify({
+                        'success': True,
+                        'message': 'If an account exists with that email or username, a password reset link has been sent.'
+                    })
+                flash('If an account exists with that email or username, a password reset link has been sent.', 'info')
+                return render_template('forgot_password.html')
+            
+            # Generate reset token
+            token = secrets.token_urlsafe(32)
+            expires_at = (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Save token
+            storage.create_reset_token(user.id, token, expires_at)
+            
+            # Send email if configured
+            send_password_reset_email(user, token)
+            
+            if request.is_json:
+                return jsonify({
+                    'success': True,
+                    'message': 'If an account exists with that email or username, a password reset link has been sent.'
+                })
+            flash('If an account exists with that email or username, a password reset link has been sent.', 'info')
+            return render_template('forgot_password.html')
+            
+        except Exception as e:
+            current_app.logger.error(f"Error in forgot_password: {e}", exc_info=True)
+            if request.is_json:
+                return jsonify({'success': False, 'errors': ['An error occurred. Please try again.']}), 500
+            flash('An error occurred. Please try again.', 'error')
+            return render_template('forgot_password.html')
+    
+    return render_template('forgot_password.html')
+
+
+@auth_bp.route('/reset-password/<token>', methods=['GET', 'POST'])
+@rate_limit_if_available("10 per hour")
+def reset_password(token):
+    """Reset password page - with token"""
+    # Validate token
+    token_data = storage.get_reset_token(token)
+    if not token_data:
+        flash('Invalid or expired reset token. Please request a new password reset.', 'error')
+        return redirect(url_for('auth.forgot_password'))
+    
+    if request.method == 'POST':
+        try:
+            data = request.get_json() if request.is_json else request.form.to_dict()
+            new_password = data.get('password', '')
+            confirm_password = data.get('confirm_password', '')
+            
+            if not new_password:
+                if request.is_json:
+                    return jsonify({'success': False, 'errors': ['Password is required']}), 400
+                flash('Password is required', 'error')
+                return render_template('reset_password.html', token=token)
+            
+            if len(new_password) < 8:
+                if request.is_json:
+                    return jsonify({'success': False, 'errors': ['Password must be at least 8 characters']}), 400
+                flash('Password must be at least 8 characters', 'error')
+                return render_template('reset_password.html', token=token)
+            
+            if new_password != confirm_password:
+                if request.is_json:
+                    return jsonify({'success': False, 'errors': ['Passwords do not match']}), 400
+                flash('Passwords do not match', 'error')
+                return render_template('reset_password.html', token=token)
+            
+            # Update password
+            user_id = token_data['user_id']
+            if storage.update_user_password(user_id, new_password):
+                # Delete used token
+                storage.delete_reset_token(token)
+                
+                if request.is_json:
+                    return jsonify({
+                        'success': True,
+                        'message': 'Password reset successfully. You can now log in with your new password.',
+                        'redirect': '/login'
+                    })
+                flash('Password reset successfully. You can now log in with your new password.', 'success')
+                return redirect(url_for('auth.login'))
+            else:
+                if request.is_json:
+                    return jsonify({'success': False, 'errors': ['Failed to update password. Please try again.']}), 500
+                flash('Failed to update password. Please try again.', 'error')
+                return render_template('reset_password.html', token=token)
+                
+        except Exception as e:
+            current_app.logger.error(f"Error in reset_password: {e}", exc_info=True)
+            if request.is_json:
+                return jsonify({'success': False, 'errors': ['An error occurred. Please try again.']}), 500
+            flash('An error occurred. Please try again.', 'error')
+            return render_template('reset_password.html', token=token)
+    
+    return render_template('reset_password.html', token=token)
+
+
+def send_password_reset_email(user, token):
+    """Send password reset email (if SMTP is configured)"""
+    from flask import request
+    admin_email = os.environ.get('ADMIN_EMAIL', '').strip()
+    smtp_enabled = os.environ.get('SMTP_ENABLED', '').lower() in ('true', '1', 'on')
+    
+    # Get base URL for reset link
+    try:
+        base_url = request.host_url.rstrip('/') if hasattr(request, 'host_url') and request.host_url else 'http://localhost:8080'
+    except:
+        base_url = 'http://localhost:8080'
+    reset_url = f"{base_url}/reset-password/{token}"
+    
+    if not smtp_enabled or not admin_email:
+        # Email not configured - log the reset link for admin to send manually
+        current_app.logger.info(
+            f"PASSWORD RESET REQUEST for user: {user.username} ({user.email or 'no email'})\n"
+            f"Reset URL: {reset_url}\n"
+            f"Token expires in 1 hour."
+        )
+        return
+    
+    # Only send email if user has an email address
+    if not user.email:
+        current_app.logger.warning(f"Password reset requested for user {user.username} but no email address on file")
+        return
+    
+    try:
+        smtp_host = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
+        smtp_port = int(os.environ.get('SMTP_PORT', '587'))
+        smtp_user = os.environ.get('SMTP_USER', '').strip()
+        smtp_password = os.environ.get('SMTP_PASSWORD', '').strip()
+        
+        if not smtp_user or not smtp_password:
+            current_app.logger.warning("SMTP credentials not configured, logging reset link instead")
+            current_app.logger.info(f"Password reset link for {user.username}: {reset_url}")
+            return
+        
+        # Create email
+        msg = MIMEMultipart()
+        msg['From'] = smtp_user
+        msg['To'] = user.email
+        msg['Subject'] = "FutureElite Password Reset"
+        
+        body = f"""
+Hello {user.username},
+
+You requested to reset your password for your FutureElite account.
+
+Click the link below to reset your password (valid for 1 hour):
+{reset_url}
+
+If you did not request this password reset, please ignore this email.
+
+Best regards,
+FutureElite Team
+        """
+        
+        msg.attach(MIMEText(body, 'plain'))
+        
+        # Send email
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.send_message(msg)
+        
+        current_app.logger.info(f"Password reset email sent to {user.email}")
+        
+    except Exception as e:
+        current_app.logger.error(f"Failed to send password reset email: {e}", exc_info=True)
+        # Log the reset link as fallback
+        current_app.logger.info(f"Password reset link for {user.username}: {reset_url}")
 

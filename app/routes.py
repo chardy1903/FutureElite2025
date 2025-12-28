@@ -3395,12 +3395,19 @@ def admin_users():
         # Remove password hashes for security
         users_data = []
         for user in users:
+            # Get subscription status for this user
+            subscription = storage.get_subscription_by_user_id(user.id)
+            subscription_status = subscription.status.value if subscription else 'none'
+            subscription_plan = subscription.plan_name if subscription else None
+            
             users_data.append({
                 'id': user.id,
                 'username': user.username,
                 'email': user.email,
                 'created_at': user.created_at,
-                'is_active': user.is_active
+                'is_active': user.is_active,
+                'subscription_status': subscription_status,
+                'subscription_plan': subscription_plan
             })
         
         # Sort by creation date (newest first)
@@ -3435,6 +3442,12 @@ def api_admin_users():
             })
         
         users_data.sort(key=lambda x: x['created_at'], reverse=True)
+        
+        # Add subscription info to API response
+        for user_data in users_data:
+            subscription = storage.get_subscription_by_user_id(user_data['id'])
+            user_data['subscription_status'] = subscription.status.value if subscription else 'none'
+            user_data['subscription_plan'] = subscription.plan_name if subscription else None
         
         return jsonify({'success': True, 'users': users_data, 'total': len(users_data)})
     except Exception as e:

@@ -21,6 +21,7 @@ class StorageManager:
         self.users_file = self.data_dir / "users.json"
         self.subscriptions_file = self.data_dir / "subscriptions.json"
         self.references_file = self.data_dir / "references.json"
+        self.reset_tokens_file = self.data_dir / "reset_tokens.json"
         
         # Ensure data directory exists
         self.data_dir.mkdir(exist_ok=True)
@@ -1000,4 +1001,92 @@ class StorageManager:
             self._save_references(references)
             return True
         return False
+    
+    # Password reset token management
+    def _load_reset_tokens(self) -> list:
+        """Load reset tokens from JSON file"""
+        try:
+            if not self.reset_tokens_file.exists():
+                return []
+            with open(self.reset_tokens_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data if isinstance(data, list) else []
+        except (FileNotFoundError, json.JSONDecodeError):
+            return []
+    
+    def _save_reset_tokens(self, tokens: list) -> None:
+        """Save reset tokens to JSON file"""
+        try:
+            with open(self.reset_tokens_file, 'w', encoding='utf-8') as f:
+                json.dump(tokens, f, indent=2, ensure_ascii=False)
+        except (IOError, OSError) as e:
+            raise RuntimeError(f"Failed to save reset tokens: {str(e)}")
+    
+    def create_reset_token(self, user_id: str, token: str, expires_at: str) -> bool:
+        """Create a password reset token"""
+        tokens = self._load_reset_tokens()
+        # Remove any existing tokens for this user
+        tokens = [t for t in tokens if t.get('user_id') != user_id]
+        # Add new token
+        tokens.append({
+            'user_id': user_id,
+            'token': token,
+            'expires_at': expires_at,
+            'created_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        })
+        self._save_reset_tokens(tokens)
+        return True
+    
+    def get_reset_token(self, token: str) -> Optional[Dict[str, Any]]:
+        """Get reset token info if valid"""
+        tokens = self._load_reset_tokens()
+        for token_data in tokens:
+            if token_data.get('token') == token:
+                # Check if expired
+                try:
+                    expires_at = datetime.strptime(token_data['expires_at'], "%Y-%m-%d %H:%M:%S")
+                    if datetime.now() < expires_at:
+                        return token_data
+                    else:
+                        # Token expired, remove it
+                        tokens.remove(token_data)
+                        self._save_reset_tokens(tokens)
+                except (ValueError, KeyError):
+                    # Invalid date format, remove token
+                    tokens.remove(token_data)
+                    self._save_reset_tokens(tokens)
+        return None
+    
+    def delete_reset_token(self, token: str) -> bool:
+        """Delete a reset token (after use)"""
+        tokens = self._load_reset_tokens()
+        original_count = len(tokens)
+        tokens = [t for t in tokens if t.get('token') != token]
+        if len(tokens) < original_count:
+            self._save_reset_tokens(tokens)
+            return True
+        return False
+    
+    def update_user_password(self, user_id: str, new_password: str) -> bool:
+        """Update a user's password"""
+        users = self.load_users()
+        for user_data in users:
+            if user_data.get('id') == user_id:
+                user_data['password_hash'] = generate_password_hash(new_password)
+                self._save_users(users)
+                return True
+        return False
+    
+    def get_user_by_email(self, email: str) -> Optional[User]:
+        """Get a user by email address"""
+        if not email:
+            return None
+        users = self.load_users()
+        for user_data in users:
+            if user_data.get('email') and user_data.get('email').lower() == email.lower():
+                try:
+                    return User(**user_data)
+                except (ValueError, TypeError, KeyError):
+                    continue
+        return None
 
