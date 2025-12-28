@@ -173,7 +173,12 @@ def register():
             redirect_url = '/dashboard'
         
         if request.is_json:
-            return jsonify({'success': True, 'redirect': redirect_url})
+            # Return user ID so frontend can store it for authentication checks
+            return jsonify({
+                'success': True,
+                'redirect': redirect_url,
+                'user_id': str(user.id)  # Include user ID for frontend storage
+            })
         
         return redirect(redirect_url)
     
