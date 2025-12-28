@@ -7,6 +7,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
 import time
 import os
+import re
 import smtplib
 import secrets
 from datetime import datetime, timedelta
@@ -210,15 +211,38 @@ def register():
             
             username = data.get('username', '').strip()
             password = data.get('password', '')
-            # Handle email - it might be None, empty string, or a value
-            email_value = data.get('email')
-            email = email_value.strip().lower() if email_value and email_value.strip() else None
+            # Email is now required for password reset functionality
+            email_value = data.get('email', '').strip()
+            email = email_value.lower() if email_value else None
             
             # Validate inputs
             if not username or not password:
                 if request.is_json:
                     return jsonify({'success': False, 'errors': ['Username and password are required']}), 400
                 flash('Username and password are required', 'error')
+                return render_template('register.html')
+            
+            # Email is now required
+            if not email or not email.strip():
+                if request.is_json:
+                    return jsonify({'success': False, 'errors': ['Email address is required for password reset functionality']}), 400
+                flash('Email address is required for password reset functionality', 'error')
+                return render_template('register.html')
+            
+            # Basic email validation
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(email_pattern, email):
+                if request.is_json:
+                    return jsonify({'success': False, 'errors': ['Please enter a valid email address']}), 400
+                flash('Please enter a valid email address', 'error')
+                return render_template('register.html')
+            
+            # Check if email is already registered
+            existing_user_by_email = storage.get_user_by_email(email)
+            if existing_user_by_email:
+                if request.is_json:
+                    return jsonify({'success': False, 'errors': ['An account with this email address already exists']}), 409
+                flash('An account with this email address already exists', 'error')
                 return render_template('register.html')
             
             if len(password) < 8:

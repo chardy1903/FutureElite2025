@@ -66,6 +66,17 @@ const clientAuth = {
                 throw new Error('Username and password are required');
             }
 
+            // Email is now required for password reset functionality
+            if (!email || !email.trim()) {
+                throw new Error('Email address is required for password reset functionality');
+            }
+
+            // Basic email validation
+            const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!emailPattern.test(email)) {
+                throw new Error('Please enter a valid email address');
+            }
+
             if (password.length < 8) {
                 throw new Error('Password must be at least 8 characters');
             }

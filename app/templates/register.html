@@ -25,10 +25,11 @@
                            placeholder="Choose a username">
                 </div>
                 <div>
-                    <label for="email" class="block text-sm font-medium text-gray-700">Email (optional)</label>
-                    <input id="email" name="email" type="email" 
+                    <label for="email" class="block text-sm font-medium text-gray-700">Email Address <span class="text-red-500">*</span></label>
+                    <input id="email" name="email" type="email" required
                            class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-qadsiah-red focus:border-qadsiah-red focus:z-10 sm:text-sm" 
                            placeholder="your@email.com">
+                    <p class="mt-1 text-xs text-gray-500">Required for password reset functionality</p>
                 </div>
                 <div>
                     <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
@@ -57,9 +58,22 @@ document.getElementById('registerForm').addEventListener('submit', async functio
     const email = formData.get('email');
     const password = formData.get('password');
     
+    // Validate email is provided
+    if (!email || !email.trim()) {
+        showToast('Email address is required for password reset functionality', 'error');
+        return;
+    }
+    
+    // Basic email validation
+    const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailPattern.test(email)) {
+        showToast('Please enter a valid email address', 'error');
+        return;
+    }
+    
     try {
         showLoading('Creating account...');
-        const result = await clientAuth.register(username, password, email || null);
+        const result = await clientAuth.register(username, password, email);
         
         if (result.success) {
             hideLoading();
