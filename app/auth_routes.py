@@ -406,15 +406,50 @@ def forgot_password():
             # Save token
             storage.create_reset_token(user.id, token, expires_at)
             
+            # Check if email is configured
+            smtp_enabled = os.environ.get('SMTP_ENABLED', '').lower() in ('true', '1', 'on')
+            email_sent = False
+            
             # Send email if configured
-            send_password_reset_email(user, token)
+            if smtp_enabled and user.email:
+                send_password_reset_email(user, token)
+                email_sent = True
+            
+            # Get reset URL for response (if email not sent, show link in dev mode)
+            try:
+                base_url = request.host_url.rstrip('/') if hasattr(request, 'host_url') and request.host_url else 'http://localhost:8080'
+            except:
+                base_url = 'http://localhost:8080'
+            reset_url = f"{base_url}/reset-password/{token}"
+            
+            # Log reset link (always, for admin reference)
+            current_app.logger.info(
+                f"PASSWORD RESET REQUEST for user: {user.username} ({user.email or 'no email'})\n"
+                f"Reset URL: {reset_url}\n"
+                f"Token expires in 1 hour.\n"
+                f"Email sent: {email_sent}"
+            )
+            
+            # In development mode or if email not configured, include reset link in response
+            is_dev = os.environ.get('FLASK_ENV', '').lower() != 'production'
+            response_data = {
+                'success': True,
+                'message': 'If an account exists with that email or username, a password reset link has been sent.' if email_sent else 'Password reset link generated. Check server logs or contact support if email was not received.',
+            }
+            
+            # Include reset link in dev mode or if email not sent (for testing)
+            if (is_dev or not email_sent) and user.email:
+                response_data['reset_link'] = reset_url
+                response_data['message'] = f'Password reset link: {reset_url}' if is_dev else 'Password reset link generated. Email may not be configured - check with administrator.'
             
             if is_json_request:
-                return jsonify({
-                    'success': True,
-                    'message': 'If an account exists with that email or username, a password reset link has been sent.'
-                })
-            flash('If an account exists with that email or username, a password reset link has been sent.', 'info')
+                return jsonify(response_data)
+            
+            # For form submissions, show appropriate message
+            if is_dev or not email_sent:
+                flash(f'Password reset link: {reset_url}', 'info')
+            else:
+                flash('If an account exists with that email or username, a password reset link has been sent.', 'info')
             return render_template('forgot_password.html')
             
         except Exception as e:
