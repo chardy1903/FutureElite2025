@@ -30,7 +30,7 @@ try:
 except ImportError:
     EXCEL_SUPPORT = False
 
-from .models import Match, MatchCategory, MatchResult, AppSettings, PhysicalMeasurement, Achievement, ClubHistory, TrainingCamp, PhysicalMetrics, Reference, SubscriptionStatus, Subscription
+from .models import Match, MatchCategory, MatchResult, AppSettings, PhysicalMeasurement, Achievement, ClubHistory, TrainingCamp, PhysicalMetrics, Reference, SubscriptionStatus, Subscription, User
 from .storage import StorageManager
 from .utils import validate_match_data, parse_input_date, format_date_for_input
 from .pdf import generate_season_pdf, generate_scout_pdf
@@ -3374,3 +3374,68 @@ def references_page():
     return render_template('references.html', 
                          settings=default_settings,
                          references=[])
+
+
+@bp.route('/admin/users')
+@login_required
+def admin_users():
+    """Admin page to view all registered users"""
+    # Simple admin check - you can enhance this with role-based access
+    # For now, any logged-in user can view (you may want to restrict this)
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    
+    # If ADMIN_USERNAME is set, only that user can access
+    if admin_username and current_user.username != admin_username:
+        flash('Access denied. Admin access required.', 'error')
+        return redirect(url_for('main.dashboard'))
+    
+    try:
+        users = storage.get_all_users()
+        # Remove password hashes for security
+        users_data = []
+        for user in users:
+            users_data.append({
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'created_at': user.created_at,
+                'is_active': user.is_active
+            })
+        
+        # Sort by creation date (newest first)
+        users_data.sort(key=lambda x: x['created_at'], reverse=True)
+        
+        return render_template('admin_users.html', users=users_data)
+    except Exception as e:
+        current_app.logger.error(f"Error loading users for admin: {e}", exc_info=True)
+        flash('Error loading users. Please try again.', 'error')
+        return redirect(url_for('main.dashboard'))
+
+
+@bp.route('/api/admin/users')
+@login_required
+def api_admin_users():
+    """API endpoint to get all users as JSON"""
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    
+    if admin_username and current_user.username != admin_username:
+        return jsonify({'success': False, 'errors': ['Access denied']}), 403
+    
+    try:
+        users = storage.get_all_users()
+        users_data = []
+        for user in users:
+            users_data.append({
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'created_at': user.created_at,
+                'is_active': user.is_active
+            })
+        
+        users_data.sort(key=lambda x: x['created_at'], reverse=True)
+        
+        return jsonify({'success': True, 'users': users_data, 'total': len(users_data)})
+    except Exception as e:
+        current_app.logger.error(f"Error loading users for admin API: {e}", exc_info=True)
+        return jsonify({'success': False, 'errors': ['Error loading users']}), 500

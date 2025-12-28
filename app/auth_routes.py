@@ -6,6 +6,10 @@ from flask import Blueprint, render_template, request, jsonify, redirect, url_fo
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
 import time
+import os
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 from .storage import StorageManager
 from .auth import UserSession
@@ -42,6 +46,59 @@ def rate_limit_if_available(limit_str):
                 pass
         return f
     return decorator
+
+
+def send_new_user_notification(user):
+    """Send email notification when a new user registers (optional)"""
+    # Check if email notifications are enabled
+    admin_email = os.environ.get('ADMIN_EMAIL', '').strip()
+    smtp_enabled = os.environ.get('SMTP_ENABLED', '').lower() in ('true', '1', 'on')
+    
+    if not smtp_enabled or not admin_email:
+        # Email notifications disabled or not configured
+        return
+    
+    try:
+        # Get SMTP configuration
+        smtp_host = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
+        smtp_port = int(os.environ.get('SMTP_PORT', '587'))
+        smtp_user = os.environ.get('SMTP_USER', '').strip()
+        smtp_password = os.environ.get('SMTP_PASSWORD', '').strip()
+        
+        if not smtp_user or not smtp_password:
+            current_app.logger.warning("SMTP credentials not configured, skipping email notification")
+            return
+        
+        # Create email
+        msg = MIMEMultipart()
+        msg['From'] = smtp_user
+        msg['To'] = admin_email
+        msg['Subject'] = f"New User Registration: {user.username}"
+        
+        body = f"""
+New user has registered on FutureElite:
+
+Username: {user.username}
+Email: {user.email or 'Not provided'}
+User ID: {user.id}
+Registration Date: {user.created_at}
+
+You can view all users at: https://futureelite.co.uk/admin/users
+        """
+        
+        msg.attach(MIMEText(body, 'plain'))
+        
+        # Send email
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.send_message(msg)
+        
+        current_app.logger.info(f"New user notification email sent to {admin_email}")
+        
+    except Exception as e:
+        current_app.logger.error(f"Failed to send new user notification email: {e}", exc_info=True)
+        # Don't raise - notification failure shouldn't break registration
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
@@ -185,6 +242,20 @@ def register():
             # Create user
             try:
                 user = storage.create_user(username, password, email)
+                
+                # Log new user registration for admin tracking
+                current_app.logger.info(
+                    f"NEW USER REGISTRATION: username={username}, email={email or 'none'}, "
+                    f"user_id={user.id if user else 'unknown'}, created_at={user.created_at if user else 'unknown'}"
+                )
+                
+                # Send notification email if configured (optional)
+                try:
+                    send_new_user_notification(user)
+                except Exception as e:
+                    # Don't fail registration if notification fails
+                    current_app.logger.warning(f"Failed to send new user notification: {e}")
+                    
             except Exception as e:
                 # Log the error but don't expose details to client
                 current_app.logger.error(f"Error creating user {username}: {e}", exc_info=True)

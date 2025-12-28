@@ -826,6 +826,17 @@ class StorageManager:
                     continue
         return None
     
+    def get_all_users(self) -> list[User]:
+        """Get all users as User objects"""
+        users = self.load_users()
+        result = []
+        for user_data in users:
+            try:
+                result.append(User(**user_data))
+            except (ValueError, TypeError, KeyError):
+                continue
+        return result
+    
     def verify_password(self, user: User, password: str) -> bool:
         """Verify a user's password"""
         try:

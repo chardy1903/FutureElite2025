@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - Users{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <div class="px-4 py-6 sm:px-0">
+        <div class="mb-6">
+            <h1 class="text-3xl font-bold text-gray-900">Registered Users</h1>
+            <p class="mt-2 text-sm text-gray-600">Total users: <span id="userCount">{{ users|length }}</span></p>
+        </div>
+
+        <div class="bg-white shadow overflow-hidden sm:rounded-md">
+            <ul class="divide-y divide-gray-200">
+                {% for user in users %}
+                <li class="px-6 py-4 hover:bg-gray-50">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="h-10 w-10 rounded-full bg-qadsiah-red flex items-center justify-center">
+                                        <span class="text-white font-semibold text-sm">{{ user.username[0].upper() }}</span>
+                                    </div>
+                                </div>
+                                <div class="ml-4">
+                                    <div class="text-sm font-medium text-gray-900">
+                                        {{ user.username }}
+                                    </div>
+                                    <div class="text-sm text-gray-500">
+                                        {% if user.email %}
+                                            {{ user.email }}
+                                        {% else %}
+                                            <span class="text-gray-400">No email provided</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ml-4 flex-shrink-0 text-right">
+                            <div class="text-sm text-gray-500">
+                                Registered: {{ user.created_at }}
+                            </div>
+                            <div class="text-xs text-gray-400 mt-1">
+                                ID: {{ user.id }}
+                            </div>
+                            {% if user.is_active %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-1">
+                                    Active
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 mt-1">
+                                    Inactive
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        {% if users|length == 0 %}
+        <div class="text-center py-12">
+            <p class="text-gray-500">No users registered yet.</p>
+        </div>
+        {% endif %}
+
+        <div class="mt-6">
+            <button onclick="exportUsers()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-qadsiah-red hover:bg-red-700">
+                Export Users (JSON)
+            </button>
+            <button onclick="location.reload()" class="ml-3 inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                Refresh
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+async function exportUsers() {
+    try {
+        showLoading('Exporting users...');
+        const response = await fetch('/api/admin/users', {
+            credentials: 'include'
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            // Create download
+            const blob = new Blob([JSON.stringify(data.users, null, 2)], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `futureelite_users_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            hideLoading();
+            showToast('Users exported successfully!', 'success');
+        } else {
+            hideLoading();
+            showToast('Error exporting users: ' + (data.errors?.join(', ') || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        hideLoading();
+        console.error('Export error:', error);
+        showToast('Error exporting users: ' + error.message, 'error');
+    }
+}
+</script>
+{% endblock %}
+
