@@ -148,7 +148,7 @@ def create_app():
                 class ExemptViewsSet:
                     def __init__(self, original_set):
                         self._original = original_set
-                        self._auth_endpoints = {'auth.login', 'auth.register'}
+                        self._auth_endpoints = {'auth.login', 'auth.register', 'auth.forgot_password'}
                     
                     def __contains__(self, item):
                         # Always return True for auth endpoints
@@ -274,14 +274,16 @@ def create_app():
             # This is the most reliable method for blueprint routes with multiple decorators
             csrf.exempt('auth.login')
             csrf.exempt('auth.register')
+            csrf.exempt('auth.forgot_password')
             csrf.exempt('subscription.stripe_webhook')
             
             # Also try function reference as backup (may not work if wrapped by rate limiter)
             try:
-                from .auth_routes import login, register
+                from .auth_routes import login, register, forgot_password
                 from .subscription_routes import stripe_webhook
                 csrf.exempt(login)
                 csrf.exempt(register)
+                csrf.exempt(forgot_password)
                 csrf.exempt(stripe_webhook)
             except Exception:
                 # Function reference exemption failed (likely due to decorator wrapping)
