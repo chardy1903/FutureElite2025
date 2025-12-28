@@ -368,11 +368,18 @@ def forgot_password():
     """Forgot password page - request password reset"""
     if request.method == 'POST':
         try:
-            data = request.get_json() if request.is_json else request.form.to_dict()
+            # Check if this is a JSON request (API call from JavaScript)
+            is_json_request = request.is_json or (request.content_type and 'application/json' in request.content_type)
+            
+            if is_json_request:
+                data = request.get_json() or {}
+            else:
+                data = request.form.to_dict()
+            
             email_or_username = data.get('email_or_username', '').strip()
             
             if not email_or_username:
-                if request.is_json:
+                if is_json_request:
                     return jsonify({'success': False, 'errors': ['Email or username is required']}), 400
                 flash('Email or username is required', 'error')
                 return render_template('forgot_password.html')
@@ -384,7 +391,7 @@ def forgot_password():
             
             if not user:
                 # Don't reveal if user exists or not (security best practice)
-                if request.is_json:
+                if is_json_request:
                     return jsonify({
                         'success': True,
                         'message': 'If an account exists with that email or username, a password reset link has been sent.'
@@ -402,7 +409,7 @@ def forgot_password():
             # Send email if configured
             send_password_reset_email(user, token)
             
-            if request.is_json:
+            if is_json_request:
                 return jsonify({
                     'success': True,
                     'message': 'If an account exists with that email or username, a password reset link has been sent.'
@@ -412,7 +419,9 @@ def forgot_password():
             
         except Exception as e:
             current_app.logger.error(f"Error in forgot_password: {e}", exc_info=True)
-            if request.is_json:
+            # Check if JSON request (may not be set if exception occurred early)
+            is_json_request = request.is_json or (request.content_type and 'application/json' in request.content_type)
+            if is_json_request:
                 return jsonify({'success': False, 'errors': ['An error occurred. Please try again.']}), 500
             flash('An error occurred. Please try again.', 'error')
             return render_template('forgot_password.html')
