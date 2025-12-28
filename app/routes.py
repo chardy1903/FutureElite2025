@@ -1986,7 +1986,7 @@ def calculate_phv_endpoint():
         if not settings.date_of_birth:
             return jsonify({
                 'success': False,
-                'errors': ['Date of birth is required for PHV calculation. Please add date of birth in Settings.']
+                'errors': ['Please add your date of birth in Settings to calculate PHV']
             }), 400
         
         # Validate measurements
@@ -2143,7 +2143,7 @@ def physical_data_analysis():
         if not settings.date_of_birth:
             return jsonify({
                 'success': False,
-                'errors': ['Date of birth is required for physical data analysis']
+                'errors': ['Please add your date of birth in Settings to view physical data analysis']
             }), 400
         
         # Calculate current age
@@ -2272,7 +2272,7 @@ def physical_data_analysis():
         traceback.print_exc()
         return jsonify({
             'success': False,
-            'errors': [f'Error analyzing physical data: {error_details}']
+            'errors': ['Unable to analyze physical data at this time. Please try again or check your data.']
         }), 500
 
 
