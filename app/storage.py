@@ -806,10 +806,14 @@ class StorageManager:
         return user
     
     def get_user_by_username(self, username: str) -> Optional[User]:
-        """Get a user by username"""
+        """Get a user by username (case-sensitive exact match)"""
+        if not username:
+            return None
+        username = username.strip()
         users = self.load_users()
         for user_data in users:
-            if user_data.get('username') == username:
+            # Exact match (case-sensitive)
+            if user_data.get('username', '').strip() == username:
                 try:
                     return User(**user_data)
                 except (ValueError, TypeError, KeyError):
