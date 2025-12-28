@@ -90,6 +90,12 @@
         </div>
     </div>
 
+    <!-- Client-side storage and API - Load BEFORE inline script that uses them -->
+    <script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/storage.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/api.js') }}"></script>
+
     <script>
         // Toast notification functions
         function showToast(message, type = 'success') {
@@ -285,12 +291,6 @@
             }
         });
     </script>
-
-    <!-- Client-side storage and API -->
-    <script src="{{ url_for('static', filename='js/csrf.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/storage.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/api.js') }}"></script>
     
     {% block scripts %}{% endblock %}
 </body>
