@@ -98,9 +98,14 @@ const clientAuth = {
                 throw new Error(result.errors?.[0] || 'Registration failed');
             }
 
-            // Server sets session cookie, store username locally for UI
+            // Server sets session cookie, store username and user_id locally for UI
             sessionStorage.setItem('username', username);
             localStorage.setItem('username', username);
+            
+            // Store user ID for authentication checks
+            if (result.user_id) {
+                clientStorage.setCurrentUserId(result.user_id);
+            }
 
             return { success: true };
         } catch (error) {
