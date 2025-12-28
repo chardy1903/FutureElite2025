@@ -337,16 +337,19 @@ def create_app():
         }), 200
     
     # Security: Add endpoint to get CSRF token for JSON API clients
-    if CSRF_AVAILABLE:
-        @app.route('/api/csrf-token', methods=['GET'])
-        def get_csrf_token():
-            """Get CSRF token for JSON API requests"""
+    @app.route('/api/csrf-token', methods=['GET'])
+    def get_csrf_token():
+        """Get CSRF token for JSON API requests"""
+        if CSRF_AVAILABLE:
             from flask_wtf.csrf import generate_csrf
             from flask import session
             # Ensure session exists for CSRF token validation
             session.permanent = True
             token = generate_csrf()
             return jsonify({'csrf_token': token})
+        else:
+            # CSRF not available - return empty token (client will handle gracefully)
+            return jsonify({'csrf_token': ''})
     
     # Add error handler for API routes to return JSON instead of HTML
     @app.errorhandler(500)
