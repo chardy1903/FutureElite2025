@@ -1,0 +1,12 @@
+{
+  "name": "futureelite",
+  "version": "1.0.0",
+  "description": "FutureElite GoalTracker",
+  "scripts": {
+    "build:css": "tailwindcss -i ./assets/tailwind.css -o ./app/static/css/tailwind.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
+  }
+}
+

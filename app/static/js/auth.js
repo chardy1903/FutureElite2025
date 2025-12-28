@@ -66,8 +66,8 @@ const clientAuth = {
                 throw new Error('Username and password are required');
             }
 
-            if (password.length < 6) {
-                throw new Error('Password must be at least 6 characters');
+            if (password.length < 8) {
+                throw new Error('Password must be at least 8 characters');
             }
 
             // Note: Register endpoint is exempt from CSRF (entry point, rate-limited, requires credentials)

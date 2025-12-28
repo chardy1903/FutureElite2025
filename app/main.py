@@ -202,8 +202,10 @@ def create_app():
             strict_transport_security_preload=False,  # Set True after HSTS preload approval
             content_security_policy={
                 'default-src': "'self'",
-                'script-src': "'self' https://cdn.tailwindcss.com 'unsafe-inline'",  # unsafe-inline needed for Tailwind
-                'style-src': "'self' 'unsafe-inline' https://cdn.tailwindcss.com",
+                # unsafe-inline needed for inline scripts in templates (e.g., tailwind.config)
+                # Consider moving to external JS files in future for stricter CSP
+                'script-src': "'self' 'unsafe-inline'",
+                'style-src': "'self' 'unsafe-inline'",  # unsafe-inline needed for inline styles
                 'img-src': "'self' data: https:",
                 'font-src': "'self' data:",
                 'connect-src': "'self'",
@@ -357,14 +359,20 @@ def create_app():
     
     @app.errorhandler(404)
     def handle_404_error(e):
-        """Return JSON for API 404 errors"""
+        """Handle 404 errors - return JSON for API routes, minimal HTML for others"""
+        # Handle HEAD requests gracefully
+        if request.method == 'HEAD':
+            return '', 404
+        
+        # Return JSON for API routes
         if request.path.startswith('/api/'):
             return jsonify({
                 'success': False,
                 'errors': ['Endpoint not found']
             }), 404
-        # For non-API routes, return default HTML error page
-        return e
+        
+        # For non-API routes, return minimal HTML
+        return '<!DOCTYPE html><html><head><title>404 Not Found</title></head><body><h1>404 Not Found</h1></body></html>', 404
     
     # Handle 400 errors (including CSRF) for JSON requests
     @app.errorhandler(400)

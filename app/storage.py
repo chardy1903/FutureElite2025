@@ -828,7 +828,13 @@ class StorageManager:
     
     def verify_password(self, user: User, password: str) -> bool:
         """Verify a user's password"""
-        return check_password_hash(user.password_hash, password)
+        try:
+            if not user.password_hash:
+                return False
+            return check_password_hash(user.password_hash, password)
+        except ValueError:
+            # Invalid hash format - treat as authentication failure
+            return False
     
     # Subscription management methods
     def _save_subscriptions(self, subscriptions: list) -> None:
