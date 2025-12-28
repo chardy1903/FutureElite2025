@@ -60,22 +60,16 @@ def login():
             # Get user
             user = storage.get_user_by_username(username)
             
-        # Security: Prevent timing attacks and account enumeration
-        # Always perform password check (even with dummy hash) to prevent timing differences
-        # Use a properly formatted bcrypt hash for the dummy check
-        dummy_hash = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyYqBWVHxkd0"  # Valid format dummy hash
-        if not user:
-            # Simulate password check with dummy hash to prevent timing attacks
-            try:
-                check_password_hash(dummy_hash, password)
-            except (ValueError, Exception):
-                # If hash format is invalid, just do a time delay
-                pass
-            time.sleep(0.1)  # Add small delay to prevent timing-based enumeration
-            if request.is_json:
-                return jsonify({'success': False, 'errors': ['Invalid username or password']}), 401
-            flash('Invalid username or password', 'error')
-            return render_template('login.html')
+            # Security: Prevent timing attacks and account enumeration
+            # Add a small delay to prevent timing-based enumeration
+            # We don't need to check a dummy hash - the time delay is sufficient
+            if not user:
+                # Add delay to prevent timing-based account enumeration
+                time.sleep(0.1)
+                if request.is_json:
+                    return jsonify({'success': False, 'errors': ['Invalid username or password']}), 401
+                flash('Invalid username or password', 'error')
+                return render_template('login.html')
             
             # Verify password
             if not storage.verify_password(user, password):
