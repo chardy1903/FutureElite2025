@@ -74,7 +74,10 @@ def send_new_user_notification(user):
         
         # Create email
         msg = MIMEMultipart()
-        msg['From'] = smtp_user
+        # Use FROM_EMAIL if configured, otherwise use admin@futureelite.pro
+        from_email = os.environ.get('FROM_EMAIL', '').strip() or 'admin@futureelite.pro'
+        msg['From'] = from_email
+        msg['Reply-To'] = from_email
         msg['To'] = admin_email
         msg['Subject'] = f"New User Registration: {user.username}"
         
@@ -582,7 +585,10 @@ def send_password_reset_email(user, token):
         
         # Create email
         msg = MIMEMultipart()
-        msg['From'] = smtp_user
+        # Use FROM_EMAIL if configured, otherwise use admin@futureelite.pro
+        from_email = os.environ.get('FROM_EMAIL', '').strip() or 'admin@futureelite.pro'
+        msg['From'] = from_email
+        msg['Reply-To'] = from_email
         msg['To'] = user.email
         msg['Subject'] = "FutureElite Password Reset"
         
