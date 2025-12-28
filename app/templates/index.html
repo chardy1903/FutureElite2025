@@ -46,6 +46,170 @@
         </div>
     </div>
 
+    <!-- Performance Report Widget -->
+    <div class="bg-gradient-to-br from-blue-900 to-blue-700 rounded-lg shadow-xl mb-8 overflow-hidden">
+        <div class="bg-white bg-opacity-10 backdrop-blur-sm px-6 py-4">
+            <h2 class="text-2xl font-bold text-white">Youth Player Performance Report</h2>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
+            <!-- Player Profile (Left Top) -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex items-start space-x-4 mb-4">
+                    <div class="flex-shrink-0">
+                        <div id="playerPhotoContainer" class="w-24 h-24 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
+                            <svg class="w-16 h-16 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <h3 id="playerNameHeader" class="text-xl font-bold text-gray-900 mb-2">Player</h3>
+                        <div class="space-y-1 text-sm text-gray-600">
+                            <p><span class="font-medium">Current Club:</span> <span id="playerClub">-</span></p>
+                            <p><span class="font-medium">Position:</span> <span id="playerPosition">-</span></p>
+                            <p><span class="font-medium">Dominant Foot:</span> <span id="playerFoot">-</span></p>
+                            <p><span class="font-medium">Season:</span> <span id="playerSeason">-</span></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="border-t pt-4 mt-4">
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <p class="text-gray-500">Age Group</p>
+                            <p id="playerAgeGroup" class="font-semibold text-gray-900">-</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-500">Height</p>
+                            <p id="playerHeight" class="font-semibold text-gray-900">-</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-500">Weight</p>
+                            <p id="playerWeight" class="font-semibold text-gray-900">-</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-500">PHV Status</p>
+                            <p id="playerPHVStatus" class="font-semibold text-gray-900">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Physical Development Profile (Right Top) -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Physical Development Profile</h3>
+                <div id="physicalMetricsContainer" class="space-y-3 mb-4">
+                    <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                                <span class="text-white text-xl">🏃</span>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600">Sprint Speed</p>
+                                <p id="sprintSpeed" class="font-semibold text-gray-900">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
+                                <span class="text-white text-xl">⬆️</span>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600">Vertical Jump</p>
+                                <p id="verticalJump" class="font-semibold text-gray-900">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
+                                <span class="text-white text-xl">💪</span>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600">Beep Test</p>
+                                <p id="beepTest" class="font-semibold text-gray-900">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="phvBadge" class="text-center">
+                    <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                        </svg>
+                        <span id="phvStageText">PHV Status</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Match & Performance Summary (Left Bottom) -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Match & Performance Summary</h3>
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="bg-blue-600 text-white p-4 rounded-lg text-center">
+                        <p class="text-2xl font-bold" id="totalMatches">0</p>
+                        <p class="text-sm opacity-90">Matches</p>
+                    </div>
+                    <div class="bg-green-600 text-white p-4 rounded-lg text-center">
+                        <p class="text-2xl font-bold" id="totalGoals">0</p>
+                        <p class="text-sm opacity-90">Total Goals</p>
+                    </div>
+                    <div class="bg-purple-600 text-white p-4 rounded-lg text-center">
+                        <p class="text-2xl font-bold" id="totalAssists">0</p>
+                        <p class="text-sm opacity-90">Total Assists</p>
+                    </div>
+                    <div class="bg-orange-600 text-white p-4 rounded-lg text-center">
+                        <p class="text-2xl font-bold" id="totalMinutes">0</p>
+                        <p class="text-sm opacity-90">Minutes Played</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mt-4">
+                    <div class="bg-gray-100 p-3 rounded-lg text-center">
+                        <p class="text-sm text-gray-600">Goals Per 60 Mins</p>
+                        <p class="text-lg font-bold text-gray-900" id="goalsPer60">0.00</p>
+                    </div>
+                    <div class="bg-gray-100 p-3 rounded-lg text-center">
+                        <p class="text-sm text-gray-600">Minutes Per Contribution</p>
+                        <p class="text-lg font-bold text-gray-900" id="minutesPerContribution">-</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scout Snapshot (Right Bottom) -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Scout Snapshot</h3>
+                <div class="mb-4">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-2">Key Strengths</h4>
+                    <ul id="keyStrengths" class="list-disc list-inside space-y-1 text-sm text-gray-600">
+                        <li>Loading strengths...</li>
+                    </ul>
+                </div>
+                <div class="mb-4 space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Goals Per 60 Mins:</span>
+                        <span class="font-semibold text-gray-900" id="scoutGoalsPer60">0.00</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Assists Per 60 Mins:</span>
+                        <span class="font-semibold text-gray-900" id="scoutAssistsPer60">0.00</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Goal Contrib. Per 60:</span>
+                        <span class="font-semibold text-gray-900" id="scoutGoalContribPer60">0.00</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Minutes Per Goal:</span>
+                        <span class="font-semibold text-gray-900" id="scoutMinutesPerGoal">-</span>
+                    </div>
+                </div>
+                <button onclick="generateScoutPDF()" class="w-full bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors">
+                    Export Report (PDF)
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Recent Matches -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div class="bg-white shadow rounded-lg">
@@ -865,6 +1029,9 @@ async function loadDashboardData() {
         // Load and display stats
         await updateStatsPeriod();
         
+        // Load performance report data
+        await loadPerformanceReport(settings);
+        
         // Load recent matches
         const matches = await clientStorage.getAllMatches();
         const recentMatches = matches
@@ -1054,6 +1221,155 @@ async function updateStatsPeriod() {
     } catch (error) {
         console.error('Error updating statistics:', error);
         showToast('Error loading statistics: ' + error.message, 'error');
+    }
+}
+
+async function loadPerformanceReport(settings) {
+    try {
+        await ensureStorageReady();
+        
+        // Player Profile Section
+        document.getElementById('playerNameHeader').textContent = settings.player_name || 'Player';
+        document.getElementById('playerClub').textContent = settings.club_name || 'Not set';
+        document.getElementById('playerPosition').textContent = settings.position || 'Not set';
+        document.getElementById('playerFoot').textContent = settings.dominant_foot || 'Not set';
+        document.getElementById('playerSeason').textContent = settings.season_year || 'Not set';
+        
+        // Load player photo if available
+        const photoContainer = document.getElementById('playerPhotoContainer');
+        if (settings.player_photo_path) {
+            photoContainer.innerHTML = `<img src="${settings.player_photo_path}" alt="Player Photo" class="w-full h-full object-cover">`;
+        }
+        
+        // Load physical measurements
+        const measurements = await clientStorage.getAllPhysicalMeasurements();
+        const latestMeasurement = measurements.sort((a, b) => {
+            try {
+                const dateA = new Date(a.date.split(' ').reverse().join('-'));
+                const dateB = new Date(b.date.split(' ').reverse().join('-'));
+                return dateB - dateA;
+            } catch {
+                return 0;
+            }
+        })[0];
+        
+        if (latestMeasurement) {
+            document.getElementById('playerHeight').textContent = latestMeasurement.height_cm ? `${latestMeasurement.height_cm} cm` : '-';
+            document.getElementById('playerWeight').textContent = latestMeasurement.weight_kg ? `${latestMeasurement.weight_kg} kg` : '-';
+        } else {
+            document.getElementById('playerHeight').textContent = settings.height_cm ? `${settings.height_cm} cm` : '-';
+            document.getElementById('playerWeight').textContent = settings.weight_kg ? `${settings.weight_kg} kg` : '-';
+        }
+        
+        // Calculate age group from date of birth
+        if (settings.date_of_birth) {
+            try {
+                const dob = new Date(settings.date_of_birth);
+                const today = new Date();
+                let age = today.getFullYear() - dob.getFullYear();
+                const monthDiff = today.getMonth() - dob.getMonth();
+                if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+                    age--;
+                }
+                const ageGroup = age <= 12 ? 'U12' : age <= 13 ? 'U13' : age <= 14 ? 'U14' : age <= 15 ? 'U15' : age <= 16 ? 'U16' : age <= 17 ? 'U17' : 'U18+';
+                document.getElementById('playerAgeGroup').textContent = ageGroup;
+            } catch (e) {
+                document.getElementById('playerAgeGroup').textContent = '-';
+            }
+        } else {
+            document.getElementById('playerAgeGroup').textContent = '-';
+        }
+        
+        // PHV Status
+        if (settings.phv_date && settings.phv_age) {
+            const phvDate = new Date(settings.phv_date);
+            const today = new Date();
+            const phvStatus = today >= phvDate ? 'Post-PHV' : 'Pre-PHV';
+            document.getElementById('playerPHVStatus').textContent = `${phvStatus} (${settings.phv_age.toFixed(1)} years)`;
+            document.getElementById('phvStageText').textContent = phvStatus === 'Post-PHV' ? 'Advanced PHV Stage' : 'Pre-PHV Stage';
+        } else {
+            document.getElementById('playerPHVStatus').textContent = 'Not calculated';
+            document.getElementById('phvStageText').textContent = 'PHV Not Calculated';
+        }
+        
+        // Physical Metrics (from physical_metrics data)
+        const physicalMetrics = await clientStorage.getAllPhysicalMetrics();
+        const latestMetrics = physicalMetrics.sort((a, b) => {
+            try {
+                const dateA = new Date(a.date.split(' ').reverse().join('-'));
+                const dateB = new Date(b.date.split(' ').reverse().join('-'));
+                return dateB - dateA;
+            } catch {
+                return 0;
+            }
+        })[0];
+        
+        if (latestMetrics) {
+            const sprintSpeed = latestMetrics.sprint_speed_ms || latestMetrics.sprint_speed_kmh ? 
+                (latestMetrics.sprint_speed_ms ? `${latestMetrics.sprint_speed_ms} m/s` : `${latestMetrics.sprint_speed_kmh} km/h`) : 
+                'Not recorded';
+            document.getElementById('sprintSpeed').textContent = sprintSpeed;
+            document.getElementById('verticalJump').textContent = latestMetrics.vertical_jump_cm ? `${latestMetrics.vertical_jump_cm} cm` : 'Not recorded';
+            document.getElementById('beepTest').textContent = latestMetrics.beep_test_level ? `${latestMetrics.beep_test_level}` : 'Not recorded';
+        } else {
+            document.getElementById('sprintSpeed').textContent = 'Not recorded';
+            document.getElementById('verticalJump').textContent = 'Not recorded';
+            document.getElementById('beepTest').textContent = 'Not recorded';
+        }
+        
+        // Match Statistics
+        const matches = await clientStorage.getAllMatches();
+        const completedMatches = matches.filter(m => !m.is_fixture);
+        
+        const totalMatches = completedMatches.length;
+        const totalGoals = completedMatches.reduce((sum, m) => sum + (m.brodie_goals || 0), 0);
+        const totalAssists = completedMatches.reduce((sum, m) => sum + (m.brodie_assists || 0), 0);
+        const totalMinutes = completedMatches.reduce((sum, m) => sum + (m.minutes_played || 0), 0);
+        
+        document.getElementById('totalMatches').textContent = totalMatches;
+        document.getElementById('totalGoals').textContent = totalGoals;
+        document.getElementById('totalAssists').textContent = totalAssists;
+        document.getElementById('totalMinutes').textContent = totalMinutes;
+        
+        // Performance Ratios
+        const goalsPer60 = totalMinutes > 0 ? ((totalGoals / totalMinutes) * 60).toFixed(2) : '0.00';
+        const assistsPer60 = totalMinutes > 0 ? ((totalAssists / totalMinutes) * 60).toFixed(2) : '0.00';
+        const goalContribPer60 = totalMinutes > 0 ? (((totalGoals + totalAssists) / totalMinutes) * 60).toFixed(2) : '0.00';
+        const minutesPerGoal = totalGoals > 0 ? Math.round(totalMinutes / totalGoals) : '-';
+        const minutesPerContribution = (totalGoals + totalAssists) > 0 ? Math.round(totalMinutes / (totalGoals + totalAssists)) : '-';
+        
+        document.getElementById('goalsPer60').textContent = goalsPer60;
+        document.getElementById('minutesPerContribution').textContent = minutesPerContribution !== '-' ? minutesPerContribution : '-';
+        
+        // Scout Snapshot
+        document.getElementById('scoutGoalsPer60').textContent = goalsPer60;
+        document.getElementById('scoutAssistsPer60').textContent = assistsPer60;
+        document.getElementById('scoutGoalContribPer60').textContent = goalContribPer60;
+        document.getElementById('scoutMinutesPerGoal').textContent = minutesPerGoal;
+        
+        // Key Strengths (based on performance)
+        const strengths = [];
+        if (parseFloat(goalsPer60) >= 1.0) {
+            strengths.push('Clinical Finishing');
+        }
+        if (parseFloat(assistsPer60) >= 0.5) {
+            strengths.push('Creative Playmaking');
+        }
+        if (totalMatches >= 10) {
+            strengths.push('Consistent Performer');
+        }
+        if (totalMinutes >= 500) {
+            strengths.push('High Match Involvement');
+        }
+        if (strengths.length === 0) {
+            strengths.push('Building Performance Profile');
+        }
+        
+        const strengthsList = document.getElementById('keyStrengths');
+        strengthsList.innerHTML = strengths.map(s => `<li>${s}</li>`).join('');
+        
+    } catch (error) {
+        console.error('Error loading performance report:', error);
     }
 }
 
