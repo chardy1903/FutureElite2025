@@ -14,5 +14,13 @@
     "email": "chris@reserva-group.co.uk",
     "created_at": "15 Nov 2025",
     "is_active": true
+  },
+  {
+    "id": "20251228_201954",
+    "username": "Admin_Chris1903_FutureElite",
+    "password_hash": "pbkdf2:sha256:600000$I9IlIqu04PrSTOGz$1e638405be5242600da4938ea0651b089a215ff24feed9ad629d43d0d9f74936",
+    "email": null,
+    "created_at": "28 Dec 2025",
+    "is_active": true
   }
 ]
