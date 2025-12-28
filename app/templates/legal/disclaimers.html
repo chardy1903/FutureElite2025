@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Disclaimers - FutureElite{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0 max-w-4xl mx-auto">
+    <div class="bg-white shadow rounded-lg p-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">Disclaimers</h1>
+        <p class="text-sm text-gray-500 mb-8">Last updated: {{ current_year }}</p>
+
+        <div class="prose max-w-none space-y-6">
+            <section>
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+                    <p class="text-yellow-800 font-semibold text-lg">Important Disclaimers</p>
+                    <p class="text-yellow-700 mt-2">
+                        Please read these disclaimers carefully before using FutureElite. By using the Service, you acknowledge and agree to these disclaimers.
+                    </p>
+                </div>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">1. Peak Height Velocity (PHV) Disclaimer</h2>
+                <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+                    <p class="text-red-800 font-semibold">Medical & Health Disclaimer</p>
+                    <p class="text-red-700 mt-2">
+                        <strong>Peak Height Velocity (PHV) calculations are estimates only and are NOT medical advice.</strong>
+                    </p>
+                </div>
+                <p class="text-gray-700 leading-relaxed">
+                    The PHV calculations provided by FutureElite are:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Estimates only:</strong> Based on statistical models and historical data</li>
+                    <li><strong>Not medical advice:</strong> Not a substitute for professional medical consultation</li>
+                    <li><strong>Variable:</strong> Actual growth patterns vary significantly between individuals</li>
+                    <li><strong>Not guaranteed:</strong> Actual PHV timing and magnitude may differ from predictions</li>
+                </ul>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    Growth patterns are influenced by genetics, nutrition, health, and many other factors. PHV estimates should be used for informational purposes only and should not be used to make medical, training, or development decisions without consulting qualified professionals.
+                </p>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">2. Accuracy Disclaimer</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    The accuracy of all metrics, statistics, and calculations in FutureElite depends on:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>User Input Accuracy:</strong> The quality and accuracy of data you enter</li>
+                    <li><strong>Measurement Precision:</strong> The precision of physical measurements provided</li>
+                    <li><strong>Data Completeness:</strong> Whether all relevant data has been entered</li>
+                    <li><strong>Calculation Methods:</strong> The statistical models and formulas used</li>
+                </ul>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    FutureElite is not responsible for errors resulting from inaccurate user input, incomplete data, or limitations in calculation methods. Always verify critical information independently.
+                </p>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">3. Medical & Health Disclaimer</h2>
+                <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+                    <p class="text-red-800 font-semibold">Not Medical Advice</p>
+                    <p class="text-red-700 mt-2">
+                        <strong>FutureElite is not a medical or health service.</strong> The information provided is for informational and tracking purposes only.
+                    </p>
+                </div>
+                <p class="text-gray-700 leading-relaxed">
+                    FutureElite does not:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Provide medical advice, diagnosis, or treatment recommendations</li>
+                    <li>Replace consultation with qualified healthcare professionals</li>
+                    <li>Guarantee the accuracy of health-related calculations</li>
+                    <li>Account for individual medical conditions or health factors</li>
+                </ul>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    Always consult qualified healthcare professionals for medical advice, especially regarding growth, development, training, or injury concerns.
+                </p>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">4. Scouting & Recruitment Disclaimer</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    FutureElite provides tools for documenting and sharing player information, but:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>No Guarantee of Interest:</strong> We do not guarantee that scouts, coaches, or clubs will review or be interested in reports</li>
+                    <li><strong>No Guarantee of Trials:</strong> We do not guarantee trial opportunities, contracts, or recruitment</li>
+                    <li><strong>Evaluation Factors:</strong> Scout evaluation depends on many factors beyond what can be captured in reports</li>
+                    <li><strong>Snapshot Tool:</strong> Reports provide a snapshot at a point in time and may not reflect current performance</li>
+                </ul>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    Reports are tools for communication and documentation only. Outcomes depend on numerous factors including performance, fit, timing, and many other variables beyond the scope of this application.
+                </p>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">5. Example Data Disclaimer</h2>
+                <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4">
+                    <p class="text-blue-800 font-semibold">Fictional Data Notice</p>
+                    <p class="text-blue-700 mt-2">
+                        <strong>Any example data, sample reports, or demonstration content shown in FutureElite is fictional and for illustrative purposes only.</strong>
+                    </p>
+                </div>
+                <p class="text-gray-700 leading-relaxed">
+                    Example data includes:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Sample player names (e.g., "Player X")</li>
+                    <li>Fictional club names (e.g., "Youth Development Academy")</li>
+                    <li>Placeholder metrics and statistics</li>
+                    <li>Example report layouts</li>
+                </ul>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    Example data should not be used as a reference for actual player information or expectations.
+                </p>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">6. Performance Metrics Disclaimer</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    Performance metrics and comparisons provided by FutureElite:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Are based on general benchmarks and may not apply to all contexts</li>
+                    <li>Do not account for individual circumstances, training history, or environmental factors</li>
+                    <li>Should not be used as the sole basis for training or development decisions</li>
+                    <li>May not reflect current elite standards or regional variations</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">7. Third-Party Content Disclaimer</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    FutureElite may include links to external websites or content (e.g., highlight reel links):
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>We are not responsible for the content, accuracy, or availability of external sites</li>
+                    <li>Inclusion of links does not imply endorsement</li>
+                    <li>Users are responsible for evaluating third-party content</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">8. Service Availability Disclaimer</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    FutureElite is provided "as is" and we do not guarantee:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Uninterrupted or error-free service</li>
+                    <li>That the Service will meet all your requirements</li>
+                    <li>That data will never be lost (though we use local storage to minimize risk)</li>
+                    <li>Compatibility with all devices or browsers</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">9. Limitation of Liability</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    To the maximum extent permitted by law, FutureElite and its operators shall not be liable for:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Any decisions made based on information provided by the Service</li>
+                    <li>Loss of data (though we use local storage to minimize this risk)</li>
+                    <li>Inaccurate calculations or metrics</li>
+                    <li>Missed opportunities or outcomes</li>
+                    <li>Any indirect, incidental, or consequential damages</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">10. User Responsibility</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    You are responsible for:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Ensuring the accuracy of all data you enter</li>
+                    <li>Verifying calculations and metrics independently when needed</li>
+                    <li>Consulting qualified professionals for medical, training, or development advice</li>
+                    <li>Backing up important data</li>
+                    <li>Using the Service in accordance with these disclaimers</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">11. Contact for Questions</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    If you have questions about these disclaimers, please contact us at:
+                </p>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    <strong>Email:</strong> <a href="mailto:{{ support_email }}" class="text-qadsiah-red hover:underline">{{ support_email }}</a>
+                </p>
+            </section>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-gray-200">
+            <a href="/" class="text-qadsiah-red hover:underline">← Back to Home</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

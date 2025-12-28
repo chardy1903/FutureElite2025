@@ -36,6 +36,7 @@ from .utils import validate_match_data, parse_input_date, format_date_for_input
 from .pdf import generate_season_pdf, generate_scout_pdf
 from .phv_calculator import calculate_phv, validate_measurements_for_phv, calculate_predicted_adult_height, calculate_age_at_date
 from .elite_benchmarks import get_elite_benchmarks_for_age, compare_to_elite
+from .config import SUPPORT_EMAIL, SUBSCRIPTION_PRICING, CURRENT_YEAR
 
 # Create blueprint
 bp = Blueprint('main', __name__)
@@ -3439,3 +3440,65 @@ def api_admin_users():
     except Exception as e:
         current_app.logger.error(f"Error loading users for admin API: {e}", exc_info=True)
         return jsonify({'success': False, 'errors': ['Error loading users']}), 500
+
+
+# ============================================================================
+# Legal & Support Pages
+# ============================================================================
+
+@bp.route('/privacy')
+def privacy():
+    """Privacy Policy page"""
+    return render_template('legal/privacy.html', 
+                         support_email=SUPPORT_EMAIL,
+                         current_year=CURRENT_YEAR)
+
+@bp.route('/terms')
+def terms():
+    """Terms & Conditions page"""
+    return render_template('legal/terms.html',
+                         support_email=SUPPORT_EMAIL,
+                         current_year=CURRENT_YEAR)
+
+@bp.route('/safeguarding')
+def safeguarding():
+    """Child Safety & Safeguarding page"""
+    return render_template('legal/safeguarding.html',
+                         support_email=SUPPORT_EMAIL,
+                         current_year=CURRENT_YEAR)
+
+@bp.route('/disclaimers')
+def disclaimers():
+    """Disclaimers page (PHV, Accuracy, etc.)"""
+    return render_template('legal/disclaimers.html',
+                         support_email=SUPPORT_EMAIL,
+                         current_year=CURRENT_YEAR)
+
+@bp.route('/subscription-info')
+def subscription_info():
+    """Subscription & Billing Information page"""
+    return render_template('legal/subscription_info.html',
+                         pricing=SUBSCRIPTION_PRICING,
+                         support_email=SUPPORT_EMAIL,
+                         current_year=CURRENT_YEAR)
+
+@bp.route('/contact')
+def contact():
+    """Contact & Support page"""
+    return render_template('legal/contact.html',
+                         support_email=SUPPORT_EMAIL,
+                         current_year=CURRENT_YEAR)
+
+@bp.route('/faq')
+def faq():
+    """Frequently Asked Questions page"""
+    return render_template('legal/faq.html',
+                         support_email=SUPPORT_EMAIL,
+                         current_year=CURRENT_YEAR)
+
+@bp.route('/example-report')
+def example_report():
+    """Example Report Preview page"""
+    return render_template('legal/example_report.html',
+                         support_email=SUPPORT_EMAIL,
+                         current_year=CURRENT_YEAR)

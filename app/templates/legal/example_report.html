@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Example Report - FutureElite{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0 max-w-5xl mx-auto">
+    <div class="bg-white shadow rounded-lg p-8">
+        <div class="mb-6">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Example Report Preview</h1>
+            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                <p class="text-yellow-800 font-semibold">⚠️ Fictional Data Notice</p>
+                <p class="text-yellow-700 mt-2 text-sm">
+                    <strong>This is an example report with fictional data for demonstration purposes only.</strong> All names, clubs, statistics, and information shown are fictional and do not represent real players or data.
+                </p>
+            </div>
+        </div>
+
+        <!-- Example Report Preview -->
+        <div class="border-2 border-gray-300 rounded-lg p-8 bg-gray-50 relative" style="min-height: 800px;">
+            <!-- Watermark -->
+            <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10">
+                <div class="text-6xl font-bold text-gray-400 transform -rotate-45">
+                    EXAMPLE REPORT<br/>(FICTIONAL DATA)
+                </div>
+            </div>
+
+            <!-- Report Content -->
+            <div class="relative z-10">
+                <!-- Cover Page -->
+                <div class="text-center mb-12 pb-8 border-b-2 border-qadsiah-red">
+                    <h2 class="text-4xl font-bold text-qadsiah-red mb-4">Player X</h2>
+                    <h3 class="text-2xl text-gray-700 mb-8">Player Profile & Performance Report</h3>
+                    <div class="space-y-2 text-gray-600">
+                        <p><strong>Current Club:</strong> Youth Development Academy</p>
+                        <p><strong>Season:</strong> 2024/25</p>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-6">Report Generated: 15 January 2025</p>
+                </div>
+
+                <!-- Player Profile Section -->
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-900 mb-4 border-b border-gray-300 pb-2">Player Profile</h3>
+                    <div class="grid grid-cols-2 gap-6">
+                        <div>
+                            <div class="bg-gray-200 rounded-lg h-48 flex items-center justify-center mb-4">
+                                <span class="text-gray-500">[Player Photo Placeholder]</span>
+                            </div>
+                        </div>
+                        <div class="space-y-3">
+                            <p><strong>Name:</strong> Player X</p>
+                            <p><strong>Date of Birth:</strong> 15 March 2010</p>
+                            <p><strong>Age:</strong> 14 years</p>
+                            <p><strong>Position:</strong> Forward</p>
+                            <p><strong>Height:</strong> 165 cm</p>
+                            <p><strong>Weight:</strong> 58 kg</p>
+                            <p><strong>Nationality:</strong> [Country]</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Season Statistics -->
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-900 mb-4 border-b border-gray-300 pb-2">Season Statistics</h3>
+                    <div class="bg-white rounded-lg p-6 shadow-sm">
+                        <div class="grid grid-cols-4 gap-4 text-center">
+                            <div>
+                                <p class="text-3xl font-bold text-qadsiah-red">12</p>
+                                <p class="text-sm text-gray-600">Matches</p>
+                            </div>
+                            <div>
+                                <p class="text-3xl font-bold text-green-600">8</p>
+                                <p class="text-sm text-gray-600">Wins</p>
+                            </div>
+                            <div>
+                                <p class="text-3xl font-bold text-qadsiah-red">15</p>
+                                <p class="text-sm text-gray-600">Goals</p>
+                            </div>
+                            <div>
+                                <p class="text-3xl font-bold text-blue-600">7</p>
+                                <p class="text-sm text-gray-600">Assists</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Matches -->
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-900 mb-4 border-b border-gray-300 pb-2">Recent Matches</h3>
+                    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-qadsiah-red text-white">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium uppercase">Date</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium uppercase">Opponent</th>
+                                    <th class="px-4 py-3 text-center text-xs font-medium uppercase">Result</th>
+                                    <th class="px-4 py-3 text-center text-xs font-medium uppercase">Goals</th>
+                                    <th class="px-4 py-3 text-center text-xs font-medium uppercase">Assists</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-gray-900">10 Jan 2025</td>
+                                    <td class="px-4 py-3 text-sm text-gray-900">Academy United</td>
+                                    <td class="px-4 py-3 text-sm text-center text-green-600 font-semibold">Win 3-1</td>
+                                    <td class="px-4 py-3 text-sm text-center">2</td>
+                                    <td class="px-4 py-3 text-sm text-center">1</td>
+                                </tr>
+                                <tr class="bg-gray-50">
+                                    <td class="px-4 py-3 text-sm text-gray-900">05 Jan 2025</td>
+                                    <td class="px-4 py-3 text-sm text-gray-900">Elite FC</td>
+                                    <td class="px-4 py-3 text-sm text-center text-green-600 font-semibold">Win 2-0</td>
+                                    <td class="px-4 py-3 text-sm text-center">1</td>
+                                    <td class="px-4 py-3 text-sm text-center">0</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-3 text-sm text-gray-900">28 Dec 2024</td>
+                                    <td class="px-4 py-3 text-sm text-gray-900">Champions Academy</td>
+                                    <td class="px-4 py-3 text-sm text-center text-red-600 font-semibold">Loss 1-2</td>
+                                    <td class="px-4 py-3 text-sm text-center">1</td>
+                                    <td class="px-4 py-3 text-sm text-center">0</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Physical Metrics -->
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-900 mb-4 border-b border-gray-300 pb-2">Physical Development</h3>
+                    <div class="bg-white rounded-lg p-6 shadow-sm">
+                        <div class="grid grid-cols-3 gap-6">
+                            <div>
+                                <p class="text-sm text-gray-600 mb-1">Current Height</p>
+                                <p class="text-xl font-semibold">165 cm</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600 mb-1">Predicted Adult Height</p>
+                                <p class="text-xl font-semibold">178 cm</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600 mb-1">PHV Estimate</p>
+                                <p class="text-xl font-semibold">Age 13.5</p>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-4 italic">
+                            * PHV (Peak Height Velocity) is an estimate only and not medical advice. Actual growth patterns vary.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Achievements -->
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-900 mb-4 border-b border-gray-300 pb-2">Achievements</h3>
+                    <div class="bg-white rounded-lg p-6 shadow-sm">
+                        <ul class="list-disc list-inside space-y-2 text-gray-700">
+                            <li>Top Scorer - Youth Development Academy (2024/25 Season)</li>
+                            <li>Player of the Month - October 2024</li>
+                            <li>Regional Tournament Finalist - 2024</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Contact Information -->
+                <div class="mb-8">
+                    <h3 class="text-2xl font-semibold text-gray-900 mb-4 border-b border-gray-300 pb-2">Contact Information</h3>
+                    <div class="bg-white rounded-lg p-6 shadow-sm">
+                        <p class="text-gray-700"><strong>Email:</strong> parent@example.com</p>
+                        <p class="text-gray-700 mt-2"><strong>Club:</strong> Youth Development Academy</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Call to Action -->
+        <div class="mt-8 text-center">
+            <a href="/dashboard" class="inline-block bg-qadsiah-red text-white px-8 py-3 rounded-lg font-medium hover:bg-red-700 transition-colors">
+                Generate Your Report
+            </a>
+            <p class="text-sm text-gray-600 mt-4">
+                Create your own professional report with your player's real data
+            </p>
+        </div>
+
+        <!-- Important Notes -->
+        <div class="mt-8 bg-blue-50 border-l-4 border-blue-400 p-4">
+            <p class="text-blue-800 font-semibold mb-2">Important Notes:</p>
+            <ul class="list-disc list-inside text-blue-700 space-y-1 text-sm">
+                <li>This example shows the structure and layout of FutureElite reports</li>
+                <li>All data shown is fictional and for demonstration only</li>
+                <li>Your actual reports will include your real player data</li>
+                <li>Reports can be customized with your club colors and branding</li>
+                <li>PDF reports are generated on-demand and not stored on our servers</li>
+            </ul>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-gray-200">
+            <a href="/" class="text-qadsiah-red hover:underline">← Back to Home</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

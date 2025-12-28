@@ -258,6 +258,12 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(subscription_bp)
     
+    # Add context processor for global template variables
+    @app.context_processor
+    def inject_global_vars():
+        from .config import CURRENT_YEAR
+        return dict(current_year=CURRENT_YEAR)
+    
     # Security: Exempt auth endpoints and webhook from CSRF
     # Must be done AFTER blueprint registration so endpoints exist
     # Auth endpoints are entry points (no session yet), rate-limited, and require credentials

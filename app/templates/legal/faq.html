@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}Frequently Asked Questions - FutureElite{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0 max-w-4xl mx-auto">
+    <div class="bg-white shadow rounded-lg p-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">Frequently Asked Questions</h1>
+        <p class="text-sm text-gray-500 mb-8">Find answers to common questions about FutureElite.</p>
+
+        <!-- Search Box -->
+        <div class="mb-8">
+            <input type="text" id="faqSearch" placeholder="Search FAQs..." class="w-full border-gray-300 rounded-md shadow-sm focus:ring-qadsiah-red focus:border-qadsiah-red px-4 py-2">
+        </div>
+
+        <div id="faqContainer" class="prose max-w-none space-y-6">
+            <div class="faq-item">
+                <h2 class="text-xl font-semibold text-gray-900 mb-3">1. How do I export a PDF report?</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    To export a PDF report:
+                </p>
+                <ol class="list-decimal list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Go to your Dashboard</li>
+                    <li>Click "Season Tracker Report" for a comprehensive report, or "Scout Report" for a scouting-focused report</li>
+                    <li>The PDF will be generated and downloaded to your device</li>
+                    <li>You can then share the PDF with coaches, scouts, or anyone you choose</li>
+                </ol>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    <strong>Note:</strong> PDF generation requires an active subscription (paid plans) or may have limits on the free tier.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <h2 class="text-xl font-semibold text-gray-900 mb-3">2. How do I delete my data?</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    You can delete your data in several ways:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Clear All Data:</strong> Use the "Clear Data" function in Settings (if available) to remove all player data</li>
+                    <li><strong>Clear Browser Data:</strong> Clear your browser's local storage/cache to remove all locally stored data</li>
+                    <li><strong>Delete Account:</strong> Contact support to delete your account, which will remove all associated data</li>
+                </ul>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    <strong>Important:</strong> Data is stored locally on your device. Once cleared, it cannot be recovered unless you have exported a PDF backup.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <h2 class="text-xl font-semibold text-gray-900 mb-3">3. What is PHV (Peak Height Velocity)?</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    PHV (Peak Height Velocity) is the period during adolescence when a child grows fastest in height. It's an important indicator for:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Understanding growth patterns</li>
+                    <li>Timing training and development programs</li>
+                    <li>Predicting adult height</li>
+                </ul>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    <strong>Important:</strong> PHV calculations are estimates only and are not medical advice. Actual growth patterns vary significantly between individuals. See our <a href="/disclaimers" class="text-qadsiah-red hover:underline">Disclaimers</a> for more information.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <h2 class="text-xl font-semibold text-gray-900 mb-3">4. Who should use FutureElite?</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    FutureElite is designed for:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Parents and Guardians:</strong> To track their child's athletic development and create professional reports</li>
+                    <li><strong>Youth Athletes:</strong> (with parent/guardian supervision) to document their progress</li>
+                    <li><strong>Coaches:</strong> To help players create comprehensive performance reports</li>
+                </ul>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    Accounts should be created and managed by adults (18+). The app is not intended for direct use by children without adult supervision.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <h2 class="text-xl font-semibold text-gray-900 mb-3">5. How do subscriptions work?</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    FutureElite offers:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Free Tier:</strong> Limited features with usage limits</li>
+                    <li><strong>Monthly Subscription:</strong> Full access, billed monthly</li>
+                    <li><strong>Annual Subscription:</strong> Full access, billed annually with discount</li>
+                </ul>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    Subscriptions automatically renew unless canceled. See our <a href="/subscription-info" class="text-qadsiah-red hover:underline">Subscription & Billing page</a> for details.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <h2 class="text-xl font-semibold text-gray-900 mb-3">6. How do I cancel my subscription?</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    Cancellation depends on where you subscribed:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Web:</strong> Cancel through the Stripe Customer Portal (accessible from your Subscription page) or contact support</li>
+                    <li><strong>iOS:</strong> Cancel through Settings → [Your Name] → Subscriptions → FutureElite</li>
+                    <li><strong>Android:</strong> Cancel through Google Play Store → Subscriptions → FutureElite</li>
+                </ul>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    Cancellation takes effect at the end of your current billing period. You retain access until then.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <h2 class="text-xl font-semibold text-gray-900 mb-3">7. Are reports accepted by scouts and coaches?</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    FutureElite reports are professional documents designed to present player information clearly. However:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Acceptance depends on individual scouts, coaches, and clubs</li>
+                    <li>Reports are tools for communication, not guarantees of interest</li>
+                    <li>Scout evaluation depends on many factors beyond what can be captured in reports</li>
+                </ul>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    <strong>We do not guarantee that reports will result in trials, contracts, or scouting interest.</strong> See our <a href="/terms" class="text-qadsiah-red hover:underline">Terms & Conditions</a> for more information.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <h2 class="text-xl font-semibold text-gray-900 mb-3">8. How is my data stored and protected?</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    FutureElite uses a privacy-first approach:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Local Storage:</strong> All player data is stored locally on your device, not on our servers</li>
+                    <li><strong>No Permanent Server Storage:</strong> Player data is not permanently stored on our servers</li>
+                    <li><strong>PDF Generation:</strong> PDFs are generated temporarily and immediately sent to you</li>
+                    <li><strong>Account Security:</strong> Passwords are encrypted and never stored in plain text</li>
+                </ul>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    See our <a href="/privacy" class="text-qadsiah-red hover:underline">Privacy Policy</a> for complete details.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <h2 class="text-xl font-semibold text-gray-900 mb-3">9. How are photos handled?</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    Photos uploaded to FutureElite:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Are stored locally on your device</li>
+                    <li>Are only included in PDF reports you choose to generate</li>
+                    <li>Are not stored permanently on our servers</li>
+                    <li>Can be removed by deleting them from your device or clearing app data</li>
+                </ul>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    We recommend using appropriate photos (action shots, team photos) and avoiding photos that reveal personal information.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <h2 class="text-xl font-semibold text-gray-900 mb-3">10. Can I add highlight reel links?</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    Yes! You can add highlight reel links (YouTube, social media, etc.) in Settings:
+                </p>
+                <ol class="list-decimal list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Go to Settings</li>
+                    <li>Scroll to "Player Media & Links"</li>
+                    <li>Add your highlight reel URLs</li>
+                    <li>These links will be included in your Scout Reports</li>
+                </ol>
+            </div>
+
+            <div class="faq-item">
+                <h2 class="text-xl font-semibold text-gray-900 mb-3">11. What if PDF export isn't working?</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    If PDF export fails, try:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Check your internet connection</li>
+                    <li>Ensure you have an active subscription (if required)</li>
+                    <li>Try refreshing the page and trying again</li>
+                    <li>Clear your browser cache and try again</li>
+                    <li>Contact support if the issue persists</li>
+                </ul>
+            </div>
+
+            <div class="faq-item">
+                <h2 class="text-xl font-semibold text-gray-900 mb-3">12. Can I share reports with coaches?</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    Yes! Once you generate a PDF report, you can share it with anyone:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Download the PDF to your device</li>
+                    <li>Share via email, messaging apps, or file sharing services</li>
+                    <li>Print and share physical copies</li>
+                </ul>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    <strong>Remember:</strong> You control who receives reports. Only share with people you trust and have verified.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <h2 class="text-xl font-semibold text-gray-900 mb-3">13. How do I request a feature?</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    We welcome feature requests! To suggest a new feature:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Contact us at <a href="mailto:{{ support_email }}?subject=Feature%20Request" class="text-qadsiah-red hover:underline">{{ support_email }}</a></li>
+                    <li>Use the Contact form and select "Feedback & Suggestions"</li>
+                    <li>Include details about the feature you'd like to see</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-gray-200">
+            <p class="text-gray-700">
+                Still have questions? <a href="/contact" class="text-qadsiah-red hover:underline">Contact our support team</a>.
+            </p>
+            <a href="/" class="text-qadsiah-red hover:underline mt-4 inline-block">← Back to Home</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('faqSearch');
+    const faqItems = document.querySelectorAll('.faq-item');
+    
+    searchInput.addEventListener('input', function(e) {
+        const searchTerm = e.target.value.toLowerCase();
+        
+        faqItems.forEach(item => {
+            const text = item.textContent.toLowerCase();
+            if (text.includes(searchTerm)) {
+                item.style.display = 'block';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
+

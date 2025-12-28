@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Subscription & Billing - FutureElite{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0 max-w-4xl mx-auto">
+    <div class="bg-white shadow rounded-lg p-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">Subscription & Billing Information</h1>
+        <p class="text-sm text-gray-500 mb-8">Last updated: {{ current_year }}</p>
+
+        <div class="prose max-w-none space-y-6">
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">1. Subscription Plans</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    FutureElite offers the following subscription options:
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                    <!-- Monthly Plan -->
+                    <div class="border border-gray-200 rounded-lg p-6">
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2">Monthly Subscription</h3>
+                        <div class="mb-4">
+                            <span class="text-3xl font-bold text-qadsiah-red">{{ pricing.monthly.symbol }}{{ pricing.monthly.amount }}</span>
+                            <span class="text-gray-600">/{{ pricing.monthly.interval }}</span>
+                        </div>
+                        <ul class="list-disc list-inside text-gray-700 space-y-2 text-sm">
+                            <li>Unlimited match tracking</li>
+                            <li>Unlimited achievements</li>
+                            <li>Unlimited physical measurements</li>
+                            <li>Unlimited physical metrics</li>
+                            <li>Unlimited references</li>
+                            <li>PDF report generation</li>
+                            <li>Advanced analytics</li>
+                        </ul>
+                    </div>
+
+                    <!-- Annual Plan -->
+                    <div class="border-2 border-qadsiah-red rounded-lg p-6 relative">
+                        <div class="absolute top-0 right-0 bg-qadsiah-red text-white px-3 py-1 text-xs font-bold rounded-bl-lg">
+                            BEST VALUE
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2">Annual Subscription</h3>
+                        <div class="mb-2">
+                            <span class="text-3xl font-bold text-qadsiah-red">{{ pricing.annual.symbol }}{{ pricing.annual.amount }}</span>
+                            <span class="text-gray-600">/{{ pricing.annual.interval }}</span>
+                        </div>
+                        <div class="mb-4">
+                            <span class="text-sm text-gray-500 line-through">{{ pricing.annual.symbol }}{{ pricing.annual.original_amount }}</span>
+                            <span class="text-sm text-green-600 font-semibold ml-2">Save {{ pricing.annual.discount_percent }}%</span>
+                        </div>
+                        <ul class="list-disc list-inside text-gray-700 space-y-2 text-sm">
+                            <li>Everything in Monthly</li>
+                            <li>Priority support</li>
+                            <li>Early access to new features</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mt-6">
+                    <p class="text-blue-800 font-semibold">Free Tier Available</p>
+                    <p class="text-blue-700 mt-2">
+                        A free tier is available with limited features. See the <a href="/subscription" class="text-blue-600 hover:underline">Subscription page</a> for details.
+                    </p>
+                </div>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">2. What's Included in Paid Subscriptions</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    Paid subscriptions (Monthly and Annual) include:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Unlimited Entries:</strong> No limits on matches, achievements, measurements, metrics, or references</li>
+                    <li><strong>PDF Report Generation:</strong> Generate unlimited Season Tracker and Scout Reports</li>
+                    <li><strong>Advanced Analytics:</strong> Access to performance metrics and comparisons</li>
+                    <li><strong>Physical Performance Tracking:</strong> Track height, weight, PHV, and performance metrics</li>
+                    <li><strong>Data Export:</strong> Export your data as PDF reports</li>
+                    <li><strong>Priority Support:</strong> Faster response times for support requests (Annual plan)</li>
+                    <li><strong>Early Access:</strong> Access to new features before free users (Annual plan)</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">3. Billing & Payment</h2>
+                <h3 class="text-xl font-semibold text-gray-800 mt-4 mb-3">3.1 Payment Processing</h3>
+                <p class="text-gray-700 leading-relaxed">
+                    Billing is handled by trusted third-party payment processors:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Web Subscriptions:</strong> Processed by Stripe (secure payment processing)</li>
+                    <li><strong>Mobile App Subscriptions:</strong> Processed by Apple App Store (iOS) or Google Play Store (Android)</li>
+                </ul>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    We do not store your credit card information. All payment data is handled securely by the payment processor.
+                </p>
+
+                <h3 class="text-xl font-semibold text-gray-800 mt-4 mb-3">3.2 Billing Cycle</h3>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>Monthly:</strong> Billed monthly on the same date you subscribed</li>
+                    <li><strong>Annual:</strong> Billed once per year on the anniversary of your subscription</li>
+                    <li>Subscriptions automatically renew unless canceled</li>
+                    <li>You will be charged at the beginning of each billing period</li>
+                </ul>
+
+                <h3 class="text-xl font-semibold text-gray-800 mt-4 mb-3">3.3 Price Changes</h3>
+                <p class="text-gray-700 leading-relaxed">
+                    We reserve the right to change subscription prices. If we increase prices:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Existing subscribers will be notified at least 30 days in advance</li>
+                    <li>Price changes will apply to your next billing cycle</li>
+                    <li>You may cancel before the price change takes effect</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">4. Cancellation</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    You may cancel your subscription at any time:
+                </p>
+                <h3 class="text-xl font-semibold text-gray-800 mt-4 mb-3">4.1 Web Subscriptions (Stripe)</h3>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Cancel through the Stripe Customer Portal (accessible from your Subscription page)</li>
+                    <li>Or contact support at <a href="mailto:{{ support_email }}" class="text-qadsiah-red hover:underline">{{ support_email }}</a></li>
+                </ul>
+
+                <h3 class="text-xl font-semibold text-gray-800 mt-4 mb-3">4.2 Mobile App Subscriptions</h3>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li><strong>iOS (Apple):</strong> Cancel through Settings → [Your Name] → Subscriptions → FutureElite</li>
+                    <li><strong>Android (Google):</strong> Cancel through Google Play Store → Subscriptions → FutureElite</li>
+                </ul>
+
+                <h3 class="text-xl font-semibold text-gray-800 mt-4 mb-3">4.3 Cancellation Effect</h3>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Cancellation takes effect at the end of your current billing period</li>
+                    <li>You retain access to paid features until the period ends</li>
+                    <li>After cancellation, your account reverts to the free tier</li>
+                    <li>No refunds for partial billing periods</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">5. Refunds</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    Refund policies depend on the payment processor:
+                </p>
+                <h3 class="text-xl font-semibold text-gray-800 mt-4 mb-3">5.1 Stripe (Web)</h3>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Refund requests are handled on a case-by-case basis</li>
+                    <li>Contact support at <a href="mailto:{{ support_email }}" class="text-qadsiah-red hover:underline">{{ support_email }}</a> with "Refund Request" in the subject</li>
+                    <li>Refunds may be provided for technical issues or service failures</li>
+                </ul>
+
+                <h3 class="text-xl font-semibold text-gray-800 mt-4 mb-3">5.2 Apple App Store</h3>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Refunds are handled through Apple's refund policy</li>
+                    <li>Request refunds through <a href="https://reportaproblem.apple.com" target="_blank" class="text-qadsiah-red hover:underline">reportaproblem.apple.com</a></li>
+                    <li>Apple's standard refund terms apply</li>
+                </ul>
+
+                <h3 class="text-xl font-semibold text-gray-800 mt-4 mb-3">5.3 Google Play Store</h3>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Refunds are handled through Google Play's refund policy</li>
+                    <li>Request refunds through <a href="https://play.google.com/store/account" target="_blank" class="text-qadsiah-red hover:underline">Google Play Store account settings</a></li>
+                    <li>Google's standard refund terms apply</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">6. Subscription Management</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    You can manage your subscription:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>View subscription status on the <a href="/subscription" class="text-qadsiah-red hover:underline">Subscription page</a></li>
+                    <li>Update payment methods through the payment processor's portal</li>
+                    <li>Change subscription plans (upgrade or downgrade)</li>
+                    <li>View billing history</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">7. Failed Payments</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    If a payment fails:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>You will be notified by email</li>
+                    <li>The payment processor will retry the payment</li>
+                    <li>If payment continues to fail, your subscription may be canceled</li>
+                    <li>You can update your payment method to restore access</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">8. Contact for Billing Questions</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    For questions about subscriptions, billing, or refunds:
+                </p>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    <strong>Email:</strong> <a href="mailto:{{ support_email }}?subject=Billing%20Question" class="text-qadsiah-red hover:underline">{{ support_email }}</a>
+                </p>
+                <p class="text-gray-700 leading-relaxed mt-2">
+                    Please include "Billing" in the subject line for faster response.
+                </p>
+            </section>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-gray-200">
+            <a href="/" class="text-qadsiah-red hover:underline">← Back to Home</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

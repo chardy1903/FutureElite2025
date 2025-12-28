@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Child Safety & Safeguarding - FutureElite{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0 max-w-4xl mx-auto">
+    <div class="bg-white shadow rounded-lg p-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">Child Safety & Safeguarding</h1>
+        <p class="text-sm text-gray-500 mb-8">Last updated: {{ current_year }}</p>
+
+        <div class="prose max-w-none space-y-6">
+            <section>
+                <div class="bg-green-50 border-l-4 border-green-400 p-4 mb-6">
+                    <p class="text-green-800 font-semibold text-lg">Our Commitment to Child Safety</p>
+                    <p class="text-green-700 mt-2">
+                        FutureElite is designed with child safety as a top priority. We have implemented multiple safeguards to protect children and ensure a safe environment for all users.
+                    </p>
+                </div>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">1. No Direct Child-to-Scout Contact</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    <strong>FutureElite does not enable direct communication between children and scouts, coaches, or any third parties.</strong> The application has no messaging features, chat functionality, or direct contact mechanisms.
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4 mt-3">
+                    <li>No in-app messaging or chat</li>
+                    <li>No direct contact information sharing between users</li>
+                    <li>No social networking features</li>
+                    <li>No public forums or discussion boards</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">2. No Public Profiles</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    FutureElite does not create public profiles that can be viewed by others. All data is private and controlled by the account holder (parent or guardian):
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Player information is not searchable by others</li>
+                    <li>No public directory or player database</li>
+                    <li>No profile pages visible to other users</li>
+                    <li>Data is only accessible to the account owner</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">3. Parent/Guardian Controlled Sharing</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    All report sharing is controlled exclusively by the parent or guardian account holder:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Only the account owner can generate and export PDF reports</li>
+                    <li>Reports are shared only when the account owner explicitly chooses to share them</li>
+                    <li>No automatic sharing or distribution</li>
+                    <li>Account owner decides who receives reports and when</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">4. Personal Contact Information</h2>
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                    <p class="text-yellow-800 font-semibold">Important Safety Advice</p>
+                    <p class="text-yellow-700 mt-2">
+                        <strong>Never share personal contact details publicly.</strong> When sharing PDF reports:
+                    </p>
+                    <ul class="list-disc list-inside text-yellow-700 mt-2 ml-4">
+                        <li>Only include contact information you are comfortable sharing</li>
+                        <li>Consider using a dedicated email address for scouting inquiries</li>
+                        <li>Do not include home addresses or personal phone numbers unless necessary</li>
+                        <li>Verify the identity of recipients before sharing sensitive information</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">5. Photo Safety</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    Photos uploaded to FutureElite are stored locally on your device and only included in PDF reports you choose to generate. We recommend:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Only using appropriate photos (e.g., action shots, team photos)</li>
+                    <li>Avoiding photos that reveal personal information (home address, school name, etc.)</li>
+                    <li>Ensuring photos are appropriate for professional sharing</li>
+                    <li>Reviewing photos before including them in reports</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">6. Reporting Concerns</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    If you have concerns about child safety, inappropriate behavior, or potential abuse related to FutureElite or its users, please report it immediately:
+                </p>
+                <div class="bg-red-50 border-l-4 border-red-400 p-4 mt-4">
+                    <p class="text-red-800 font-semibold">Report Safeguarding Concerns</p>
+                    <p class="text-red-700 mt-2">
+                        <strong>Email:</strong> <a href="mailto:{{ support_email }}?subject=Safeguarding%20Concern" class="text-red-600 hover:underline font-semibold">{{ support_email }}</a>
+                    </p>
+                    <p class="text-red-700 mt-2">
+                        Please include "Safeguarding Concern" in the subject line for urgent attention.
+                    </p>
+                </div>
+                <p class="text-gray-700 leading-relaxed mt-4">
+                    For immediate safety concerns, contact your local law enforcement or child protection services.
+                </p>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">7. Age-Appropriate Use</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    FutureElite is designed for use by parents and guardians, not directly by children:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Accounts should be created and managed by adults (18+)</li>
+                    <li>Children should not have direct access to account credentials</li>
+                    <li>All data entry and sharing decisions should be made by the parent/guardian</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">8. Data Privacy & Security</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    We protect children's data through:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Local storage only (data stays on your device)</li>
+                    <li>No permanent server storage of player data</li>
+                    <li>No data sharing without explicit parent/guardian consent</li>
+                    <li>Secure account authentication</li>
+                </ul>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    See our <a href="/privacy" class="text-qadsiah-red hover:underline">Privacy Policy</a> for more details.
+                </p>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">9. Best Practices for Parents/Guardians</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    To ensure the safest experience:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>Keep your account credentials secure and private</li>
+                    <li>Review all data before sharing in reports</li>
+                    <li>Verify the identity of recipients before sharing reports</li>
+                    <li>Monitor who has access to shared reports</li>
+                    <li>Educate your child about online safety</li>
+                    <li>Report any suspicious or inappropriate behavior</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">10. Compliance</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    FutureElite is designed to comply with child protection laws and best practices, including:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 space-y-2 ml-4">
+                    <li>COPPA (Children's Online Privacy Protection Act) compliance</li>
+                    <li>GDPR requirements for children's data</li>
+                    <li>Industry best practices for child safety</li>
+                </ul>
+            </section>
+
+            <section>
+                <h2 class="text-2xl font-semibold text-gray-900 mt-6 mb-4">11. Contact for Safeguarding Issues</h2>
+                <p class="text-gray-700 leading-relaxed">
+                    For safeguarding concerns, questions, or to report inappropriate behavior:
+                </p>
+                <p class="text-gray-700 leading-relaxed mt-3">
+                    <strong>Email:</strong> <a href="mailto:{{ support_email }}?subject=Safeguarding%20Inquiry" class="text-qadsiah-red hover:underline">{{ support_email }}</a>
+                </p>
+                <p class="text-gray-700 leading-relaxed mt-2">
+                    Please include "Safeguarding" in the subject line for priority handling.
+                </p>
+            </section>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-gray-200">
+            <a href="/" class="text-qadsiah-red hover:underline">← Back to Home</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
