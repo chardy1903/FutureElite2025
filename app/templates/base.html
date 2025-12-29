@@ -346,6 +346,8 @@
             await ensureStorageReady();
             const isAuth = clientAuth.isAuthenticated();
             const username = clientAuth.getCurrentUsername();
+            const adminUsername = '{{ admin_username|default("") }}';
+            const isAdmin = adminUsername && username === adminUsername;
             
             if (isAuth && username) {
                 // Show authenticated UI
@@ -358,9 +360,18 @@
                 
                 // Show admin link if user is admin
                 const adminLink = document.getElementById('adminLink');
-                const adminUsername = '{{ admin_username|default("") }}';
-                if (adminLink && adminUsername && username === adminUsername) {
+                if (adminLink && isAdmin) {
                     adminLink.style.display = 'block';
+                }
+                
+                // Redirect admin users from player pages to admin page
+                if (isAdmin) {
+                    const currentPath = window.location.pathname;
+                    const playerPages = ['/dashboard', '/settings', '/matches', '/achievements', '/player-profile', '/physical-data', '/physical-metrics', '/references'];
+                    if (playerPages.includes(currentPath) || currentPath.startsWith('/matches/') || currentPath.startsWith('/achievements/')) {
+                        window.location.href = '/admin/users';
+                        return;
+                    }
                 }
                 
                 // Handle logout

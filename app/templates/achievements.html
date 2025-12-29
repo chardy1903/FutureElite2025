@@ -461,6 +461,14 @@ async function loadAchievementsData() {
             return;
         }
         
+        // Check if user is admin - redirect to admin page
+        const username = clientAuth.getCurrentUsername();
+        const adminUsername = '{{ admin_username|default("") }}';
+        if (adminUsername && username === adminUsername) {
+            window.location.href = '/admin/users';
+            return;
+        }
+        
         // Load settings
         const settings = await clientStorage.loadSettings();
         document.getElementById('achievementsHeader').textContent = 

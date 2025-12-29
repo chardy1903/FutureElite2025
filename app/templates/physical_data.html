@@ -157,6 +157,14 @@ async function loadAnalysis() {
             return;
         }
         
+        // Check if user is admin - redirect to admin page
+        const username = clientAuth.getCurrentUsername();
+        const adminUsername = '{{ admin_username|default("") }}';
+        if (adminUsername && username === adminUsername) {
+            window.location.href = '/admin/users';
+            return;
+        }
+        
         document.getElementById('loadingState').classList.remove('hidden');
         document.getElementById('mainContent').classList.add('hidden');
         document.getElementById('infoState').classList.add('hidden');
