@@ -1233,19 +1233,45 @@ def import_excel():
         if not (filename.endswith('.xlsx') or filename.endswith('.xls')):
             return jsonify({'success': False, 'errors': ['File must be an Excel file (.xlsx or .xls)']}), 400
         
-        # Check if this is a full backup (has multiple sheets) or match-only import
-        temp_check = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
-        file.save(temp_check.name)
-        workbook_check = openpyxl.load_workbook(temp_check.name, data_only=True)
-        is_full_backup = len(workbook_check.sheetnames) > 1 or 'Settings' in workbook_check.sheetnames or 'Physical Measurements' in workbook_check.sheetnames
-        os.unlink(temp_check.name)
+        # Save file temporarily first
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+        file.save(temp_file.name)
         
-        # If it's a full backup, redirect to the main import route
+        # Check if this is a full backup (has multiple sheets) or match-only import
+        workbook_check = openpyxl.load_workbook(temp_file.name, data_only=True)
+        is_full_backup = len(workbook_check.sheetnames) > 1 or 'Settings' in workbook_check.sheetnames or 'Physical Measurements' in workbook_check.sheetnames
+        
+        # If it's a full backup, use the main import route which handles full backups
         if is_full_backup:
-            # Reset file pointer
-            file.seek(0)
-            # Use the main import route which handles full backups
-            return import_data()
+            # Close the workbook check
+            workbook_check.close()
+            # The temp_file will be handled by import_data()
+            # We need to recreate the file object for import_data
+            from werkzeug.datastructures import FileStorage
+            import shutil
+            temp_file_path = temp_file.name
+            temp_file.close()
+            
+            # Create a new file object for import_data
+            with open(temp_file_path, 'rb') as f:
+                file_storage = FileStorage(
+                    stream=f,
+                    filename=filename,
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                )
+                # Temporarily replace request.files['file'] with our file
+                original_file = request.files.get('file')
+                request.files['file'] = file_storage
+                try:
+                    result = import_data()
+                    return result
+                finally:
+                    # Restore original file
+                    if original_file:
+                        request.files['file'] = original_file
+                    # Clean up temp file
+                    if os.path.exists(temp_file_path):
+                        os.unlink(temp_file_path)
         
         # Get import mode
         import_mode = request.form.get('import_mode', 'replace')  # 'replace' or 'append'
