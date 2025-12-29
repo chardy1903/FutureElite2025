@@ -1214,7 +1214,7 @@ def download_excel_template():
 @bp.route('/import-excel', methods=['POST'])
 @login_required
 def import_excel():
-    """Import matches from Excel file - returns matches to client for saving"""
+    """Import matches from Excel file or full backup - returns matches to client for saving"""
     if not EXCEL_SUPPORT:
         return jsonify({'success': False, 'errors': ['Excel support not available. Please install openpyxl: pip install openpyxl']}), 400
     
@@ -1232,6 +1232,20 @@ def import_excel():
         # Check file extension
         if not (filename.endswith('.xlsx') or filename.endswith('.xls')):
             return jsonify({'success': False, 'errors': ['File must be an Excel file (.xlsx or .xls)']}), 400
+        
+        # Check if this is a full backup (has multiple sheets) or match-only import
+        temp_check = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+        file.save(temp_check.name)
+        workbook_check = openpyxl.load_workbook(temp_check.name, data_only=True)
+        is_full_backup = len(workbook_check.sheetnames) > 1 or 'Settings' in workbook_check.sheetnames or 'Physical Measurements' in workbook_check.sheetnames
+        os.unlink(temp_check.name)
+        
+        # If it's a full backup, redirect to the main import route
+        if is_full_backup:
+            # Reset file pointer
+            file.seek(0)
+            # Use the main import route which handles full backups
+            return import_data()
         
         # Get import mode
         import_mode = request.form.get('import_mode', 'replace')  # 'replace' or 'append'
