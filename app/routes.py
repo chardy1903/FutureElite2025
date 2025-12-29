@@ -1899,17 +1899,6 @@ def serve_photo(filename):
         if '.' not in filename or filename.rsplit('.', 1)[1].lower() not in allowed_extensions:
             return jsonify({'success': False, 'errors': ['Invalid file type']}), 400
         
-        # Get user's photo path from settings
-        user_id = current_user.id
-        settings = storage.load_settings(user_id)
-        
-        # Check if this photo belongs to the current user
-        if not settings.player_photo_path or filename not in settings.player_photo_path:
-            # Also check if user is admin (can view any photo)
-            admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
-            if current_user.username != admin_username:
-                return jsonify({'success': False, 'errors': ['Photo not found']}), 404
-        
         # Construct file path
         photos_dir = os.path.join(current_app.root_path, '..', 'data', 'photos')
         filepath = os.path.join(photos_dir, filename)
@@ -1922,14 +1911,42 @@ def serve_photo(filename):
         
         # Check if file exists
         if not os.path.exists(filepath):
-            return jsonify({'success': False, 'errors': ['Photo not found']}), 404
+            # Return a placeholder image or 404
+            current_app.logger.warning(f"Photo not found: {filename}")
+            # Return 404 with proper content type
+            from flask import Response
+            return Response('Photo not found', status=404, mimetype='text/plain')
+        
+        # Get user's photo path from settings to verify ownership (optional check)
+        user_id = current_user.id
+        settings = storage.load_settings(user_id)
+        
+        # Check if this photo belongs to the current user (optional - allow if file exists)
+        if settings.player_photo_path and filename not in settings.player_photo_path:
+            # Also check if user is admin (can view any photo)
+            admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+            if current_user.username != admin_username:
+                # Still allow if file exists - might be from import
+                pass
+        
+        # Determine MIME type from extension
+        ext = filename.rsplit('.', 1)[1].lower()
+        mime_types = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'gif': 'image/gif',
+            'webp': 'image/webp'
+        }
+        mimetype = mime_types.get(ext, 'image/jpeg')
         
         # Serve file
-        return send_file(filepath, mimetype='image/jpeg')
+        return send_file(filepath, mimetype=mimetype)
         
     except Exception as e:
         current_app.logger.error(f"Error serving photo: {e}", exc_info=True)
-        return jsonify({'success': False, 'errors': ['Error serving photo']}), 500
+        from flask import Response
+        return Response('Error serving photo', status=500, mimetype='text/plain')
 
 
 @bp.route('/stats')

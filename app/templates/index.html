@@ -798,11 +798,24 @@ async function generatePDF() {
         
         data.period = period;
         
-        const response = await fetch('/pdf', { 
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        
+        // Add CSRF token if available
+        try {
+            const csrfToken = await csrfManager.getToken();
+            if (csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+        } catch (error) {
+            console.warn('Failed to get CSRF token:', error);
+        }
+        
+        const response = await fetch('/pdf', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: headers,
+            credentials: 'include',
             body: JSON.stringify(data)
         });
         
