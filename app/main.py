@@ -150,7 +150,7 @@ def create_app():
                         self._original = original_set
                         self._auth_endpoints = {
                             'auth.login', 'auth.register', 'auth.forgot_password',
-                            'main.import_excel', 'main.import_data', 'main.generate_scout_pdf_route',
+                            'main.import_excel', 'main.import_data', 'main.scout_pdf',
                             'subscription.get_subscription_status'
                         }
                     
