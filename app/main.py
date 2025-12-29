@@ -148,7 +148,7 @@ def create_app():
                 class ExemptViewsSet:
                     def __init__(self, original_set):
                         self._original = original_set
-                        self._auth_endpoints = {'auth.login', 'auth.register', 'auth.forgot_password'}
+                        self._auth_endpoints = {'auth.login', 'auth.register', 'auth.forgot_password', 'main.import_excel', 'main.import_data'}
                     
                     def __contains__(self, item):
                         # Always return True for auth endpoints
@@ -276,6 +276,8 @@ def create_app():
             csrf.exempt('auth.register')
             csrf.exempt('auth.forgot_password')
             csrf.exempt('subscription.stripe_webhook')
+            csrf.exempt('main.import_excel')
+            csrf.exempt('main.import_data')
             
             # Also try function reference as backup (may not work if wrapped by rate limiter)
             try:

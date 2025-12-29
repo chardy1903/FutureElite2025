@@ -913,8 +913,20 @@ async function importExcelData() {
         const importMode = document.querySelector('input[name="importMode"]:checked').value;
         formData.append('import_mode', importMode);
         
+        // Get CSRF token if available
+        let headers = {};
+        try {
+            const csrfToken = await csrfManager.getToken();
+            if (csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+        } catch (error) {
+            console.warn('Failed to get CSRF token:', error);
+        }
+        
         const response = await fetch('/import-excel', {
             method: 'POST',
+            headers: headers,
             body: formData,
             credentials: 'include'
         });
