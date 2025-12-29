@@ -858,7 +858,7 @@ def export_data():
 @bp.route('/import', methods=['POST'])
 @login_required
 def import_data():
-    """Import data from ZIP file"""
+    """Import data from Excel or ZIP file"""
     temp_file = None
     try:
         user_id = current_user.id
@@ -871,19 +871,121 @@ def import_data():
         
         # Validate filename to prevent path traversal
         filename = os.path.basename(file.filename)
-        if not filename.endswith('.zip'):
-            return jsonify({'success': False, 'errors': ['File must be a ZIP file']}), 400
+        is_excel = filename.endswith('.xlsx') or filename.endswith('.xls')
+        is_zip = filename.endswith('.zip')
+        
+        if not (is_excel or is_zip):
+            return jsonify({'success': False, 'errors': ['File must be an Excel file (.xlsx) or ZIP file (.zip)']}), 400
         
         # Create temporary file
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
         file.save(temp_file.name)
         
-        # Security: Check file size (max 10MB compressed)
+        # Security: Check file size (max 10MB)
         file_size = os.path.getsize(temp_file.name)
         if file_size > 10 * 1024 * 1024:
             os.unlink(temp_file.name)
             return jsonify({'success': False, 'errors': ['File too large. Maximum size is 10MB']}), 400
         
+        # Import from Excel file
+        if is_excel:
+            if not EXCEL_SUPPORT:
+                os.unlink(temp_file.name)
+                return jsonify({'success': False, 'errors': ['Excel support not available. Please install openpyxl: pip install openpyxl']}), 400
+            
+            workbook = openpyxl.load_workbook(temp_file.name, data_only=True)
+            
+            # Initialize data structures
+            matches_data = []
+            settings_data = {}
+            physical_measurements_data = []
+            physical_metrics_data = []
+            achievements_data = []
+            club_history_data = []
+            training_camps_data = []
+            references_data = []
+            
+            # Helper function to read sheet data
+            def read_sheet(sheet_name, headers=None):
+                if sheet_name not in workbook.sheetnames:
+                    return []
+                ws = workbook[sheet_name]
+                data = []
+                if headers:
+                    # Find header row
+                    header_row = None
+                    for row_idx, row in enumerate(ws.iter_rows(values_only=True), 1):
+                        if row and row[0] and str(row[0]).strip() in headers:
+                            header_row = row_idx
+                            break
+                    
+                    if header_row:
+                        # Get headers from that row
+                        header_map = {}
+                        for col_idx, header in enumerate(ws[header_row], 1):
+                            if header:
+                                header_map[col_idx] = str(header).strip()
+                        
+                        # Read data rows
+                        for row in ws.iter_rows(min_row=header_row + 1, values_only=True):
+                            if not any(row):  # Skip empty rows
+                                continue
+                            item = {}
+                            for col_idx, value in enumerate(row, 1):
+                                if col_idx in header_map and value is not None:
+                                    item[header_map[col_idx]] = value
+                            if item:
+                                data.append(item)
+                else:
+                    # Read as key-value pairs (for Settings sheet)
+                    for row in ws.iter_rows(min_row=2, values_only=True):
+                        if row[0] and row[1] is not None:
+                            key = str(row[0]).strip()
+                            value = row[1]
+                            # Convert string representations of lists back to lists
+                            if isinstance(value, str) and value.startswith('[') and value.endswith(']'):
+                                try:
+                                    import ast
+                                    value = ast.literal_eval(value)
+                                except:
+                                    pass
+                            settings_data[key] = value
+                return data
+            
+            # Read each sheet
+            matches_data = read_sheet('Matches', ['id', 'date', 'opponent', 'venue', 'result', 'goals', 'assists', 'minutes_played', 'category', 'season', 'notes', 'clean_sheets'])
+            read_sheet('Settings')  # Settings is key-value format
+            physical_measurements_data = read_sheet('Physical Measurements', ['id', 'date', 'height_cm', 'weight_kg', 'notes', 'include_in_report'])
+            physical_metrics_data = read_sheet('Physical Metrics', ['id', 'date', 'sprint_speed_ms', 'sprint_speed_kmh', 'sprint_10m_sec', 'sprint_20m_sec', 'sprint_30m_sec', 'vertical_jump_cm', 'standing_long_jump_cm', 'countermovement_jump_cm', 'agility_time_sec', 'beep_test_level', 'vo2_max', 'include_in_report'])
+            achievements_data = read_sheet('Achievements', ['id', 'date', 'title', 'category', 'season', 'goals', 'assists', 'minutes_played', 'clean_sheets', 'notes'])
+            club_history_data = read_sheet('Club History', ['id', 'club_name', 'season', 'age_group', 'position', 'achievements'])
+            training_camps_data = read_sheet('Training Camps', ['id', 'camp_name', 'organizer', 'location', 'start_date', 'end_date', 'age_group', 'focus_area'])
+            references_data = read_sheet('References', ['id', 'name', 'position', 'organization', 'email', 'phone', 'relationship', 'notes'])
+            
+            # Prepare import data
+            import_data = {
+                'matches': matches_data,
+                'settings': settings_data,
+                'physical_measurements': physical_measurements_data,
+                'club_history': club_history_data,
+                'training_camps': training_camps_data,
+                'physical_metrics': physical_metrics_data,
+                'achievements': achievements_data,
+                'references': references_data
+            }
+            
+            success = storage.import_data(import_data, user_id)
+            
+            # Clean up
+            if temp_file and os.path.exists(temp_file.name):
+                os.unlink(temp_file.name)
+            
+            if success:
+                return jsonify({'success': True, 'message': 'Data imported successfully from Excel file'})
+            else:
+                return jsonify({'success': False, 'errors': ['Failed to import data']}), 400
+        
+        # Import from ZIP file (existing functionality)
         # Security: ZIP bomb protection - check uncompressed size and file count
         MAX_UNCOMPRESSED_SIZE = 50 * 1024 * 1024  # 50MB
         MAX_FILES_IN_ZIP = 100
@@ -997,10 +1099,13 @@ def import_data():
         else:
             return jsonify({'success': False, 'errors': ['Failed to import data']}), 400
         
-    except (zipfile.BadZipFile, json.JSONDecodeError) as e:
+    except (zipfile.BadZipFile, json.JSONDecodeError, Exception) as e:
         if temp_file and os.path.exists(temp_file.name):
             os.unlink(temp_file.name)
-        return jsonify({'success': False, 'errors': [f'Invalid file format: {str(e)}']}), 400
+        error_msg = str(e)
+        if 'openpyxl' in error_msg.lower() or 'excel' in error_msg.lower():
+            return jsonify({'success': False, 'errors': [f'Invalid Excel file format: {error_msg}']}), 400
+        return jsonify({'success': False, 'errors': [f'Invalid file format: {error_msg}']}), 400
     except Exception as e:
         if temp_file and os.path.exists(temp_file.name):
             os.unlink(temp_file.name)
