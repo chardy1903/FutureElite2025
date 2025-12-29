@@ -82,9 +82,10 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
         if (result.success) {
             hideLoading();
             showToast('Login successful!', 'success');
-            // Redirect to dashboard (the actual app) instead of homepage
+            // Redirect to the URL provided by server (admin page for admin users, dashboard for regular users)
+            const redirectUrl = result.redirect || '/dashboard';
             setTimeout(() => {
-                window.location.href = '/dashboard';
+                window.location.href = redirectUrl;
             }, 500);
         }
     } catch (error) {

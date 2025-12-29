@@ -129,6 +129,15 @@ def test():
 @bp.route('/')
 def homepage():
     """Homepage - Public landing page - data loaded client-side"""
+    # If logged in as admin, redirect to admin page
+    try:
+        if current_user.is_authenticated:
+            admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+            if admin_username and current_user.username == admin_username:
+                return redirect(url_for('main.admin_users'))
+    except:
+        pass  # If not authenticated or error, continue to homepage
+    
     # Return empty/default data - actual data will be loaded client-side
     default_settings = {
         'club_name': '',
@@ -148,7 +157,7 @@ def homepage():
 @login_required
 def dashboard():
     """Main dashboard page - data loaded client-side"""
-    # Redirect admin users to admin page
+    # Redirect admin users to admin page immediately
     admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
     if admin_username and current_user.username == admin_username:
         return redirect(url_for('main.admin_users'))

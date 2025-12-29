@@ -172,13 +172,22 @@ def login():
             user_session = UserSession(user)
             login_user(user_session, remember=True)
             
-            # Get redirect URL - handle errors gracefully
-            try:
-                redirect_url = url_for('main.dashboard')
-            except Exception as e:
-                current_app.logger.error(f"Error generating dashboard URL: {e}", exc_info=True)
-                # Fallback to hardcoded path if url_for fails
-                redirect_url = '/dashboard'
+            # Check if user is admin - redirect to admin page
+            admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+            if admin_username and user.username == admin_username:
+                # Admin user - redirect to admin page
+                try:
+                    redirect_url = url_for('main.admin_users')
+                except Exception as e:
+                    current_app.logger.error(f"Error generating admin URL: {e}", exc_info=True)
+                    redirect_url = '/admin/users'
+            else:
+                # Regular user - redirect to dashboard
+                try:
+                    redirect_url = url_for('main.dashboard')
+                except Exception as e:
+                    current_app.logger.error(f"Error generating dashboard URL: {e}", exc_info=True)
+                    redirect_url = '/dashboard'
             
             if request.is_json:
                 # Return user ID so frontend can store it for authentication checks
@@ -325,13 +334,22 @@ def register():
                 flash('Account created. Please log in.', 'success')
                 return redirect(url_for('auth.login'))
             
-            # Get redirect URL - handle errors gracefully
-            try:
-                redirect_url = url_for('main.dashboard')
-            except Exception as e:
-                current_app.logger.error(f"Error generating dashboard URL: {e}", exc_info=True)
-                # Fallback to hardcoded path if url_for fails
-                redirect_url = '/dashboard'
+            # Check if user is admin - redirect to admin page
+            admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+            if admin_username and user.username == admin_username:
+                # Admin user - redirect to admin page
+                try:
+                    redirect_url = url_for('main.admin_users')
+                except Exception as e:
+                    current_app.logger.error(f"Error generating admin URL: {e}", exc_info=True)
+                    redirect_url = '/admin/users'
+            else:
+                # Regular user - redirect to dashboard
+                try:
+                    redirect_url = url_for('main.dashboard')
+                except Exception as e:
+                    current_app.logger.error(f"Error generating dashboard URL: {e}", exc_info=True)
+                    redirect_url = '/dashboard'
             
             if request.is_json:
                 # Return user ID so frontend can store it for authentication checks

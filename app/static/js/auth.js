@@ -52,7 +52,11 @@ const clientAuth = {
                 clientStorage.setCurrentUserId(result.user_id);
             }
 
-            return { success: true };
+            // Return redirect URL if provided by server
+            return { 
+                success: true,
+                redirect: result.redirect || '/dashboard'
+            };
         } catch (error) {
             console.error('Login error:', error);
             throw error;

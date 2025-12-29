@@ -358,7 +358,7 @@
                 document.getElementById('loginLink').style.display = 'none';
                 document.getElementById('registerLink').style.display = 'none';
                 
-                // Show admin link if user is admin
+                // Show admin link if user is admin - always show for admin users
                 const adminLink = document.getElementById('adminLink');
                 if (adminLink && isAdmin) {
                     adminLink.style.display = 'block';
@@ -367,8 +367,9 @@
                 // Redirect admin users from player pages to admin page
                 if (isAdmin) {
                     const currentPath = window.location.pathname;
-                    const playerPages = ['/dashboard', '/settings', '/matches', '/achievements', '/player-profile', '/physical-data', '/physical-metrics', '/references'];
-                    if (playerPages.includes(currentPath) || currentPath.startsWith('/matches/') || currentPath.startsWith('/achievements/')) {
+                    const playerPages = ['/', '/dashboard', '/settings', '/matches', '/achievements', '/player-profile', '/physical-data', '/physical-metrics', '/references', '/homepage'];
+                    // Only redirect if not already on admin page
+                    if (currentPath !== '/admin/users' && (playerPages.includes(currentPath) || currentPath.startsWith('/matches/') || currentPath.startsWith('/achievements/'))) {
                         window.location.href = '/admin/users';
                         return;
                     }
