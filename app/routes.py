@@ -1884,6 +1884,54 @@ def upload_photo():
         return jsonify({'success': False, 'errors': [str(e)]}), 500
 
 
+@bp.route('/data/photos/<filename>')
+@login_required
+def serve_photo(filename):
+    """Serve player photos securely"""
+    try:
+        # Security: Validate filename to prevent path traversal
+        filename = secure_filename(filename)
+        if not filename:
+            return jsonify({'success': False, 'errors': ['Invalid filename']}), 400
+        
+        # Security: Only allow image file extensions
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+        if '.' not in filename or filename.rsplit('.', 1)[1].lower() not in allowed_extensions:
+            return jsonify({'success': False, 'errors': ['Invalid file type']}), 400
+        
+        # Get user's photo path from settings
+        user_id = current_user.id
+        settings = storage.load_settings(user_id)
+        
+        # Check if this photo belongs to the current user
+        if not settings.player_photo_path or filename not in settings.player_photo_path:
+            # Also check if user is admin (can view any photo)
+            admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+            if current_user.username != admin_username:
+                return jsonify({'success': False, 'errors': ['Photo not found']}), 404
+        
+        # Construct file path
+        photos_dir = os.path.join(current_app.root_path, '..', 'data', 'photos')
+        filepath = os.path.join(photos_dir, filename)
+        
+        # Security: Ensure filepath is within photos directory (prevent path traversal)
+        photos_dir_abs = os.path.abspath(photos_dir)
+        filepath_abs = os.path.abspath(filepath)
+        if not filepath_abs.startswith(photos_dir_abs):
+            return jsonify({'success': False, 'errors': ['Invalid file path']}), 400
+        
+        # Check if file exists
+        if not os.path.exists(filepath):
+            return jsonify({'success': False, 'errors': ['Photo not found']}), 404
+        
+        # Serve file
+        return send_file(filepath, mimetype='image/jpeg')
+        
+    except Exception as e:
+        current_app.logger.error(f"Error serving photo: {e}", exc_info=True)
+        return jsonify({'success': False, 'errors': ['Error serving photo']}), 500
+
+
 @bp.route('/stats')
 @login_required
 def get_stats():

@@ -148,7 +148,11 @@ def create_app():
                 class ExemptViewsSet:
                     def __init__(self, original_set):
                         self._original = original_set
-                        self._auth_endpoints = {'auth.login', 'auth.register', 'auth.forgot_password', 'main.import_excel', 'main.import_data'}
+                        self._auth_endpoints = {
+                            'auth.login', 'auth.register', 'auth.forgot_password',
+                            'main.import_excel', 'main.import_data', 'main.scout_pdf',
+                            'subscription.get_subscription_status'
+                        }
                     
                     def __contains__(self, item):
                         # Always return True for auth endpoints
@@ -282,11 +286,16 @@ def create_app():
             # Also try function reference as backup (may not work if wrapped by rate limiter)
             try:
                 from .auth_routes import login, register, forgot_password
-                from .subscription_routes import stripe_webhook
+                from .subscription_routes import stripe_webhook, get_subscription_status
+                from .routes import import_excel, import_data, scout_pdf
                 csrf.exempt(login)
                 csrf.exempt(register)
                 csrf.exempt(forgot_password)
                 csrf.exempt(stripe_webhook)
+                csrf.exempt(get_subscription_status)
+                csrf.exempt(import_excel)
+                csrf.exempt(import_data)
+                csrf.exempt(scout_pdf)
             except Exception:
                 # Function reference exemption failed (likely due to decorator wrapping)
                 # Endpoint name exemptions above should be sufficient

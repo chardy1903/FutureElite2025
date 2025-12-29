@@ -504,11 +504,24 @@ async function checkSubscriptionAccess() {
         
         // Try to get subscription from server first
         try {
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            // Add CSRF token if available
+            try {
+                const csrfToken = await csrfManager.getToken();
+                if (csrfToken) {
+                    headers['X-CSRFToken'] = csrfToken;
+                }
+            } catch (error) {
+                console.warn('Failed to get CSRF token:', error);
+            }
+            
             const response = await fetch('/api/subscription/status', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: headers,
+                credentials: 'include',
                 body: JSON.stringify({ user_id: userId })
             });
             const data = await response.json();
@@ -707,11 +720,24 @@ async function generateScoutPDF() {
         
         data.period = period;
         
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        
+        // Add CSRF token if available
+        try {
+            const csrfToken = await csrfManager.getToken();
+            if (csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+        } catch (error) {
+            console.warn('Failed to get CSRF token:', error);
+        }
+        
         const response = await fetch('/scout-pdf', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: headers,
+            credentials: 'include',
             body: JSON.stringify(data)
         });
         
