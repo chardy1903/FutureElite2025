@@ -150,7 +150,7 @@ def create_app():
                         self._original = original_set
                         self._auth_endpoints = {
                             'auth.login', 'auth.register', 'auth.forgot_password',
-                            'main.import_excel', 'main.import_data', 'main.scout_pdf',
+                            'main.import_excel', 'main.import_data', 'main.generate_scout_pdf_route',
                             'subscription.get_subscription_status'
                         }
                     
@@ -287,7 +287,7 @@ def create_app():
             try:
                 from .auth_routes import login, register, forgot_password
                 from .subscription_routes import stripe_webhook, get_subscription_status
-                from .routes import import_excel, import_data, scout_pdf
+                from .routes import import_excel, import_data, generate_scout_pdf_route
                 csrf.exempt(login)
                 csrf.exempt(register)
                 csrf.exempt(forgot_password)
@@ -295,7 +295,7 @@ def create_app():
                 csrf.exempt(get_subscription_status)
                 csrf.exempt(import_excel)
                 csrf.exempt(import_data)
-                csrf.exempt(scout_pdf)
+                csrf.exempt(generate_scout_pdf_route)
             except Exception:
                 # Function reference exemption failed (likely due to decorator wrapping)
                 # Endpoint name exemptions above should be sufficient
