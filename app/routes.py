@@ -3684,9 +3684,14 @@ def admin_users():
     # Simple admin check - you can enhance this with role-based access
     # For now, any logged-in user can view (you may want to restrict this)
     admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    current_username = current_user.username.strip() if current_user.username else ''
+    
+    # Debug logging
+    current_app.logger.info(f"Admin page access attempt - Admin username: '{admin_username}', Current user: '{current_username}'")
     
     # If ADMIN_USERNAME is set, only that user can access
-    if admin_username and current_user.username != admin_username:
+    if admin_username and current_username != admin_username:
+        current_app.logger.warning(f"Access denied - Admin username: '{admin_username}', Current user: '{current_username}'")
         flash('Access denied. Admin access required.', 'error')
         return redirect(url_for('main.dashboard'))
     
