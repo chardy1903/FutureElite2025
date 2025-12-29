@@ -271,8 +271,7 @@ function renderPHVSection(phv, measurements = [], currentAge = null) {
         </div>
     `;
     
-    // Render growth chart if we have measurements
-    if (measurements && measurements.length >= 2 && chartContainer) {
+    if (measurements && measurements.length >= 2 && chartContainer && typeof Chart !== 'undefined') {
         renderGrowthChart(measurements, phv, currentAge);
         chartContainer.classList.remove('hidden');
     } else if (chartContainer) {
@@ -283,10 +282,13 @@ function renderPHVSection(phv, measurements = [], currentAge = null) {
 // Render growth chart
 let growthChartInstance = null;
 function renderGrowthChart(measurements, phv, currentAge) {
+    if (typeof Chart === 'undefined') {
+        return;
+    }
+    
     const canvas = document.getElementById('growthChart');
     if (!canvas) return;
     
-    // Destroy existing chart if it exists
     if (growthChartInstance) {
         growthChartInstance.destroy();
     }
@@ -394,24 +396,7 @@ function renderGrowthChart(measurements, phv, currentAge) {
                             return label;
                         }
                     }
-                },
-                annotation: phv && phv.phv_date ? {
-                    annotations: {
-                        phvLine: {
-                            type: 'line',
-                            xMin: phv.phv_date,
-                            xMax: phv.phv_date,
-                            borderColor: 'rgb(34, 197, 94)',
-                            borderWidth: 2,
-                            borderDash: [5, 5],
-                            label: {
-                                content: 'PHV',
-                                enabled: true,
-                                position: 'end'
-                            }
-                        }
-                    }
-                } : {}
+                }
             },
             scales: {
                 y: {
