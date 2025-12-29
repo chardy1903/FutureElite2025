@@ -266,7 +266,8 @@ def create_app():
     @app.context_processor
     def inject_global_vars():
         from .config import CURRENT_YEAR
-        return dict(current_year=CURRENT_YEAR)
+        admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+        return dict(current_year=CURRENT_YEAR, admin_username=admin_username)
     
     # Security: Exempt auth endpoints and webhook from CSRF
     # Must be done AFTER blueprint registration so endpoints exist

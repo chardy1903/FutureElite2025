@@ -53,6 +53,32 @@ FREE_TIER_LIMITS = {
     'references': 1
 }
 
+def is_admin_user():
+    """Check if current user is admin"""
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    if not admin_username:
+        return False
+    try:
+        from flask_login import current_user
+        return current_user.is_authenticated and current_user.username == admin_username
+    except:
+        return False
+
+def get_authenticated_user_id():
+    """
+    Get the authenticated user's ID from Flask-Login.
+    SECURITY: Never trust client-provided user_id. Always use current_user.id
+    """
+    if not current_user.is_authenticated:
+        raise ValueError("User is not authenticated")
+    return current_user.id
+
+def redirect_if_admin():
+    """Redirect admin users to admin page if they try to access player data"""
+    if is_admin_user():
+        return redirect(url_for('main.admin_users'))
+    return None
+
 def check_subscription_and_limit(user_id, resource_type, current_count=None):
     """
     Check if user has active subscription and if they've reached free tier limits.
@@ -119,8 +145,14 @@ def homepage():
 
 
 @bp.route('/dashboard')
+@login_required
 def dashboard():
     """Main dashboard page - data loaded client-side"""
+    # Redirect admin users to admin page
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    if admin_username and current_user.username == admin_username:
+        return redirect(url_for('main.admin_users'))
+    
     # Return empty/default data - actual data will be loaded client-side
     default_settings = {
         'club_name': '',
@@ -135,8 +167,14 @@ def dashboard():
 
 
 @bp.route('/matches')
+@login_required
 def matches():
     """Matches list page - data loaded client-side"""
+    # Redirect admin users to admin page
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    if admin_username and current_user.username == admin_username:
+        return redirect(url_for('main.admin_users'))
+    
     # Return empty/default data - actual data will be loaded client-side
     default_settings = {
         'club_name': '',
@@ -1665,8 +1703,14 @@ def import_excel():
 
 
 @bp.route('/settings')
+@login_required
 def settings_page():
     """Settings page - data loaded client-side"""
+    # Redirect admin users to admin page
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    if admin_username and current_user.username == admin_username:
+        return redirect(url_for('main.admin_users'))
+    
     # Return empty/default data - actual data will be loaded client-side
     default_settings = {
         'club_name': '',
@@ -1690,6 +1734,11 @@ def settings_page():
 @login_required
 def get_settings():
     """Get current settings (API endpoint)"""
+    # Redirect admin users - return empty settings
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    if admin_username and current_user.username == admin_username:
+        return jsonify({'success': True, 'settings': {}})
+    
     user_id = current_user.id
     settings = storage.load_settings(user_id)
     return jsonify({'success': True, 'settings': settings.model_dump()})
@@ -2244,8 +2293,14 @@ def calculate_phv_endpoint():
 
 
 @bp.route('/player-profile')
+@login_required
 def player_profile():
     """Player Profile page - data loaded client-side"""
+    # Redirect admin users to admin page
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    if admin_username and current_user.username == admin_username:
+        return redirect(url_for('main.admin_users'))
+    
     # Return empty/default data - actual data will be loaded client-side
     default_settings = {
         'club_name': '',
@@ -2256,8 +2311,14 @@ def player_profile():
 
 
 @bp.route('/physical-data')
+@login_required
 def physical_data():
     """Physical Data page - data loaded client-side"""
+    # Redirect admin users to admin page
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    if admin_username and current_user.username == admin_username:
+        return redirect(url_for('main.admin_users'))
+    
     # Return empty/default data - actual data will be loaded client-side
     default_settings = {
         'club_name': '',
@@ -2487,8 +2548,14 @@ def physical_data_analysis():
 
 
 @bp.route('/achievements')
+@login_required
 def achievements():
     """Achievements page - data loaded client-side"""
+    # Redirect admin users to admin page
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    if admin_username and current_user.username == admin_username:
+        return redirect(url_for('main.admin_users'))
+    
     # Return empty/default data - actual data will be loaded client-side
     default_settings = {
         'club_name': '',
@@ -3337,8 +3404,14 @@ def delete_training_camp(camp_id):
 
 
 @bp.route('/physical-metrics')
+@login_required
 def physical_metrics_page():
     """Physical metrics management page - data loaded client-side"""
+    # Redirect admin users to admin page
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    if admin_username and current_user.username == admin_username:
+        return redirect(url_for('main.admin_users'))
+    
     # Return empty/default data - actual data will be loaded client-side
     default_settings = {
         'club_name': '',
@@ -3575,8 +3648,14 @@ def delete_physical_metric(metric_id):
 
 
 @bp.route('/references')
+@login_required
 def references_page():
     """References management page - data loaded client-side"""
+    # Redirect admin users to admin page
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    if admin_username and current_user.username == admin_username:
+        return redirect(url_for('main.admin_users'))
+    
     default_settings = {
         'club_name': '',
         'player_name': '',
