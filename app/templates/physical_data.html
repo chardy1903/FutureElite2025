@@ -438,6 +438,9 @@ function renderGrowthChart(measurements, phv, currentAge) {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
+                            if (context.dataset.label === 'PHV Date') {
+                                return `PHV: ${phv.phv_date} (${phv.phv_age ? phv.phv_age.toFixed(1) : 'N/A'} years)`;
+                            }
                             const index = context.dataIndex;
                             const measurement = heightMeasurements[index];
                             let label = `Height: ${context.parsed.y.toFixed(1)} cm`;
