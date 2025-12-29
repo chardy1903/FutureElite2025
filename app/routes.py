@@ -159,7 +159,9 @@ def dashboard():
     """Main dashboard page - data loaded client-side"""
     # Redirect admin users to admin page immediately
     admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
-    if admin_username and current_user.username == admin_username:
+    current_username = current_user.username.strip() if current_user.username else ''
+    if admin_username and current_username == admin_username:
+        current_app.logger.info(f"Redirecting admin user '{current_username}' from dashboard to admin page")
         return redirect(url_for('main.admin_users'))
     
     # Return empty/default data - actual data will be loaded client-side
