@@ -133,7 +133,9 @@ def homepage():
     try:
         if current_user.is_authenticated:
             admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
-            if admin_username and current_user.username == admin_username:
+            current_username = current_user.username.strip() if current_user.username else ''
+            if admin_username and current_username == admin_username:
+                current_app.logger.info(f"Redirecting admin user '{current_username}' from homepage to admin page")
                 return redirect(url_for('main.admin_users'))
     except:
         pass  # If not authenticated or error, continue to homepage
