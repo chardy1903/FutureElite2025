@@ -152,14 +152,14 @@ def create_checkout_session():
                 ]
             }), 500
         
-        # Validate that it's a secret key (starts with sk_)
-        if not stripe.api_key.startswith('sk_'):
-            current_app.logger.error(f"Invalid Stripe API key format. Secret keys must start with 'sk_'. Got: {stripe.api_key[:10]}...")
+        # Validate that it's a secret key (starts with sk_ or rk_ for restricted keys)
+        if not stripe.api_key.startswith(('sk_', 'rk_')):
+            current_app.logger.error(f"Invalid Stripe API key format. Secret keys must start with 'sk_' or 'rk_'. Got: {stripe.api_key[:10]}...")
             return jsonify({
                 'success': False,
                 'errors': [
                     'Invalid Stripe API key format.',
-                    'STRIPE_SECRET_KEY must be a secret key (starts with sk_).',
+                    'STRIPE_SECRET_KEY must be a secret key (starts with sk_ or rk_).',
                     'You may have accidentally used a publishable key (pk_) instead.',
                     'Please check your .env file and set the correct STRIPE_SECRET_KEY.'
                 ]
