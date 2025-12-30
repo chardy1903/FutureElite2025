@@ -3812,6 +3812,85 @@ def api_admin_users():
         return jsonify({'success': False, 'errors': ['Error loading users']}), 500
 
 
+@bp.route('/api/admin/check-overdue-subscriptions', methods=['POST'])
+@login_required
+def check_overdue_subscriptions():
+    """Check and cancel overdue subscriptions (admin only)"""
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    current_username = current_user.username.strip() if current_user.username else ''
+    
+    if admin_username and current_username != admin_username:
+        return jsonify({'success': False, 'errors': ['Access denied']}), 403
+    
+    try:
+        cancelled_count = 0
+        subscriptions = storage.load_subscriptions()
+        now = datetime.now()
+        
+        for sub_data in subscriptions:
+            try:
+                subscription = Subscription(**sub_data)
+                
+                # Only check active or past_due subscriptions
+                if subscription.status not in [SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE]:
+                    continue
+                
+                # Check if current_period_end has passed
+                if subscription.current_period_end:
+                    try:
+                        # Parse ISO format date
+                        period_end_str = subscription.current_period_end
+                        # Handle different date formats
+                        if 'T' in period_end_str:
+                            period_end = datetime.fromisoformat(period_end_str.replace('Z', '+00:00'))
+                        else:
+                            # Try parsing as simple date
+                            period_end = datetime.fromisoformat(period_end_str)
+                        
+                        # Remove timezone for comparison
+                        if period_end.tzinfo:
+                            period_end = period_end.replace(tzinfo=None)
+                        
+                        # If period has ended, cancel subscription
+                        if period_end < now:
+                            # Cancel in Stripe if exists
+                            if STRIPE_AVAILABLE and subscription.stripe_subscription_id:
+                                try:
+                                    if not stripe.api_key:
+                                        stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', '').strip()
+                                    if stripe.api_key:
+                                        stripe.Subscription.modify(
+                                            subscription.stripe_subscription_id,
+                                            cancel_at_period_end=True
+                                        )
+                                except Exception as e:
+                                    current_app.logger.error(f"Error cancelling Stripe subscription {subscription.stripe_subscription_id}: {e}")
+                            
+                            # Update local subscription
+                            subscription.status = SubscriptionStatus.CANCELED
+                            subscription.cancel_at_period_end = True
+                            subscription.updated_at = datetime.now().strftime("%d %b %Y")
+                            storage.save_subscription(subscription)
+                            cancelled_count += 1
+                            
+                            current_app.logger.info(f"Auto-cancelled overdue subscription for user {subscription.user_id}")
+                    except (ValueError, TypeError) as e:
+                        current_app.logger.warning(f"Error parsing period_end for subscription {subscription.user_id}: {e}")
+                        continue
+            except (ValueError, TypeError, KeyError) as e:
+                current_app.logger.warning(f"Error processing subscription: {e}")
+                continue
+        
+        return jsonify({
+            'success': True,
+            'cancelled_count': cancelled_count,
+            'message': f'Checked subscriptions. {cancelled_count} overdue subscription(s) cancelled.'
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error checking overdue subscriptions: {e}", exc_info=True)
+        return jsonify({'success': False, 'errors': [str(e)]}), 500
+
+
 # ============================================================================
 # Legal & Support Pages
 # ============================================================================
