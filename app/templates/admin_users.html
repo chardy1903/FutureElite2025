@@ -167,6 +167,9 @@
             <button onclick="exportUsers()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-qadsiah-red hover:bg-red-700">
                 Export Users (JSON)
             </button>
+            <button onclick="syncAllSubscriptions()" class="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                Sync Subscriptions from Stripe
+            </button>
             <button onclick="checkOverdueSubscriptions()" class="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700">
                 Check Overdue Subscriptions
             </button>
@@ -242,6 +245,41 @@ async function cancelSubscription(userId, username) {
         hideLoading();
         console.error('Cancel subscription error:', error);
         showToast('Error cancelling subscription: ' + error.message, 'error');
+    }
+}
+
+async function syncAllSubscriptions() {
+    if (!confirm('Sync all subscriptions from Stripe? This will update renewal and expiration dates for all active subscriptions.')) {
+        return;
+    }
+    
+    try {
+        showLoading('Syncing subscriptions from Stripe...');
+        const response = await fetch('/api/admin/sync-all-subscriptions', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            hideLoading();
+            showToast(data.message || `Synced ${data.synced_count || 0} subscription(s) from Stripe.`, 'success');
+            // Reload page to show updated dates
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            hideLoading();
+            showToast('Error syncing subscriptions: ' + (data.errors?.join(', ') || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        hideLoading();
+        console.error('Sync subscriptions error:', error);
+        showToast('Error syncing subscriptions: ' + error.message, 'error');
     }
 }
 

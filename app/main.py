@@ -329,12 +329,13 @@ def create_app():
             csrf.exempt('main.import_data')
             csrf.exempt('main.cancel_user_subscription')
             csrf.exempt('main.check_overdue_subscriptions')
+            csrf.exempt('main.sync_all_subscriptions')
             
             # Also try function reference as backup (may not work if wrapped by rate limiter)
             try:
                 from .auth_routes import login, register, forgot_password
                 from .subscription_routes import stripe_webhook, get_subscription_status, create_checkout_session
-                from .routes import import_excel, import_data, generate_scout_pdf_route, generate_pdf, cancel_user_subscription, check_overdue_subscriptions
+                from .routes import import_excel, import_data, generate_scout_pdf_route, generate_pdf, cancel_user_subscription, check_overdue_subscriptions, sync_all_subscriptions
                 csrf.exempt(login)
                 csrf.exempt(register)
                 csrf.exempt(forgot_password)
@@ -345,6 +346,7 @@ def create_app():
                 csrf.exempt(import_data)
                 csrf.exempt(generate_scout_pdf_route)
                 csrf.exempt(generate_pdf)
+                csrf.exempt(sync_all_subscriptions)
             except Exception:
                 # Function reference exemption failed (likely due to decorator wrapping)
                 # Endpoint name exemptions above should be sufficient

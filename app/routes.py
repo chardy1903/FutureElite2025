@@ -3907,6 +3907,92 @@ def check_overdue_subscriptions():
         return jsonify({'success': False, 'errors': [str(e)]}), 500
 
 
+@bp.route('/api/admin/sync-all-subscriptions', methods=['POST'])
+@login_required
+def sync_all_subscriptions():
+    """Sync all subscriptions from Stripe to update period dates (admin only)"""
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    current_username = current_user.username.strip() if current_user.username else ''
+    
+    if admin_username and current_username != admin_username:
+        return jsonify({'success': False, 'errors': ['Access denied']}), 403
+    
+    try:
+        # Check if Stripe is available
+        try:
+            import stripe
+            STRIPE_AVAILABLE = True
+        except ImportError:
+            STRIPE_AVAILABLE = False
+        
+        if not STRIPE_AVAILABLE:
+            return jsonify({'success': False, 'errors': ['Stripe is not installed']}), 500
+        
+        stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', '').strip()
+        if not stripe.api_key or not stripe.api_key.startswith(('sk_', 'rk_')):
+            return jsonify({'success': False, 'errors': ['Stripe API key not configured']}), 500
+        
+        # Import the update function from subscription routes
+        from app.subscription_routes import update_subscription_from_stripe
+        
+        subscriptions = storage.load_subscriptions()
+        synced_count = 0
+        errors = []
+        
+        for sub_data in subscriptions:
+            try:
+                # Ensure status is properly converted to enum
+                if 'status' in sub_data and isinstance(sub_data['status'], str):
+                    try:
+                        from app.models import SubscriptionStatus
+                        sub_data['status'] = SubscriptionStatus(sub_data['status'].lower())
+                    except (ValueError, AttributeError):
+                        pass
+                
+                subscription = Subscription(**sub_data)
+                
+                # Only sync subscriptions that have a Stripe subscription ID
+                if subscription.stripe_subscription_id:
+                    try:
+                        # Retrieve subscription from Stripe
+                        stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
+                        
+                        # Update local subscription with Stripe data
+                        update_subscription_from_stripe(
+                            stripe_sub,
+                            subscription.user_id,
+                            subscription.stripe_customer_id or ''
+                        )
+                        synced_count += 1
+                        current_app.logger.info(f"Synced subscription for user {subscription.user_id}")
+                    except stripe.error.StripeError as e:
+                        error_msg = f"Stripe error for user {subscription.user_id}: {str(e)}"
+                        errors.append(error_msg)
+                        current_app.logger.warning(error_msg)
+                    except Exception as e:
+                        error_msg = f"Error syncing subscription for user {subscription.user_id}: {str(e)}"
+                        errors.append(error_msg)
+                        current_app.logger.error(error_msg, exc_info=True)
+            except Exception as e:
+                error_msg = f"Error processing subscription: {str(e)}"
+                errors.append(error_msg)
+                current_app.logger.error(error_msg, exc_info=True)
+        
+        message = f'Synced {synced_count} subscription(s) from Stripe.'
+        if errors:
+            message += f' {len(errors)} error(s) occurred.'
+        
+        return jsonify({
+            'success': True,
+            'message': message,
+            'synced_count': synced_count,
+            'errors': errors[:5]  # Limit errors to first 5
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error syncing all subscriptions: {e}", exc_info=True)
+        return jsonify({'success': False, 'errors': [str(e)]}), 500
+
+
 # ============================================================================
 # Legal & Support Pages
 # ============================================================================
