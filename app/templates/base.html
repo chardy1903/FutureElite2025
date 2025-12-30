@@ -32,16 +32,16 @@
                         <h1 class="text-xl font-bold text-qadsiah-red">FutureElite</h1>
                     </div>
                     <div id="navLinks" class="ml-6 flex space-x-1 overflow-x-auto" style="display: none;">
-                        <a href="/" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Home</a>
-                        <a href="/dashboard" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Dashboard</a>
-                        <a href="/matches" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Matches</a>
-                        <a href="/achievements" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Achievements</a>
-                        <a href="/player-profile" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Profile</a>
-                        <a href="/physical-data" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Physical</a>
-                        <a href="/physical-metrics" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Performance</a>
-                        <a href="/settings" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Settings</a>
-                        <a href="/references" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">References</a>
-                        <a href="/subscription" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Subscription</a>
+                        <a href="/" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Home</a>
+                        <a href="/dashboard" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Dashboard</a>
+                        <a href="/matches" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Matches</a>
+                        <a href="/achievements" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Achievements</a>
+                        <a href="/player-profile" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Profile</a>
+                        <a href="/physical-data" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Physical</a>
+                        <a href="/physical-metrics" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Performance</a>
+                        <a href="/settings" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Settings</a>
+                        <a href="/references" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">References</a>
+                        <a href="/subscription" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Subscription</a>
                         {% if admin_username %}
                         <a id="adminLink" href="/admin/users" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap" style="display: none;">Admin</a>
                         {% endif %}
@@ -360,13 +360,28 @@
                 document.getElementById('loginLink').style.display = 'none';
                 document.getElementById('registerLink').style.display = 'none';
                 
-                // Show admin link if user is admin - always show for admin users
+                // Hide/show navigation links based on admin status
+                const playerNavLinks = document.querySelectorAll('.player-nav-link');
                 const adminLink = document.getElementById('adminLink');
-                if (adminLink && isAdmin) {
-                    adminLink.style.display = 'block';
-                    console.log('Admin link shown');
-                } else if (adminLink) {
-                    console.log('Admin link not shown - isAdmin:', isAdmin, 'adminLink exists:', !!adminLink);
+                
+                if (isAdmin) {
+                    // Admin users: hide all player-facing links, show only Admin link
+                    playerNavLinks.forEach(link => {
+                        link.style.display = 'none';
+                    });
+                    if (adminLink) {
+                        adminLink.style.display = 'block';
+                    }
+                    console.log('Admin user: hiding player navigation links');
+                } else {
+                    // Regular users: show all player-facing links, hide Admin link
+                    playerNavLinks.forEach(link => {
+                        link.style.display = 'block';
+                    });
+                    if (adminLink) {
+                        adminLink.style.display = 'none';
+                    }
+                    console.log('Regular user: showing player navigation links');
                 }
                 
                 // Redirect admin users from player pages to admin page
