@@ -327,6 +327,7 @@ def create_app():
             csrf.exempt('subscription.create_checkout_session')
             csrf.exempt('main.import_excel')
             csrf.exempt('main.import_data')
+            csrf.exempt('main.physical_data_analysis')
             csrf.exempt('main.cancel_user_subscription')
             csrf.exempt('main.check_overdue_subscriptions')
             csrf.exempt('main.sync_all_subscriptions')
@@ -342,8 +343,11 @@ def create_app():
                 csrf.exempt(stripe_webhook)
                 csrf.exempt(get_subscription_status)
                 csrf.exempt(create_checkout_session)
+                # Import route functions for direct exemption
+                from app.routes import import_excel, import_data, generate_scout_pdf_route, generate_pdf, sync_all_subscriptions, physical_data_analysis
                 csrf.exempt(import_excel)
                 csrf.exempt(import_data)
+                csrf.exempt(physical_data_analysis)
                 csrf.exempt(generate_scout_pdf_route)
                 csrf.exempt(generate_pdf)
                 csrf.exempt(sync_all_subscriptions)

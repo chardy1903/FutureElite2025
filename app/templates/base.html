@@ -435,8 +435,7 @@
                 
                 mobileNavLinks.style.display = 'block';
                 
-                // Mobile menu toggle
-                const mobileMenuButton = document.getElementById('mobileMenuButton');
+                // Mobile menu toggle (reuse mobileMenuButton from above)
                 const mobileMenu = document.getElementById('mobileMenu');
                 mobileMenuButton.addEventListener('click', function() {
                     mobileMenu.classList.toggle('hidden');
