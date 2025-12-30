@@ -31,7 +31,8 @@
                     <div class="flex-shrink-0">
                         <h1 class="text-xl font-bold text-qadsiah-red">FutureElite</h1>
                     </div>
-                    <div id="navLinks" class="ml-6 flex space-x-1 overflow-x-auto" style="display: none;">
+                    <!-- Desktop Navigation (hidden on mobile) -->
+                    <div id="navLinks" class="hidden md:flex ml-6 space-x-1" style="display: none;">
                         <a href="/" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Home</a>
                         <a href="/dashboard" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Dashboard</a>
                         <a href="/matches" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Matches</a>
@@ -48,11 +49,29 @@
                     </div>
                 </div>
                 <div class="flex items-center flex-shrink-0 ml-4">
-                    <span id="userInfo" class="text-gray-600 px-2 py-2 text-xs sm:text-sm truncate max-w-[120px]" style="display: none;"></span>
-                    <a id="logoutLink" href="#" class="text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap" style="display: none;">Logout</a>
+                    <!-- Mobile Menu Button (hidden on desktop) -->
+                    <button id="mobileMenuButton" class="md:hidden text-gray-700 hover:text-qadsiah-red p-2 rounded-md" style="display: none;" aria-label="Toggle menu">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                    <!-- Desktop User Info (hidden on mobile) -->
+                    <span id="userInfo" class="hidden md:block text-gray-600 px-2 py-2 text-xs sm:text-sm truncate max-w-[120px]" style="display: none;"></span>
+                    <a id="logoutLink" href="#" class="hidden md:block text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap" style="display: none;">Logout</a>
                     <a href="{{ url_for('auth.login') }}" id="loginLink" class="text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium">Login</a>
                     <a href="{{ url_for('auth.register') }}" id="registerLink" class="bg-qadsiah-red text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-red-700 whitespace-nowrap">Register</a>
                 </div>
+            </div>
+        </div>
+        <!-- Mobile Menu (hidden by default) -->
+        <div id="mobileMenu" class="hidden md:hidden border-t border-gray-200 bg-white">
+            <div class="px-2 pt-2 pb-3 space-y-1" id="mobileNavLinks" style="display: none;">
+                <!-- Mobile nav links will be populated by JavaScript -->
+            </div>
+            <!-- Mobile User Info -->
+            <div id="mobileUserInfo" class="px-4 py-3 border-t border-gray-200" style="display: none;">
+                <div class="text-sm text-gray-600 mb-2" id="mobileUsername"></div>
+                <a id="mobileLogoutLink" href="#" class="block text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium">Logout</a>
             </div>
         </div>
     </nav>
@@ -346,6 +365,7 @@
             
             if (isAuth && username) {
                 // Show authenticated UI
+                // Desktop navigation
                 document.getElementById('navLinks').style.display = 'flex';
                 document.getElementById('userInfo').textContent = username;
                 document.getElementById('userInfo').style.display = 'block';
@@ -353,9 +373,20 @@
                 document.getElementById('loginLink').style.display = 'none';
                 document.getElementById('registerLink').style.display = 'none';
                 
+                // Mobile menu button
+                document.getElementById('mobileMenuButton').style.display = 'block';
+                
+                // Mobile user info
+                document.getElementById('mobileUserInfo').style.display = 'block';
+                document.getElementById('mobileUsername').textContent = username;
+                
                 // Hide/show navigation links based on admin status
                 const playerNavLinks = document.querySelectorAll('.player-nav-link');
                 const adminLink = document.getElementById('adminLink');
+                
+                // Build mobile menu
+                const mobileNavLinks = document.getElementById('mobileNavLinks');
+                mobileNavLinks.innerHTML = ''; // Clear existing
                 
                 if (isAdmin) {
                     // Admin users: hide all player-facing links, show only Admin link
@@ -364,18 +395,46 @@
                     });
                     if (adminLink) {
                         adminLink.style.display = 'block';
+                        // Add to mobile menu
+                        const mobileLink = document.createElement('a');
+                        mobileLink.href = adminLink.href;
+                        mobileLink.className = 'block text-gray-700 hover:text-qadsiah-red hover:bg-gray-50 px-3 py-2 rounded-md text-base font-medium';
+                        mobileLink.textContent = 'Admin';
+                        mobileNavLinks.appendChild(mobileLink);
                     }
                     console.log('Admin user: hiding player navigation links');
                 } else {
                     // Regular users: show all player-facing links, hide Admin link
                     playerNavLinks.forEach(link => {
                         link.style.display = 'block';
+                        // Add to mobile menu
+                        const mobileLink = document.createElement('a');
+                        mobileLink.href = link.href;
+                        mobileLink.className = 'block text-gray-700 hover:text-qadsiah-red hover:bg-gray-50 px-3 py-2 rounded-md text-base font-medium';
+                        mobileLink.textContent = link.textContent;
+                        mobileNavLinks.appendChild(mobileLink);
                     });
                     if (adminLink) {
                         adminLink.style.display = 'none';
                     }
                     console.log('Regular user: showing player navigation links');
                 }
+                
+                mobileNavLinks.style.display = 'block';
+                
+                // Mobile menu toggle
+                const mobileMenuButton = document.getElementById('mobileMenuButton');
+                const mobileMenu = document.getElementById('mobileMenu');
+                mobileMenuButton.addEventListener('click', function() {
+                    mobileMenu.classList.toggle('hidden');
+                    // Toggle hamburger icon
+                    const icon = mobileMenuButton.querySelector('svg');
+                    if (mobileMenu.classList.contains('hidden')) {
+                        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />';
+                    } else {
+                        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />';
+                    }
+                });
                 
                 // Redirect admin users from player pages to admin page
                 if (isAdmin) {
@@ -389,8 +448,13 @@
                     }
                 }
                 
-                // Handle logout
+                // Handle logout (both desktop and mobile)
                 document.getElementById('logoutLink').addEventListener('click', function(e) {
+                    e.preventDefault();
+                    clientAuth.logout();
+                    window.location.href = '/login';
+                });
+                document.getElementById('mobileLogoutLink').addEventListener('click', function(e) {
                     e.preventDefault();
                     clientAuth.logout();
                     window.location.href = '/login';
@@ -400,6 +464,8 @@
                 document.getElementById('navLinks').style.display = 'none';
                 document.getElementById('userInfo').style.display = 'none';
                 document.getElementById('logoutLink').style.display = 'none';
+                document.getElementById('mobileMenuButton').style.display = 'none';
+                document.getElementById('mobileUserInfo').style.display = 'none';
                 document.getElementById('loginLink').style.display = 'block';
                 document.getElementById('registerLink').style.display = 'block';
             }
