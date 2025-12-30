@@ -490,7 +490,99 @@ def create_app():
     storage = StorageManager()
     _initialize_sample_data(storage)
     
+    # Start background task to check overdue subscriptions
+    _start_subscription_checker(app)
+    
     return app
+
+
+def _check_overdue_subscriptions(app):
+    """Background task to check and cancel overdue subscriptions"""
+    with app.app_context():
+        from .routes import storage
+        from .models import Subscription, SubscriptionStatus
+        from datetime import datetime
+        
+        try:
+            subscriptions = storage.load_subscriptions()
+            now = datetime.now()
+            cancelled_count = 0
+            
+            for sub_data in subscriptions:
+                try:
+                    subscription = Subscription(**sub_data)
+                    
+                    # Only check active or past_due subscriptions
+                    if subscription.status not in [SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE]:
+                        continue
+                    
+                    # Check if current_period_end has passed
+                    if subscription.current_period_end:
+                        try:
+                            # Parse ISO format date
+                            period_end = datetime.fromisoformat(subscription.current_period_end.replace('Z', '+00:00'))
+                            # Remove timezone for comparison
+                            if period_end.tzinfo:
+                                period_end = period_end.replace(tzinfo=None)
+                            
+                            # If period has ended, cancel subscription
+                            if period_end < now:
+                                # Cancel in Stripe if exists
+                                try:
+                                    import stripe
+                                    if stripe and subscription.stripe_subscription_id:
+                                        stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', '').strip()
+                                        if stripe.api_key:
+                                            stripe.Subscription.modify(
+                                                subscription.stripe_subscription_id,
+                                                cancel_at_period_end=True
+                                            )
+                                except Exception as e:
+                                    app.logger.warning(f"Error cancelling Stripe subscription {subscription.stripe_subscription_id}: {e}")
+                                
+                                # Update local subscription
+                                subscription.status = SubscriptionStatus.CANCELED
+                                subscription.cancel_at_period_end = True
+                                subscription.updated_at = datetime.now().strftime("%d %b %Y")
+                                storage.save_subscription(subscription)
+                                cancelled_count += 1
+                                
+                                app.logger.info(f"Auto-cancelled overdue subscription for user {subscription.user_id}")
+                        except (ValueError, TypeError) as e:
+                            app.logger.warning(f"Error parsing period_end for subscription {subscription.user_id}: {e}")
+                            continue
+                except (ValueError, TypeError, KeyError) as e:
+                    app.logger.warning(f"Error processing subscription: {e}")
+                    continue
+            
+            if cancelled_count > 0:
+                app.logger.info(f"Auto-cancellation check: {cancelled_count} subscription(s) cancelled")
+        except Exception as e:
+            app.logger.error(f"Error in subscription checker: {e}", exc_info=True)
+
+
+def _subscription_checker_worker(app):
+    """Background worker thread that periodically checks for overdue subscriptions"""
+    import time
+    # Check every hour
+    check_interval = 3600  # 1 hour in seconds
+    
+    while True:
+        try:
+            time.sleep(check_interval)
+            _check_overdue_subscriptions(app)
+        except Exception as e:
+            app.logger.error(f"Error in subscription checker worker: {e}", exc_info=True)
+            # Continue running even if there's an error
+            time.sleep(60)  # Wait 1 minute before retrying
+
+
+def _start_subscription_checker(app):
+    """Start background thread to check overdue subscriptions"""
+    checker_thread = threading.Thread(target=_subscription_checker_worker, args=(app,))
+    checker_thread.daemon = True
+    checker_thread.start()
+    app.logger.info("Subscription checker thread started (checks every hour)")
 
 
 def _initialize_sample_data(storage: StorageManager):

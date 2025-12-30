@@ -22,6 +22,7 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subscription Status</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account Status</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registered</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
@@ -96,6 +97,19 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {{ user.created_at }}
                             </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                {% if user.subscription_status == 'active' %}
+                                    <button onclick="cancelSubscription('{{ user.id }}', '{{ user.username }}')" class="text-red-600 hover:text-red-900">
+                                        Cancel Subscription
+                                    </button>
+                                {% elif user.subscription_status == 'past_due' %}
+                                    <button onclick="cancelSubscription('{{ user.id }}', '{{ user.username }}')" class="text-red-600 hover:text-red-900">
+                                        Cancel Subscription
+                                    </button>
+                                {% else %}
+                                    <span class="text-gray-400">-</span>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -112,6 +126,9 @@
         <div class="mt-6">
             <button onclick="exportUsers()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-qadsiah-red hover:bg-red-700">
                 Export Users (JSON)
+            </button>
+            <button onclick="checkOverdueSubscriptions()" class="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700">
+                Check Overdue Subscriptions
             </button>
             <button onclick="location.reload()" class="ml-3 inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                 Refresh
@@ -150,6 +167,76 @@ async function exportUsers() {
         hideLoading();
         console.error('Export error:', error);
         showToast('Error exporting users: ' + error.message, 'error');
+    }
+}
+
+async function cancelSubscription(userId, username) {
+    if (!confirm(`Are you sure you want to cancel the subscription for ${username}?`)) {
+        return;
+    }
+    
+    try {
+        showLoading('Cancelling subscription...');
+        const response = await fetch(`/api/admin/cancel-subscription/${userId}`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            hideLoading();
+            showToast(`Subscription cancelled for ${username}`, 'success');
+            // Reload page to show updated status
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            hideLoading();
+            showToast('Error cancelling subscription: ' + (data.errors?.join(', ') || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        hideLoading();
+        console.error('Cancel subscription error:', error);
+        showToast('Error cancelling subscription: ' + error.message, 'error');
+    }
+}
+
+async function checkOverdueSubscriptions() {
+    if (!confirm('Check and cancel all overdue subscriptions? This will cancel subscriptions where the payment period has ended.')) {
+        return;
+    }
+    
+    try {
+        showLoading('Checking overdue subscriptions...');
+        const response = await fetch('/api/admin/check-overdue-subscriptions', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            hideLoading();
+            showToast(data.message || `Checked subscriptions. ${data.cancelled_count || 0} subscription(s) cancelled.`, 'success');
+            // Reload page to show updated status
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            hideLoading();
+            showToast('Error checking subscriptions: ' + (data.errors?.join(', ') || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        hideLoading();
+        console.error('Check overdue subscriptions error:', error);
+        showToast('Error checking subscriptions: ' + error.message, 'error');
     }
 }
 </script>

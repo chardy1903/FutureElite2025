@@ -38,6 +38,14 @@ from .phv_calculator import calculate_phv, validate_measurements_for_phv, calcul
 from .elite_benchmarks import get_elite_benchmarks_for_age, compare_to_elite
 from .config import SUPPORT_EMAIL, SUBSCRIPTION_PRICING, CURRENT_YEAR
 
+# Stripe import check
+try:
+    import stripe
+    STRIPE_AVAILABLE = True
+except ImportError:
+    STRIPE_AVAILABLE = False
+    stripe = None
+
 # Create blueprint
 bp = Blueprint('main', __name__)
 
@@ -3725,6 +3733,48 @@ def admin_users():
         current_app.logger.error(f"Error loading users for admin: {e}", exc_info=True)
         flash('Error loading users. Please try again.', 'error')
         return redirect(url_for('main.dashboard'))
+
+
+@bp.route('/api/admin/cancel-subscription/<user_id>', methods=['POST'])
+@login_required
+def cancel_user_subscription(user_id):
+    """Cancel a user's subscription (admin only)"""
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    current_username = current_user.username.strip() if current_user.username else ''
+    
+    if admin_username and current_username != admin_username:
+        return jsonify({'success': False, 'errors': ['Access denied']}), 403
+    
+    try:
+        subscription = storage.get_subscription_by_user_id(user_id)
+        if not subscription:
+            return jsonify({'success': False, 'errors': ['Subscription not found']}), 404
+        
+        # Cancel subscription in Stripe if it exists
+        if STRIPE_AVAILABLE and subscription.stripe_subscription_id:
+            try:
+                if not stripe.api_key:
+                    stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', '').strip()
+                stripe.Subscription.modify(
+                    subscription.stripe_subscription_id,
+                    cancel_at_period_end=True
+                )
+                current_app.logger.info(f"Cancelled Stripe subscription {subscription.stripe_subscription_id} for user {user_id}")
+            except Exception as e:
+                current_app.logger.error(f"Error cancelling Stripe subscription: {e}", exc_info=True)
+                # Continue with local cancellation even if Stripe fails
+        
+        # Update subscription status to canceled
+        subscription.status = SubscriptionStatus.CANCELED
+        subscription.cancel_at_period_end = True
+        subscription.updated_at = datetime.now().strftime("%d %b %Y")
+        storage.save_subscription(subscription)
+        
+        current_app.logger.info(f"Subscription cancelled for user {user_id} by admin {current_username}")
+        return jsonify({'success': True, 'message': 'Subscription cancelled successfully'})
+    except Exception as e:
+        current_app.logger.error(f"Error cancelling subscription: {e}", exc_info=True)
+        return jsonify({'success': False, 'errors': [str(e)]}), 500
 
 
 @bp.route('/api/admin/users')
