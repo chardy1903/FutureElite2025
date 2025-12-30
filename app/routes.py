@@ -3943,7 +3943,15 @@ def sync_all_subscriptions():
         
         stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', '').strip()
         if not stripe.api_key or not stripe.api_key.startswith(('sk_', 'rk_')):
-            return jsonify({'success': False, 'errors': ['Stripe API key not configured']}), 500
+            current_app.logger.error("STRIPE_SECRET_KEY not configured in production environment")
+            return jsonify({
+                'success': False, 
+                'errors': [
+                    'Stripe API key not configured in production environment.',
+                    'Please set STRIPE_SECRET_KEY in Render dashboard Environment settings.',
+                    'See RENDER_STRIPE_SETUP.md for instructions.'
+                ]
+            }), 500
         
         # Import the update function from subscription routes
         from app.subscription_routes import update_subscription_from_stripe
