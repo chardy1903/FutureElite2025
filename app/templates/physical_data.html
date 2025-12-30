@@ -528,8 +528,10 @@ function renderGrowthChart(measurements, phv, currentAge, predictedHeight = null
     // Prepare actual measurements data (with nulls for projected positions)
     const actualHeightsData = [...heights, ...new Array(projectedLabels.length).fill(null)];
     
-    // Prepare projected height data (with nulls for actual measurement positions)
-    const projectedHeightsData = [...new Array(heights.length).fill(null), ...projectedData];
+    // Prepare projected height data (with nulls for actual measurement positions, but start from last measurement)
+    // The projected line should start from the last actual measurement to avoid a gap
+    const lastActualHeight = heights[heights.length - 1];
+    const projectedHeightsData = [...new Array(heights.length - 1).fill(null), lastActualHeight, ...projectedData];
     
     const datasets = [{
         label: 'Height (cm)',
