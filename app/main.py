@@ -323,12 +323,14 @@ def create_app():
             csrf.exempt('subscription.stripe_webhook')
             csrf.exempt('main.import_excel')
             csrf.exempt('main.import_data')
+            csrf.exempt('main.cancel_user_subscription')
+            csrf.exempt('main.check_overdue_subscriptions')
             
             # Also try function reference as backup (may not work if wrapped by rate limiter)
             try:
                 from .auth_routes import login, register, forgot_password
                 from .subscription_routes import stripe_webhook, get_subscription_status
-                from .routes import import_excel, import_data, generate_scout_pdf_route, generate_pdf
+                from .routes import import_excel, import_data, generate_scout_pdf_route, generate_pdf, cancel_user_subscription, check_overdue_subscriptions
                 csrf.exempt(login)
                 csrf.exempt(register)
                 csrf.exempt(forgot_password)
