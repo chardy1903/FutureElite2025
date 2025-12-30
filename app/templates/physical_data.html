@@ -338,35 +338,106 @@ function renderGrowthChart(measurements, phv, currentAge, predictedHeight = null
     if (predictedHeight && predictedHeight.predicted_adult_height_cm && currentAge && currentAge < 18) {
         const predictedAdultHeight = predictedHeight.predicted_adult_height_cm;
         const yearsRemaining = 18 - currentAge;
+        const totalGrowth = predictedAdultHeight - lastHeight;
+        
+        // Determine PHV status for proper growth velocity modeling
+        let phvAge = null;
+        if (phv && phv.phv_age) {
+            phvAge = phv.phv_age;
+        }
         
         // Generate projection points: every 6 months from last measurement to age 18
         const projectionPoints = [];
-        let projectionDate = new Date(lastDate);
-        let currentProjectedHeight = lastHeight;
-        const totalGrowth = predictedAdultHeight - lastHeight;
-        
-        // Calculate growth per year (decelerating)
         const monthsTo18 = yearsRemaining * 12;
+        
+        // Calculate growth velocity at last measurement based on PHV status
+        // This determines the starting velocity for the projection
+        let currentVelocity = 0;
+        if (phvAge !== null) {
+            const yearsSincePHV = currentAge - phvAge;
+            if (yearsSincePHV > 0) {
+                // Past PHV - growth is decelerating
+                // Growth velocity decreases exponentially after PHV
+                // Typical: 8-10 cm/year at PHV, ~1-2 cm/year by age 18
+                const phvVelocity = phv.phv_velocity_cm_per_year || 10;
+                if (yearsSincePHV < 1) {
+                    currentVelocity = phvVelocity * 0.6; // 60% of peak
+                } else if (yearsSincePHV < 2) {
+                    currentVelocity = phvVelocity * 0.3; // 30% of peak
+                } else {
+                    currentVelocity = Math.max(1.0, phvVelocity * 0.15); // 15% of peak, min 1 cm/year
+                }
+            } else {
+                // Before PHV - still accelerating
+                const yearsToPHV = phvAge - currentAge;
+                const phvVelocity = phv.phv_velocity_cm_per_year || 10;
+                if (yearsToPHV < 0.5) {
+                    currentVelocity = phvVelocity * 0.8; // Approaching PHV
+                } else {
+                    currentVelocity = phvVelocity * 0.5; // Pre-PHV growth
+                }
+            }
+        } else {
+            // No PHV data - use average growth rate
+            currentVelocity = totalGrowth / yearsRemaining;
+        }
+        
+        // Cap velocity at reasonable maximum
+        currentVelocity = Math.min(currentVelocity, 5.0);
+        
+        // Model growth using exponential decay after PHV
+        // Growth velocity decreases exponentially as we approach age 18
+        let cumulativeHeight = lastHeight;
+        
         for (let monthsAhead = 6; monthsAhead <= monthsTo18; monthsAhead += 6) {
             const yearsAhead = monthsAhead / 12;
-            // Use decelerating growth curve (more growth early, less later)
-            // Growth velocity decreases as we approach age 18
-            const progress = yearsAhead / yearsRemaining;
-            // Deceleration factor: faster growth early, slower later
-            const decelerationFactor = 1 - (progress * progress * 0.5); // Quadratic deceleration
-            const projectedGrowth = totalGrowth * progress * decelerationFactor;
-            const projectedHeight = lastHeight + projectedGrowth;
+            const ageAtPoint = currentAge + yearsAhead;
             
-            projectionDate = new Date(lastDate);
+            // Calculate growth velocity at this point
+            let velocityAtPoint = currentVelocity;
+            if (phvAge !== null && ageAtPoint > phvAge) {
+                // Past PHV - exponential decay
+                const yearsSincePHV = ageAtPoint - phvAge;
+                const phvVelocity = phv.phv_velocity_cm_per_year || 10;
+                
+                // Exponential decay: velocity = peak * e^(-decay_rate * years_since_PHV)
+                // Decay rate chosen so velocity is ~1-2 cm/year by age 18
+                const decayRate = 0.4; // Adjust this to control decay speed
+                velocityAtPoint = phvVelocity * Math.exp(-decayRate * yearsSincePHV);
+                
+                // Minimum velocity of 0.5 cm/year (very slow growth near age 18)
+                velocityAtPoint = Math.max(0.5, velocityAtPoint);
+            } else if (phvAge !== null && ageAtPoint <= phvAge) {
+                // Before PHV - velocity increases towards PHV
+                const yearsToPHV = phvAge - ageAtPoint;
+                const phvVelocity = phv.phv_velocity_cm_per_year || 10;
+                // Linear increase from current to PHV velocity
+                const progressToPHV = 1 - (yearsToPHV / (phvAge - currentAge));
+                velocityAtPoint = currentVelocity + (phvVelocity - currentVelocity) * progressToPHV;
+            }
+            
+            // Cap velocity
+            velocityAtPoint = Math.min(velocityAtPoint, 12.0);
+            
+            // Calculate height growth for this 6-month period
+            // Growth = velocity * time (in years)
+            const timePeriod = 0.5; // 6 months = 0.5 years
+            const heightGrowth = velocityAtPoint * timePeriod;
+            cumulativeHeight += heightGrowth;
+            
+            // Ensure we don't exceed predicted adult height
+            cumulativeHeight = Math.min(cumulativeHeight, predictedAdultHeight);
+            
+            const projectionDate = new Date(lastDate);
             projectionDate.setMonth(projectionDate.getMonth() + monthsAhead);
             
             projectionPoints.push({
                 date: new Date(projectionDate),
-                height: Math.min(projectedHeight, predictedAdultHeight) // Cap at predicted adult height
+                height: cumulativeHeight
             });
         }
         
-        // Add final point at age 18
+        // Add final point at age 18 (ensure it matches predicted adult height)
         const age18Date = new Date(lastDate);
         age18Date.setFullYear(age18Date.getFullYear() + yearsRemaining);
         projectionPoints.push({
