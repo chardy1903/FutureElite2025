@@ -61,7 +61,12 @@
                                 <div class="text-xs text-gray-400">Cannot display</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                {% if user.subscription_status == 'active' %}
+                                {% if user.is_overdue %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 font-bold">
+                                        ⚠️ OVERDUE
+                                    </span>
+                                    <div class="text-xs text-red-600 mt-1">Payment required</div>
+                                {% elif user.subscription_status == 'active' %}
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                         Active
                                     </span>
@@ -107,7 +112,9 @@
                                     <span class="text-sm text-gray-400">N/A (Free)</span>
                                 {% elif user.expiration_date %}
                                     <div class="text-sm text-gray-900">{{ user.expiration_date|format_iso_date }}</div>
-                                    {% if user.subscription_status == 'active' %}
+                                    {% if user.is_overdue %}
+                                        <div class="text-xs text-red-600 font-bold mt-1">⚠️ OVERDUE - Payment required</div>
+                                    {% elif user.subscription_status == 'active' %}
                                         {% set exp_date = user.expiration_date|parse_iso_date %}
                                         {% if exp_date %}
                                             {% set now_dt = now() %}
@@ -115,7 +122,7 @@
                                             {% if days_diff <= 7 and days_diff > 0 %}
                                                 <div class="text-xs text-orange-600 mt-1">Expires in {{ days_diff }} day(s)</div>
                                             {% elif days_diff <= 0 %}
-                                                <div class="text-xs text-red-600 mt-1">Expired</div>
+                                                <div class="text-xs text-red-600 font-bold mt-1">⚠️ EXPIRED</div>
                                             {% endif %}
                                         {% endif %}
                                     {% endif %}

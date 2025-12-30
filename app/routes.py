@@ -3719,6 +3719,7 @@ def admin_users():
             subscription_type = None
             last_renewal_date = None
             expiration_date = None
+            is_overdue = False
             # Only show dates for paid subscriptions (not free accounts)
             if subscription and subscription_status != 'none':
                 subscription_type = subscription.plan_name  # Monthly or Annual
@@ -3727,6 +3728,17 @@ def admin_users():
                     last_renewal_date = subscription.current_period_start  # When they last paid
                 if subscription.current_period_end:
                     expiration_date = subscription.current_period_end  # When subscription expires
+                    # Check if subscription is overdue (expired but still marked as active)
+                    if subscription_status == 'active' and expiration_date:
+                        try:
+                            from datetime import datetime
+                            exp_dt = datetime.fromisoformat(expiration_date.replace('Z', '+00:00'))
+                            if exp_dt.tzinfo:
+                                exp_dt = exp_dt.replace(tzinfo=None)
+                            if exp_dt < datetime.now():
+                                is_overdue = True
+                        except (ValueError, TypeError):
+                            pass  # If date parsing fails, skip overdue check
             
             users_data.append({
                 'id': user.id,
@@ -3738,7 +3750,8 @@ def admin_users():
                 'subscription_plan': subscription_plan,
                 'subscription_type': subscription_type,
                 'last_renewal_date': last_renewal_date,
-                'expiration_date': expiration_date
+                'expiration_date': expiration_date,
+                'is_overdue': is_overdue
             })
         
         # Sort by creation date (newest first)

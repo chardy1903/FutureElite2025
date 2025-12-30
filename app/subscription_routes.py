@@ -387,6 +387,14 @@ def stripe_webhook():
             subscription = event['data']['object']
             handle_subscription_deleted(subscription)
         
+        elif event['type'] == 'invoice.payment_failed':
+            invoice = event['data']['object']
+            handle_payment_failed(invoice)
+        
+        elif event['type'] == 'invoice.payment_succeeded':
+            invoice = event['data']['object']
+            handle_payment_succeeded(invoice)
+        
         return jsonify({'success': True}), 200
         
     except ValueError as e:
@@ -465,6 +473,52 @@ def handle_subscription_deleted(subscription):
         existing.status = SubscriptionStatus.CANCELED
         existing.updated_at = datetime.now().isoformat()
         storage.save_subscription(existing)
+
+
+def handle_payment_failed(invoice):
+    """Handle failed payment - mark subscription as past_due"""
+    if not STRIPE_AVAILABLE:
+        return
+    
+    subscription_id = invoice.get('subscription')
+    if not subscription_id:
+        return
+    
+    try:
+        # Get subscription from Stripe to get full details
+        stripe_subscription = stripe.Subscription.retrieve(subscription_id)
+        
+        # Find existing subscription
+        existing = storage.get_subscription_by_stripe_id(subscription_id)
+        if existing:
+            # Update subscription status to past_due
+            update_subscription_from_stripe(stripe_subscription, existing.user_id, existing.stripe_customer_id or '')
+            current_app.logger.info(f"Marked subscription {subscription_id} as past_due due to payment failure")
+    except Exception as e:
+        current_app.logger.error(f"Error handling payment failure: {e}", exc_info=True)
+
+
+def handle_payment_succeeded(invoice):
+    """Handle successful payment - update subscription period dates"""
+    if not STRIPE_AVAILABLE:
+        return
+    
+    subscription_id = invoice.get('subscription')
+    if not subscription_id:
+        return
+    
+    try:
+        # Get subscription from Stripe to get updated period dates
+        stripe_subscription = stripe.Subscription.retrieve(subscription_id)
+        
+        # Find existing subscription
+        existing = storage.get_subscription_by_stripe_id(subscription_id)
+        if existing:
+            # Update subscription with new period dates
+            update_subscription_from_stripe(stripe_subscription, existing.user_id, existing.stripe_customer_id or '')
+            current_app.logger.info(f"Updated subscription {subscription_id} after successful payment")
+    except Exception as e:
+        current_app.logger.error(f"Error handling payment success: {e}", exc_info=True)
 
 
 def update_subscription_from_stripe(stripe_subscription, user_id: str, customer_id: str):
