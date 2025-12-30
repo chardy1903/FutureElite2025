@@ -157,8 +157,16 @@ async function loadSubscriptionStatus() {
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                credentials: 'include',  // Include cookies for session authentication
                 body: JSON.stringify({ user_id: userId })
             });
+            
+            // Check if response is JSON before parsing
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error(`Expected JSON response, got ${contentType || 'unknown'}. Status: ${response.status}`);
+            }
+            
             const data = await response.json();
             if (data.success && data.subscription) {
                 subscription = data.subscription;
@@ -275,6 +283,7 @@ async function subscribe(planType) {
             headers: {
                 'Content-Type': 'application/json'
             },
+            credentials: 'include',  // Include cookies for session authentication
             body: JSON.stringify({
                 user_id: userId,
                 plan_type: planType,
@@ -322,8 +331,16 @@ async function openCustomerPortal() {
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                credentials: 'include',  // Include cookies for session authentication
                 body: JSON.stringify({ user_id: userId })
             });
+            
+            // Check if response is JSON before parsing
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error(`Expected JSON response, got ${contentType || 'unknown'}. Status: ${response.status}`);
+            }
+            
             const data = await response.json();
             if (data.success && data.subscription) {
                 subscription = data.subscription;

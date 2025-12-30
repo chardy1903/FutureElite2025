@@ -141,7 +141,7 @@ def create_checkout_session():
         
         plan = SUBSCRIPTION_PLANS[plan_type]
         
-        # Check if Stripe API key is configured
+        # Check if Stripe API key is configured and valid
         if not stripe.api_key or stripe.api_key.strip() == '' or stripe.api_key == 'sk_test_YOUR_SECRET_KEY_HERE':
             return jsonify({
                 'success': False,
@@ -149,6 +149,19 @@ def create_checkout_session():
                     'Stripe API key not configured.',
                     'Please set STRIPE_SECRET_KEY environment variable in your .env file.',
                     'See QUICK_STRIPE_SETUP.md for instructions.'
+                ]
+            }), 500
+        
+        # Validate that it's a secret key (starts with sk_)
+        if not stripe.api_key.startswith('sk_'):
+            current_app.logger.error(f"Invalid Stripe API key format. Secret keys must start with 'sk_'. Got: {stripe.api_key[:10]}...")
+            return jsonify({
+                'success': False,
+                'errors': [
+                    'Invalid Stripe API key format.',
+                    'STRIPE_SECRET_KEY must be a secret key (starts with sk_).',
+                    'You may have accidentally used a publishable key (pk_) instead.',
+                    'Please check your .env file and set the correct STRIPE_SECRET_KEY.'
                 ]
             }), 500
         

@@ -237,8 +237,10 @@ def create_app():
                 'img-src': "'self' data: https:",
                 'font-src': "'self' data:",
                 'connect-src': "'self' https://api.stripe.com",
+                # Allow Stripe Checkout iframes
+                'frame-src': "'self' https://js.stripe.com https://hooks.stripe.com",
             },
-            frame_options='DENY',
+            frame_options='SAMEORIGIN',  # Allow same-origin frames (needed for Stripe Checkout)
             referrer_policy='strict-origin-when-cross-origin'
         )
         app.logger.info("Security headers enabled")
