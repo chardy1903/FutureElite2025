@@ -32,7 +32,7 @@
                         <h1 class="text-xl font-bold text-qadsiah-red">FutureElite</h1>
                     </div>
                     <!-- Desktop Navigation (hidden on mobile) -->
-                    <div id="navLinks" class="hidden md:flex ml-6 space-x-1" style="display: none;">
+                    <div id="navLinks" class="hidden md:flex ml-6 space-x-1">
                         <a href="/" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Home</a>
                         <a href="/dashboard" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Dashboard</a>
                         <a href="/matches" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Matches</a>
@@ -50,14 +50,14 @@
                 </div>
                 <div class="flex items-center flex-shrink-0 ml-4">
                     <!-- Mobile Menu Button (hidden on desktop) -->
-                    <button id="mobileMenuButton" class="md:hidden text-gray-700 hover:text-qadsiah-red p-2 rounded-md" style="display: none;" aria-label="Toggle menu">
+                    <button id="mobileMenuButton" class="hidden md:hidden text-gray-700 hover:text-qadsiah-red p-2 rounded-md" aria-label="Toggle menu">
                         <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
                     </button>
                     <!-- Desktop User Info (hidden on mobile) -->
-                    <span id="userInfo" class="hidden md:block text-gray-600 px-2 py-2 text-xs sm:text-sm truncate max-w-[120px]" style="display: none;"></span>
-                    <a id="logoutLink" href="#" class="hidden md:block text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap" style="display: none;">Logout</a>
+                    <span id="userInfo" class="hidden md:block text-gray-600 px-2 py-2 text-xs sm:text-sm truncate max-w-[120px]"></span>
+                    <a id="logoutLink" href="#" class="hidden md:block text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap">Logout</a>
                     <a href="{{ url_for('auth.login') }}" id="loginLink" class="text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium">Login</a>
                     <a href="{{ url_for('auth.register') }}" id="registerLink" class="bg-qadsiah-red text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-red-700 whitespace-nowrap">Register</a>
                 </div>
@@ -365,16 +365,29 @@
             
             if (isAuth && username) {
                 // Show authenticated UI
-                // Desktop navigation
-                document.getElementById('navLinks').style.display = 'flex';
-                document.getElementById('userInfo').textContent = username;
-                document.getElementById('userInfo').style.display = 'block';
-                document.getElementById('logoutLink').style.display = 'block';
+                // Desktop navigation - use class manipulation to respect responsive breakpoints
+                const navLinks = document.getElementById('navLinks');
+                navLinks.classList.remove('hidden');
+                navLinks.classList.add('md:flex');
+                // Don't set inline style - let Tailwind classes handle responsive display
+                
+                // Desktop user info
+                const userInfo = document.getElementById('userInfo');
+                userInfo.textContent = username;
+                userInfo.classList.remove('hidden');
+                userInfo.classList.add('md:block');
+                
+                const logoutLink = document.getElementById('logoutLink');
+                logoutLink.classList.remove('hidden');
+                logoutLink.classList.add('md:block');
+                
                 document.getElementById('loginLink').style.display = 'none';
                 document.getElementById('registerLink').style.display = 'none';
                 
-                // Mobile menu button
-                document.getElementById('mobileMenuButton').style.display = 'block';
+                // Mobile menu button - show on mobile, hide on desktop
+                const mobileMenuButton = document.getElementById('mobileMenuButton');
+                mobileMenuButton.classList.remove('hidden');
+                mobileMenuButton.classList.add('md:hidden');
                 
                 // Mobile user info
                 document.getElementById('mobileUserInfo').style.display = 'block';
@@ -461,10 +474,22 @@
                 });
             } else {
                 // Show unauthenticated UI
-                document.getElementById('navLinks').style.display = 'none';
-                document.getElementById('userInfo').style.display = 'none';
-                document.getElementById('logoutLink').style.display = 'none';
-                document.getElementById('mobileMenuButton').style.display = 'none';
+                const navLinks = document.getElementById('navLinks');
+                navLinks.classList.add('hidden');
+                navLinks.classList.remove('md:flex');
+                
+                const userInfo = document.getElementById('userInfo');
+                userInfo.classList.add('hidden');
+                userInfo.classList.remove('md:block');
+                
+                const logoutLink = document.getElementById('logoutLink');
+                logoutLink.classList.add('hidden');
+                logoutLink.classList.remove('md:block');
+                
+                const mobileMenuButton = document.getElementById('mobileMenuButton');
+                mobileMenuButton.classList.add('hidden');
+                mobileMenuButton.classList.remove('md:hidden');
+                
                 document.getElementById('mobileUserInfo').style.display = 'none';
                 document.getElementById('loginLink').style.display = 'block';
                 document.getElementById('registerLink').style.display = 'block';
