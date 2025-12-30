@@ -220,7 +220,7 @@ async function loadAnalysis() {
         });
         
         if (data.success) {
-            renderPHVSection(data.phv, measurements, data.current_age);
+            renderPHVSection(data.phv, measurements, data.current_age, data.predicted_height);
             renderPredictedHeightSection(data.predicted_height, data.current_age);
             renderEliteComparisons(data.comparisons, data.benchmarks, data.bmi);
             
@@ -243,7 +243,7 @@ async function loadAnalysis() {
 }
 
 // Render PHV section
-function renderPHVSection(phv, measurements = [], currentAge = null) {
+function renderPHVSection(phv, measurements = [], currentAge = null, predictedHeight = null) {
     const section = document.getElementById('phvSection');
     const chartContainer = document.getElementById('growthChartContainer');
     
@@ -284,7 +284,7 @@ function renderPHVSection(phv, measurements = [], currentAge = null) {
     `;
     
     if (measurements && measurements.length >= 2 && chartContainer && typeof Chart !== 'undefined') {
-        renderGrowthChart(measurements, phv, currentAge);
+        renderGrowthChart(measurements, phv, currentAge, predictedHeight);
         chartContainer.classList.remove('hidden');
     } else if (chartContainer) {
         chartContainer.classList.add('hidden');
@@ -293,7 +293,7 @@ function renderPHVSection(phv, measurements = [], currentAge = null) {
 
 // Render growth chart
 let growthChartInstance = null;
-function renderGrowthChart(measurements, phv, currentAge) {
+function renderGrowthChart(measurements, phv, currentAge, predictedHeight = null) {
     if (typeof Chart === 'undefined') {
         return;
     }
@@ -327,12 +327,67 @@ function renderGrowthChart(measurements, phv, currentAge) {
         return;
     }
     
-    // Prepare data for chart
-    const labels = heightMeasurements.map(m => {
+    // Get last measurement for projection
+    const lastMeasurement = heightMeasurements[heightMeasurements.length - 1];
+    const lastDate = lastMeasurement.date;
+    const lastHeight = lastMeasurement.height;
+    
+    // Calculate projected height points if predicted height is available
+    let projectedData = [];
+    let projectedLabels = [];
+    if (predictedHeight && predictedHeight.predicted_adult_height_cm && currentAge && currentAge < 18) {
+        const predictedAdultHeight = predictedHeight.predicted_adult_height_cm;
+        const yearsRemaining = 18 - currentAge;
+        
+        // Generate projection points: every 6 months from last measurement to age 18
+        const projectionPoints = [];
+        let projectionDate = new Date(lastDate);
+        let currentProjectedHeight = lastHeight;
+        const totalGrowth = predictedAdultHeight - lastHeight;
+        
+        // Calculate growth per year (decelerating)
+        const monthsTo18 = yearsRemaining * 12;
+        for (let monthsAhead = 6; monthsAhead <= monthsTo18; monthsAhead += 6) {
+            const yearsAhead = monthsAhead / 12;
+            // Use decelerating growth curve (more growth early, less later)
+            // Growth velocity decreases as we approach age 18
+            const progress = yearsAhead / yearsRemaining;
+            // Deceleration factor: faster growth early, slower later
+            const decelerationFactor = 1 - (progress * progress * 0.5); // Quadratic deceleration
+            const projectedGrowth = totalGrowth * progress * decelerationFactor;
+            const projectedHeight = lastHeight + projectedGrowth;
+            
+            projectionDate = new Date(lastDate);
+            projectionDate.setMonth(projectionDate.getMonth() + monthsAhead);
+            
+            projectionPoints.push({
+                date: new Date(projectionDate),
+                height: Math.min(projectedHeight, predictedAdultHeight) // Cap at predicted adult height
+            });
+        }
+        
+        // Add final point at age 18
+        const age18Date = new Date(lastDate);
+        age18Date.setFullYear(age18Date.getFullYear() + yearsRemaining);
+        projectionPoints.push({
+            date: age18Date,
+            height: predictedAdultHeight
+        });
+        
+        projectedData = projectionPoints.map(p => p.height);
+        projectedLabels = projectionPoints.map(p => {
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            return `${months[p.date.getMonth()]} ${p.date.getFullYear()}`;
+        });
+    }
+    
+    // Prepare data for chart - combine actual and projected labels
+    const actualLabels = heightMeasurements.map(m => {
         // Format date as "MMM YYYY" for cleaner labels
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         return `${months[m.date.getMonth()]} ${m.date.getFullYear()}`;
     });
+    const labels = [...actualLabels, ...projectedLabels];
     const heights = heightMeasurements.map(m => m.height);
     
     // Calculate PHV date range for highlighting
@@ -398,25 +453,66 @@ function renderGrowthChart(measurements, phv, currentAge) {
     
     // Create chart
     const ctx = canvas.getContext('2d');
+    
+    // Prepare actual measurements data (with nulls for projected positions)
+    const actualHeightsData = [...heights, ...new Array(projectedLabels.length).fill(null)];
+    
+    // Prepare projected height data (with nulls for actual measurement positions)
+    const projectedHeightsData = [...new Array(heights.length).fill(null), ...projectedData];
+    
     const datasets = [{
         label: 'Height (cm)',
-        data: heights,
+        data: actualHeightsData,
         borderColor: 'rgb(59, 130, 246)',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
         borderWidth: 2,
-        pointRadius: 4,
-        pointBackgroundColor: borderColors,
-        pointBorderColor: borderColors,
+        pointRadius: function(context) {
+            // Only show points for actual measurements
+            return context.dataIndex < heights.length ? 4 : 0;
+        },
+        pointBackgroundColor: function(context) {
+            if (context.dataIndex < heights.length) {
+                return borderColors[context.dataIndex];
+            }
+            return 'transparent';
+        },
+        pointBorderColor: function(context) {
+            if (context.dataIndex < heights.length) {
+                return borderColors[context.dataIndex];
+            }
+            return 'transparent';
+        },
         pointHoverRadius: 6,
         fill: true,
-        tension: 0.4
+        tension: 0.4,
+        spanGaps: false
     }];
     
-    // Add PHV marker line if available
+    // Add projected height line if available
+    if (projectedData.length > 0) {
+        datasets.push({
+            label: 'Projected Height',
+            data: projectedHeightsData,
+            borderColor: 'rgb(168, 85, 247)', // Purple for projection
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            borderDash: [8, 4], // Dashed line for projection
+            pointRadius: 3,
+            pointBackgroundColor: 'rgb(168, 85, 247)',
+            pointBorderColor: 'rgb(168, 85, 247)',
+            pointHoverRadius: 5,
+            fill: false,
+            tension: 0.4,
+            spanGaps: false
+        });
+    }
+    
+    // Add PHV marker line if available (extend to cover all labels)
     if (phvMarkerData && phvLabelIndex >= 0) {
+        const extendedPhvMarkerData = [...phvMarkerData, ...new Array(projectedLabels.length).fill(null)];
         datasets.push({
             label: 'PHV Date',
-            data: phvMarkerData,
+            data: extendedPhvMarkerData,
             borderColor: 'rgb(34, 197, 94)',
             backgroundColor: 'transparent',
             borderWidth: 2,
@@ -449,13 +545,23 @@ function renderGrowthChart(measurements, phv, currentAge) {
                             if (context.dataset.label === 'PHV Date') {
                                 return `PHV: ${phv.phv_date} (${phv.phv_age ? phv.phv_age.toFixed(1) : 'N/A'} years)`;
                             }
-                            const index = context.dataIndex;
-                            const measurement = heightMeasurements[index];
-                            let label = `Height: ${context.parsed.y.toFixed(1)} cm`;
-                            if (phvStartDate && phvEndDate && measurement.date >= phvStartDate && measurement.date <= phvEndDate) {
-                                label += ' (PHV Period)';
+                            if (context.dataset.label === 'Projected Height') {
+                                const index = context.dataIndex - heights.length;
+                                if (index >= 0 && projectedLabels[index]) {
+                                    return `Projected: ${context.parsed.y.toFixed(1)} cm (${projectedLabels[index]})`;
+                                }
+                                return `Projected: ${context.parsed.y.toFixed(1)} cm`;
                             }
-                            return label;
+                            const index = context.dataIndex;
+                            if (index < heightMeasurements.length) {
+                                const measurement = heightMeasurements[index];
+                                let label = `Height: ${context.parsed.y.toFixed(1)} cm`;
+                                if (phvStartDate && phvEndDate && measurement.date >= phvStartDate && measurement.date <= phvEndDate) {
+                                    label += ' (PHV Period)';
+                                }
+                                return label;
+                            }
+                            return `Height: ${context.parsed.y.toFixed(1)} cm`;
                         }
                     }
                 }
