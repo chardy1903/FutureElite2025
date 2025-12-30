@@ -20,6 +20,9 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Login</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Password</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subscription Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subscription Type</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Renewal</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expires</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account Status</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registered</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -81,6 +84,38 @@
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                                         {{ user.subscription_status|title }}
                                     </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if user.subscription_type %}
+                                    <span class="text-sm font-medium text-gray-900">{{ user.subscription_type }}</span>
+                                {% else %}
+                                    <span class="text-sm text-gray-400">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if user.last_renewal_date %}
+                                    <div class="text-sm text-gray-900">{{ user.last_renewal_date|format_iso_date }}</div>
+                                {% else %}
+                                    <span class="text-sm text-gray-400">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if user.expiration_date %}
+                                    <div class="text-sm text-gray-900">{{ user.expiration_date|format_iso_date }}</div>
+                                    {% if user.subscription_status == 'active' %}
+                                        {% set exp_date = user.expiration_date|parse_iso_date %}
+                                        {% if exp_date %}
+                                            {% set days_diff = (exp_date - now()).days %}
+                                            {% if days_diff <= 7 and days_diff > 0 %}
+                                                <div class="text-xs text-orange-600 mt-1">Expires in {{ days_diff }} day(s)</div>
+                                            {% elif days_diff <= 0 %}
+                                                <div class="text-xs text-red-600 mt-1">Expired</div>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-sm text-gray-400">-</span>
                                 {% endif %}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">

@@ -3715,6 +3715,15 @@ def admin_users():
             subscription_status = subscription.status.value if subscription else 'none'
             subscription_plan = subscription.plan_name if subscription else None
             
+            # Get subscription details
+            subscription_type = None
+            last_renewal_date = None
+            expiration_date = None
+            if subscription:
+                subscription_type = subscription.plan_name  # Monthly or Annual
+                last_renewal_date = subscription.current_period_start  # When they last paid
+                expiration_date = subscription.current_period_end  # When subscription expires
+            
             users_data.append({
                 'id': user.id,
                 'username': user.username,
@@ -3722,7 +3731,10 @@ def admin_users():
                 'created_at': user.created_at,
                 'is_active': user.is_active,
                 'subscription_status': subscription_status,
-                'subscription_plan': subscription_plan
+                'subscription_plan': subscription_plan,
+                'subscription_type': subscription_type,
+                'last_renewal_date': last_renewal_date,
+                'expiration_date': expiration_date
             })
         
         # Sort by creation date (newest first)

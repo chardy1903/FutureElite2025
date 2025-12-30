@@ -266,8 +266,48 @@ def create_app():
     @app.context_processor
     def inject_global_vars():
         from .config import CURRENT_YEAR
+        from datetime import datetime
         admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
-        return dict(current_year=CURRENT_YEAR, admin_username=admin_username)
+        
+        def format_iso_date(date_str):
+            """Format ISO date string for display"""
+            if not date_str:
+                return '-'
+            try:
+                # Handle ISO format with or without timezone
+                if 'T' in date_str:
+                    dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                else:
+                    dt = datetime.fromisoformat(date_str)
+                # Remove timezone for display
+                if dt.tzinfo:
+                    dt = dt.replace(tzinfo=None)
+                return dt.strftime("%d %b %Y")
+            except (ValueError, TypeError):
+                return date_str
+        
+        def parse_iso_date(date_str):
+            """Parse ISO date string to datetime object"""
+            if not date_str:
+                return None
+            try:
+                if 'T' in date_str:
+                    dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                else:
+                    dt = datetime.fromisoformat(date_str)
+                if dt.tzinfo:
+                    dt = dt.replace(tzinfo=None)
+                return dt
+            except (ValueError, TypeError):
+                return None
+        
+        return dict(
+            current_year=CURRENT_YEAR, 
+            admin_username=admin_username,
+            format_iso_date=format_iso_date,
+            parse_iso_date=parse_iso_date,
+            now=datetime.now
+        )
     
     # Security: Exempt auth endpoints and webhook from CSRF
     # Must be done AFTER blueprint registration so endpoints exist
