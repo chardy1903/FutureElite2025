@@ -520,7 +520,14 @@ def _check_overdue_subscriptions(app):
                     if subscription.current_period_end:
                         try:
                             # Parse ISO format date
-                            period_end = datetime.fromisoformat(subscription.current_period_end.replace('Z', '+00:00'))
+                            period_end_str = subscription.current_period_end
+                            # Handle different date formats
+                            if 'T' in period_end_str:
+                                period_end = datetime.fromisoformat(period_end_str.replace('Z', '+00:00'))
+                            else:
+                                # Try parsing as simple date
+                                period_end = datetime.fromisoformat(period_end_str)
+                            
                             # Remove timezone for comparison
                             if period_end.tzinfo:
                                 period_end = period_end.replace(tzinfo=None)
