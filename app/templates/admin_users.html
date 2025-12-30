@@ -347,6 +347,14 @@ async function checkOverdueSubscriptions() {
         showToast('Error checking subscriptions: ' + error.message, 'error');
     }
 }
+
+// Ensure functions are available globally for onclick handlers (browser compatibility)
+if (typeof window !== 'undefined') {
+    window.syncAllSubscriptions = syncAllSubscriptions;
+    window.checkOverdueSubscriptions = checkOverdueSubscriptions;
+    window.cancelSubscription = cancelSubscription;
+    window.exportUsers = exportUsers;
+}
 </script>
 {% endblock %}
 
