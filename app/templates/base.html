@@ -26,27 +26,10 @@
     <!-- Navigation -->
     <nav class="bg-white shadow-sm border-b">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- First Row: Logo and User Info -->
             <div class="flex justify-between items-center h-16">
-                <div class="flex items-center flex-1 min-w-0">
-                    <div class="flex-shrink-0">
-                        <h1 class="text-xl font-bold text-qadsiah-red">FutureElite</h1>
-                    </div>
-                    <!-- Desktop Navigation (hidden on mobile) -->
-                    <div id="navLinks" class="hidden md:flex ml-6 space-x-1">
-                        <a href="/" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Home</a>
-                        <a href="/dashboard" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Dashboard</a>
-                        <a href="/matches" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Matches</a>
-                        <a href="/achievements" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Achievements</a>
-                        <a href="/player-profile" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Profile</a>
-                        <a href="/physical-data" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Physical</a>
-                        <a href="/physical-metrics" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Performance</a>
-                        <a href="/settings" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Settings</a>
-                        <a href="/references" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">References</a>
-                        <a href="/subscription" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Subscription</a>
-                        {% if admin_username %}
-                        <a id="adminLink" href="/admin/users" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap" style="display: none;">Admin</a>
-                        {% endif %}
-                    </div>
+                <div class="flex items-center flex-shrink-0">
+                    <h1 class="text-xl font-bold text-qadsiah-red">FutureElite</h1>
                 </div>
                 <div class="flex items-center flex-shrink-0 ml-4">
                     <!-- Mobile Menu Button (hidden on desktop) -->
@@ -61,6 +44,22 @@
                     <a href="{{ url_for('auth.login') }}" id="loginLink" class="text-gray-700 hover:text-qadsiah-red px-3 py-2 rounded-md text-sm font-medium">Login</a>
                     <a href="{{ url_for('auth.register') }}" id="registerLink" class="bg-qadsiah-red text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-red-700 whitespace-nowrap">Register</a>
                 </div>
+            </div>
+            <!-- Second Row: Navigation Links (hidden on mobile) -->
+            <div id="navLinks" class="hidden md:flex flex-wrap items-center py-2 space-x-1 border-t border-gray-200">
+                <a href="/" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Home</a>
+                <a href="/dashboard" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Dashboard</a>
+                <a href="/matches" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Matches</a>
+                <a href="/achievements" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Achievements</a>
+                <a href="/player-profile" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Profile</a>
+                <a href="/physical-data" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Physical</a>
+                <a href="/physical-metrics" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Performance</a>
+                <a href="/settings" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Settings</a>
+                <a href="/references" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">References</a>
+                <a href="/subscription" class="player-nav-link text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap">Subscription</a>
+                {% if admin_username %}
+                <a id="adminLink" href="/admin/users" class="text-gray-700 hover:text-qadsiah-red px-2 py-2 rounded-md text-sm font-medium whitespace-nowrap" style="display: none;">Admin</a>
+                {% endif %}
             </div>
         </div>
         <!-- Mobile Menu (hidden by default) -->
