@@ -94,14 +94,18 @@
                                 {% endif %}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                {% if user.last_renewal_date %}
+                                {% if user.subscription_status == 'none' %}
+                                    <span class="text-sm text-gray-400">N/A (Free)</span>
+                                {% elif user.last_renewal_date %}
                                     <div class="text-sm text-gray-900">{{ user.last_renewal_date|format_iso_date }}</div>
                                 {% else %}
                                     <span class="text-sm text-gray-400">-</span>
                                 {% endif %}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                {% if user.expiration_date %}
+                                {% if user.subscription_status == 'none' %}
+                                    <span class="text-sm text-gray-400">N/A (Free)</span>
+                                {% elif user.expiration_date %}
                                     <div class="text-sm text-gray-900">{{ user.expiration_date|format_iso_date }}</div>
                                     {% if user.subscription_status == 'active' %}
                                         {% set exp_date = user.expiration_date|parse_iso_date %}

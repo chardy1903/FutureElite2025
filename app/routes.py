@@ -3719,10 +3719,14 @@ def admin_users():
             subscription_type = None
             last_renewal_date = None
             expiration_date = None
-            if subscription:
+            # Only show dates for paid subscriptions (not free accounts)
+            if subscription and subscription_status != 'none':
                 subscription_type = subscription.plan_name  # Monthly or Annual
-                last_renewal_date = subscription.current_period_start  # When they last paid
-                expiration_date = subscription.current_period_end  # When subscription expires
+                # Only set dates if they exist (not None)
+                if subscription.current_period_start:
+                    last_renewal_date = subscription.current_period_start  # When they last paid
+                if subscription.current_period_end:
+                    expiration_date = subscription.current_period_end  # When subscription expires
             
             users_data.append({
                 'id': user.id,
