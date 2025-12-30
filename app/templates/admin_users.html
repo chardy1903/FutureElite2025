@@ -106,7 +106,8 @@
                                     {% if user.subscription_status == 'active' %}
                                         {% set exp_date = user.expiration_date|parse_iso_date %}
                                         {% if exp_date %}
-                                            {% set days_diff = (exp_date - now()).days %}
+                                            {% set now_dt = now() %}
+                                            {% set days_diff = (exp_date - now_dt).days %}
                                             {% if days_diff <= 7 and days_diff > 0 %}
                                                 <div class="text-xs text-orange-600 mt-1">Expires in {{ days_diff }} day(s)</div>
                                             {% elif days_diff <= 0 %}
