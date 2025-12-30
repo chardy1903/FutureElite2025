@@ -3995,15 +3995,24 @@ def sync_all_subscriptions():
         if errors:
             message += f' {len(errors)} error(s) occurred.'
         
+        current_app.logger.info(f"Sync completed: {synced_count} synced, {len(errors)} errors")
+        
         return jsonify({
             'success': True,
             'message': message,
             'synced_count': synced_count,
             'errors': errors[:5]  # Limit errors to first 5
-        })
+        }), 200
     except Exception as e:
         current_app.logger.error(f"Error syncing all subscriptions: {e}", exc_info=True)
-        return jsonify({'success': False, 'errors': [str(e)]}), 500
+        import traceback
+        error_trace = traceback.format_exc()
+        current_app.logger.error(f"Full traceback: {error_trace}")
+        return jsonify({
+            'success': False, 
+            'errors': [str(e)],
+            'error_details': error_trace[:500] if current_app.debug else None
+        }), 500
 
 
 # ============================================================================

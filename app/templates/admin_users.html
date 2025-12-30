@@ -174,7 +174,7 @@
             <button onclick="exportUsers()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-qadsiah-red hover:bg-red-700">
                 Export Users (JSON)
             </button>
-            <button onclick="syncAllSubscriptions()" class="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+            <button onclick="syncAllSubscriptions()" class="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700" id="syncSubscriptionsBtn">
                 Sync Subscriptions from Stripe
             </button>
             <button onclick="checkOverdueSubscriptions()" class="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700">
@@ -262,6 +262,7 @@ async function syncAllSubscriptions() {
     
     try {
         showLoading('Syncing subscriptions from Stripe...');
+        
         const response = await fetch('/api/admin/sync-all-subscriptions', {
             method: 'POST',
             credentials: 'include',
@@ -269,6 +270,25 @@ async function syncAllSubscriptions() {
                 'Content-Type': 'application/json'
             }
         });
+        
+        // Check if response is OK
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Sync failed with status:', response.status, 'Response:', errorText);
+            throw new Error(`Server returned ${response.status}: ${errorText.substring(0, 100)}`);
+        }
+        
+        // Check if response is JSON before parsing
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('Non-JSON response from sync:', {
+                status: response.status,
+                contentType: contentType,
+                body: text.substring(0, 200)
+            });
+            throw new Error(`Expected JSON response, got ${contentType || 'unknown'}. Status: ${response.status}`);
+        }
         
         const data = await response.json();
         
@@ -281,12 +301,15 @@ async function syncAllSubscriptions() {
             }, 1500);
         } else {
             hideLoading();
-            showToast('Error syncing subscriptions: ' + (data.errors?.join(', ') || 'Unknown error'), 'error');
+            const errorMsg = data.errors ? (Array.isArray(data.errors) ? data.errors.join(', ') : String(data.errors)) : 'Unknown error';
+            console.error('Sync returned success=false:', data);
+            showToast('Error syncing subscriptions: ' + errorMsg, 'error');
         }
     } catch (error) {
         hideLoading();
         console.error('Sync subscriptions error:', error);
-        showToast('Error syncing subscriptions: ' + error.message, 'error');
+        const errorMsg = error.message || 'An unexpected error occurred';
+        showToast('Error syncing subscriptions: ' + errorMsg, 'error');
     }
 }
 
