@@ -231,11 +231,12 @@ def create_app():
                 'default-src': "'self'",
                 # unsafe-inline needed for inline scripts in templates (e.g., tailwind.config)
                 # Consider moving to external JS files in future for stricter CSP
-                'script-src': "'self' 'unsafe-inline'",
+                # Allow Stripe.js for payment processing
+                'script-src': "'self' 'unsafe-inline' https://js.stripe.com",
                 'style-src': "'self' 'unsafe-inline'",  # unsafe-inline needed for inline styles
                 'img-src': "'self' data: https:",
                 'font-src': "'self' data:",
-                'connect-src': "'self'",
+                'connect-src': "'self' https://api.stripe.com",
             },
             frame_options='DENY',
             referrer_policy='strict-origin-when-cross-origin'
@@ -321,6 +322,7 @@ def create_app():
             csrf.exempt('auth.register')
             csrf.exempt('auth.forgot_password')
             csrf.exempt('subscription.stripe_webhook')
+            csrf.exempt('subscription.create_checkout_session')
             csrf.exempt('main.import_excel')
             csrf.exempt('main.import_data')
             csrf.exempt('main.cancel_user_subscription')
@@ -329,13 +331,14 @@ def create_app():
             # Also try function reference as backup (may not work if wrapped by rate limiter)
             try:
                 from .auth_routes import login, register, forgot_password
-                from .subscription_routes import stripe_webhook, get_subscription_status
+                from .subscription_routes import stripe_webhook, get_subscription_status, create_checkout_session
                 from .routes import import_excel, import_data, generate_scout_pdf_route, generate_pdf, cancel_user_subscription, check_overdue_subscriptions
                 csrf.exempt(login)
                 csrf.exempt(register)
                 csrf.exempt(forgot_password)
                 csrf.exempt(stripe_webhook)
                 csrf.exempt(get_subscription_status)
+                csrf.exempt(create_checkout_session)
                 csrf.exempt(import_excel)
                 csrf.exempt(import_data)
                 csrf.exempt(generate_scout_pdf_route)
