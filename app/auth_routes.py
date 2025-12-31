@@ -113,10 +113,15 @@ def login():
     """Login page"""
     if request.method == 'POST':
         try:
+            # Debug logging
+            current_app.logger.info(f"Login request - is_json: {request.is_json}, content_type: {request.content_type}, method: {request.method}")
+            
             data = request.get_json() if request.is_json else request.form.to_dict()
             
             username = data.get('username', '').strip()
             password = data.get('password', '')
+            
+            current_app.logger.info(f"Login attempt for username: {username[:10]}... (length: {len(username)})")
             
             if not username or not password:
                 if request.is_json:
@@ -126,6 +131,7 @@ def login():
             
             # Get user
             user = storage.get_user_by_username(username)
+            current_app.logger.info(f"User lookup result: {'found' if user else 'not found'}")
             
             # Security: Constant-time password checking to prevent timing attacks
             # Always perform a hash check, even if user doesn't exist
