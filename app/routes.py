@@ -2361,7 +2361,16 @@ def physical_data_analysis():
         
         # Get data from request (client-side storage for measurements and metrics)
         data = request.get_json() if request.is_json else {}
-        measurements_data = data.get('measurements', [])
+        
+        # Load measurements from server first (most up-to-date), fall back to client data
+        server_measurements = storage.get_all_physical_measurements(user_id)
+        if server_measurements:
+            # Use server measurements (most accurate)
+            measurements_data = [m.model_dump() for m in server_measurements]
+        else:
+            # Fall back to client-provided measurements
+            measurements_data = data.get('measurements', [])
+        
         physical_metrics_data = data.get('physical_metrics', [])
         
         # If client provided settings and server settings don't have date_of_birth, try client settings
