@@ -16,13 +16,26 @@ const clientAuth = {
             // SECURITY: Send plain password to server over HTTPS for secure server-side verification
             // Server uses werkzeug's scrypt-based password hashing
             // Note: Login endpoint is exempt from CSRF (entry point, rate-limited, requires credentials)
+            
+            // Ensure password is a string and not modified
+            if (typeof password !== 'string') {
+                password = String(password);
+            }
+            
+            // Debug logging (remove in production)
+            console.log('Login attempt:', {
+                username: username,
+                passwordLength: password.length,
+                passwordType: typeof password
+            });
+            
             const response = await fetch('/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 credentials: 'include', // Include cookies for session
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ username: username.trim(), password: password })
             });
 
             // Check if response is JSON before parsing
