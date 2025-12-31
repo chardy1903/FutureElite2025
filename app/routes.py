@@ -2422,20 +2422,30 @@ def physical_data_analysis():
         # Settings already loaded from server above
         
         # Convert measurement dates from YYYY-MM-DD to dd MMM yyyy format if needed
+        # Server measurements are already in correct format, but client might send YYYY-MM-DD
         cleaned_measurements_data = []
         for m in measurements_data:
             cleaned_m = m.copy()
             # Check if date is in YYYY-MM-DD format and convert
             if 'date' in cleaned_m and cleaned_m['date']:
                 date_str = str(cleaned_m['date']).strip()
+                # Only convert if it's in YYYY-MM-DD format (client might send this)
                 if '-' in date_str and len(date_str) == 10 and date_str.count('-') == 2:
                     try:
                         # Convert from YYYY-MM-DD to dd MMM yyyy
                         cleaned_m['date'] = parse_input_date(date_str)
                     except Exception as e:
-                        # If conversion fails, skip this measurement or use original
-                        print(f"Warning: Could not convert date {date_str}: {e}")
-                        continue
+                        # If conversion fails, log but don't skip - use original date
+                        current_app.logger.warning(f"Could not convert date {date_str}: {e}, using original")
+                        # Don't skip - try to use original date format
+                # If date is already in "dd MMM yyyy" format, validate it
+                else:
+                    try:
+                        # Validate that it's in the expected format
+                        datetime.strptime(date_str, "%d %b %Y")
+                    except ValueError:
+                        # If validation fails, log warning but don't skip
+                        current_app.logger.warning(f"Date format unexpected: {date_str}, but continuing")
             cleaned_measurements_data.append(cleaned_m)
         
         measurements = [PhysicalMeasurement(**m) for m in cleaned_measurements_data]
