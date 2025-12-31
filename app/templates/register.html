@@ -54,9 +54,9 @@ document.getElementById('registerForm').addEventListener('submit', async functio
     e.preventDefault();
     
     const formData = new FormData(this);
-    const username = formData.get('username');
-    const email = formData.get('email');
-    const password = formData.get('password');
+    const username = formData.get('username')?.trim() || '';
+    const email = formData.get('email')?.trim() || '';
+    const password = formData.get('password') || ''; // Don't trim password - preserve exact value
     
     // Validate email is provided
     if (!email || !email.trim()) {
