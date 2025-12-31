@@ -137,6 +137,15 @@ def login():
             user = storage.get_user_by_username(username)
             current_app.logger.info(f"User lookup result: {'found' if user else 'not found'}")
             
+            if user:
+                current_app.logger.info(
+                    f"User details - username: '{user.username}', "
+                    f"has password_hash: {bool(user.password_hash)}, "
+                    f"password_hash type: {type(user.password_hash)}, "
+                    f"password_hash length: {len(user.password_hash) if user.password_hash else 0}, "
+                    f"password_hash preview: {user.password_hash[:30] if user.password_hash else 'None'}..."
+                )
+            
             # Security: Constant-time password checking to prevent timing attacks
             # Always perform a hash check, even if user doesn't exist
             password_hash_to_check = DUMMY_PASSWORD_HASH
@@ -148,6 +157,7 @@ def login():
                     password_hash_to_check = DUMMY_PASSWORD_HASH
                 else:
                     password_hash_to_check = user.password_hash
+                    current_app.logger.info(f"Using password hash for verification (length: {len(password_hash_to_check)})")
             
             # Perform constant-time password check
             try:
