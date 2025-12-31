@@ -121,7 +121,11 @@ def login():
             username = data.get('username', '').strip()
             password = data.get('password', '')
             
-            current_app.logger.info(f"Login attempt for username: {username[:10]}... (length: {len(username)})")
+            # Log password info for debugging (without exposing actual password)
+            current_app.logger.info(
+                f"Login attempt - username: '{username}' (length: {len(username)}), "
+                f"password length: {len(password)}, password type: {type(password)}"
+            )
             
             if not username or not password:
                 if request.is_json:
@@ -148,6 +152,14 @@ def login():
             # Perform constant-time password check
             try:
                 password_valid = check_password_hash(password_hash_to_check, password)
+                current_app.logger.info(f"Password check result for {username}: {password_valid}")
+                if user and not password_valid:
+                    # Log hash details for debugging (without exposing the actual hash)
+                    current_app.logger.warning(
+                        f"Password mismatch for {username}. "
+                        f"Hash format: {password_hash_to_check[:20] if password_hash_to_check else 'None'}..., "
+                        f"Hash length: {len(password_hash_to_check) if password_hash_to_check else 0}"
+                    )
             except ValueError as e:
                 # Invalid hash format - log error and treat as auth failure
                 current_app.logger.error(f"Password hash validation error for user {username}: {e}", exc_info=True)
@@ -228,10 +240,16 @@ def register():
             data = request.get_json() if request.is_json else request.form.to_dict()
             
             username = data.get('username', '').strip()
-            password = data.get('password', '')
+            password = data.get('password', '')  # Don't strip password - preserve exact value
             # Email is now required for password reset functionality
             email_value = data.get('email', '').strip()
             email = email_value.lower() if email_value else None
+            
+            # Log registration info for debugging (without exposing actual password)
+            current_app.logger.info(
+                f"Registration attempt - username: '{username}' (length: {len(username)}), "
+                f"password length: {len(password)}, email: '{email or 'none'}'"
+            )
             
             # Validate inputs
             if not username or not password:
