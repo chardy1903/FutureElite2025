@@ -1010,16 +1010,22 @@ class StorageManager:
                 self._save_references(updated_references)
             
             # Delete reset tokens (if any exist for this user)
-            reset_tokens = self.load_reset_tokens()
-            updated_tokens = []
-            for token_data in reset_tokens:
-                # Check if token belongs to this user
-                token_user = self.get_user_by_id(token_data.get('user_id', ''))
-                if token_user and token_user.id == user_id:
-                    continue  # Skip this token
-                updated_tokens.append(token_data)
-            if len(updated_tokens) != len(reset_tokens):
-                self._save_reset_tokens(updated_tokens)
+            try:
+                reset_tokens = self._load_reset_tokens()
+                updated_tokens = []
+                for token_data in reset_tokens:
+                    # Check if token belongs to this user
+                    token_user_id = token_data.get('user_id', '')
+                    if token_user_id == user_id:
+                        continue  # Skip this token
+                    updated_tokens.append(token_data)
+                if len(updated_tokens) != len(reset_tokens):
+                    self._save_reset_tokens(updated_tokens)
+            except Exception as e:
+                # Reset tokens deletion is optional, don't fail if it errors
+                import traceback
+                traceback.print_exc()
+                pass
             
             return True
         except Exception as e:

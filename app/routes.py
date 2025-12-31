@@ -3877,7 +3877,9 @@ def delete_user(user_id):
             
     except Exception as e:
         current_app.logger.error(f"Error deleting user {user_id}: {e}", exc_info=True)
-        return jsonify({'success': False, 'errors': [str(e)]}), 500
+        import traceback
+        current_app.logger.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'errors': [f'Error deleting user: {str(e)}']}), 500
 
 
 @bp.route('/api/admin/check-overdue-subscriptions', methods=['POST'])
