@@ -1009,6 +1009,56 @@ const FREE_TIER_LIMITS = {
     references: 1
 };
 
+// Check if user has active subscription
+async function checkSubscriptionAccess() {
+    try {
+        await ensureStorageReady();
+        const userId = clientStorage.getCurrentUserId();
+        if (!userId) {
+            return false;
+        }
+        
+        // Try to get subscription from server first
+        try {
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            // Add CSRF token if available
+            try {
+                const csrfToken = await csrfManager.getToken();
+                if (csrfToken) {
+                    headers['X-CSRFToken'] = csrfToken;
+                }
+            } catch (error) {
+                console.warn('Failed to get CSRF token:', error);
+            }
+            
+            const response = await fetch('/api/subscription/status', {
+                method: 'POST',
+                headers: headers,
+                credentials: 'include',
+                body: JSON.stringify({ user_id: userId })
+            });
+            const data = await response.json();
+            if (data.success && data.subscription && data.subscription.has_access) {
+                // Sync to client storage
+                await clientStorage.saveSubscription(data.subscription);
+                return true;
+            }
+        } catch (e) {
+            console.warn('Could not check subscription from server:', e);
+        }
+        
+        // Fallback to client storage
+        const subscription = await clientStorage.getSubscription(userId);
+        return subscription && subscription.status === 'active';
+    } catch (error) {
+        console.error('Error checking subscription:', error);
+        return false;
+    }
+}
+
 // Check if user can add more of a resource type
 async function checkResourceLimit(resourceType) {
     const hasAccess = await checkSubscriptionAccess();

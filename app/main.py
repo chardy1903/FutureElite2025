@@ -232,7 +232,7 @@ def create_app():
                 # unsafe-inline needed for inline scripts in templates (e.g., tailwind.config)
                 # Consider moving to external JS files in future for stricter CSP
                 # Allow Stripe.js for payment processing
-                'script-src': "'self' 'unsafe-inline' https://js.stripe.com",
+                'script-src': "'self' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net",
                 'style-src': "'self' 'unsafe-inline'",  # unsafe-inline needed for inline styles
                 'img-src': "'self' data: https:",
                 'font-src': "'self' data:",
