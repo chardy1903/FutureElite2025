@@ -348,11 +348,11 @@
                 <!-- Import -->
                 <div class="border-t pt-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Import Data</label>
-                    <input type="file" id="importFile" accept=".xlsx,.xls,.zip,application/json" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-qadsiah-red file:text-white hover:file:bg-red-700">
+                    <input type="file" id="importFile" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-qadsiah-red file:text-white hover:file:bg-red-700">
                     <button onclick="importData()" class="mt-2 w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-                        Import
+                        Import Excel
                     </button>
-                    <p class="mt-2 text-xs text-gray-500">Supports Excel files (.xlsx, .xls) or backup files (.zip, .json)</p>
+                    <p class="mt-2 text-xs text-gray-500">Excel files only (.xlsx, .xls)</p>
                 </div>
             </div>
         </div>
@@ -869,7 +869,7 @@ async function importData() {
     const file = fileInput.files[0];
     
     if (!file) {
-        showToast('Please select a file to import', 'error');
+        showToast('Please select an Excel file to import', 'error');
         return;
     }
     
@@ -882,85 +882,75 @@ async function importData() {
             return;
         }
         
-        showLoading('Importing data...');
-        
+        // Validate file type
         const fileName = file.name.toLowerCase();
-        const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+        if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
+            showToast('Please select an Excel file (.xlsx or .xls)', 'error');
+            return;
+        }
         
-        if (isExcel) {
-            // Import Excel file (matches only, replaces existing)
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('import_mode', 'replace'); // Default to replace for simplicity
+        showLoading('Importing Excel file...');
+        
+        // Import Excel file (matches only, replaces existing)
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('import_mode', 'replace'); // Default to replace for simplicity
+        
+        // Get CSRF token if available
+        let headers = {};
+        try {
+            const csrfToken = await csrfManager.getToken();
+            if (csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+        } catch (error) {
+            console.warn('Failed to get CSRF token:', error);
+        }
+        
+        const response = await fetch('/import-excel', {
+            method: 'POST',
+            headers: headers,
+            body: formData,
+            credentials: 'include'
+        });
+        
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error(`Server returned an unexpected response (${response.status}). Please try again.`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            const importedMatches = result.matches || [];
+            const currentUserId = clientStorage.getCurrentUserId();
             
-            // Get CSRF token if available
-            let headers = {};
-            try {
-                const csrfToken = await csrfManager.getToken();
-                if (csrfToken) {
-                    headers['X-CSRFToken'] = csrfToken;
+            // Replace all existing matches
+            const existingMatches = await clientStorage.getAllMatches();
+            for (const match of existingMatches) {
+                if (match.user_id === currentUserId) {
+                    await clientStorage.deleteMatch(match.id);
                 }
-            } catch (error) {
-                console.warn('Failed to get CSRF token:', error);
             }
             
-            const response = await fetch('/import-excel', {
-                method: 'POST',
-                headers: headers,
-                body: formData,
-                credentials: 'include'
-            });
-            
-            const contentType = response.headers.get('content-type') || '';
-            if (!contentType.includes('application/json')) {
-                const text = await response.text();
-                throw new Error(`Server returned an unexpected response (${response.status}). Please try again.`);
+            // Add imported matches
+            for (const matchData of importedMatches) {
+                matchData.user_id = currentUserId;
+                await clientStorage.saveMatch(matchData);
             }
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                const importedMatches = result.matches || [];
-                const currentUserId = clientStorage.getCurrentUserId();
-                
-                // Replace all existing matches
-                const existingMatches = await clientStorage.getAllMatches();
-                for (const match of existingMatches) {
-                    if (match.user_id === currentUserId) {
-                        await clientStorage.deleteMatch(match.id);
-                    }
-                }
-                
-                // Add imported matches
-                for (const matchData of importedMatches) {
-                    matchData.user_id = currentUserId;
-                    await clientStorage.saveMatch(matchData);
-                }
-                
-                hideLoading();
-                showToast(`Successfully imported ${result.imported || importedMatches.length} matches!`, 'success');
-                closeExportModal();
-                
-                if (typeof loadDashboardData === 'function') {
-                    await loadDashboardData();
-                } else {
-                    setTimeout(() => window.location.reload(), 1000);
-                }
-            } else {
-                throw new Error(result.errors?.[0] || 'Failed to import Excel file');
-            }
-        } else {
-            // Import ZIP/JSON backup file
-            const text = await file.text();
-            const data = JSON.parse(text);
-            
-            // Import data
-            await clientStorage.importData(data);
             
             hideLoading();
-            showToast('Data imported successfully!', 'success');
+            showToast(`Successfully imported ${result.imported || importedMatches.length} matches!`, 'success');
             closeExportModal();
-            setTimeout(() => window.location.reload(), 1000);
+            
+            if (typeof loadDashboardData === 'function') {
+                await loadDashboardData();
+            } else {
+                setTimeout(() => window.location.reload(), 1000);
+            }
+        } else {
+            throw new Error(result.errors?.[0] || 'Failed to import Excel file');
         }
         
     } catch (error) {
