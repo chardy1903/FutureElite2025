@@ -145,17 +145,16 @@
                                 {{ user.created_at }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                {% if user.subscription_status == 'active' %}
-                                    <button onclick="cancelSubscription('{{ user.id }}', '{{ user.username }}')" class="text-red-600 hover:text-red-900">
-                                        Cancel Subscription
+                                <div class="flex space-x-2">
+                                    {% if user.subscription_status == 'active' or user.subscription_status == 'past_due' %}
+                                        <button onclick="cancelSubscription('{{ user.id }}', '{{ user.username }}')" class="text-red-600 hover:text-red-900">
+                                            Cancel Subscription
+                                        </button>
+                                    {% endif %}
+                                    <button onclick="deleteUser('{{ user.id }}', '{{ user.username }}')" class="text-red-600 hover:text-red-900 font-semibold">
+                                        Delete User
                                     </button>
-                                {% elif user.subscription_status == 'past_due' %}
-                                    <button onclick="cancelSubscription('{{ user.id }}', '{{ user.username }}')" class="text-red-600 hover:text-red-900">
-                                        Cancel Subscription
-                                    </button>
-                                {% else %}
-                                    <span class="text-gray-400">-</span>
-                                {% endif %}
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -252,6 +251,47 @@ async function cancelSubscription(userId, username) {
         hideLoading();
         console.error('Cancel subscription error:', error);
         showToast('Error cancelling subscription: ' + error.message, 'error');
+    }
+}
+
+async function deleteUser(userId, username) {
+    if (!confirm(`WARNING: Are you sure you want to DELETE user "${username}"?\n\nThis will permanently delete:\n- User account\n- All matches\n- All settings\n- All physical measurements\n- All achievements\n- All club history\n- All training camps\n- All physical metrics\n- Subscription data\n- All references\n\nThis action CANNOT be undone!`)) {
+        return;
+    }
+    
+    // Double confirmation for safety
+    if (!confirm(`FINAL CONFIRMATION: Delete user "${username}"?\n\nThis action is PERMANENT and CANNOT be undone!`)) {
+        return;
+    }
+    
+    try {
+        showLoading('Deleting user and all associated data...');
+        
+        const response = await fetch(`/api/admin/delete-user/${userId}`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            hideLoading();
+            showToast(`User ${username} and all associated data have been deleted`, 'success');
+            // Reload page to show updated user list
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            hideLoading();
+            showToast('Error deleting user: ' + (data.errors?.join(', ') || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        hideLoading();
+        console.error('Delete user error:', error);
+        showToast('Error deleting user: ' + error.message, 'error');
     }
 }
 

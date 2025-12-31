@@ -933,6 +933,100 @@ class StorageManager:
         self._save_subscriptions(subscriptions)
         return subscription
     
+    def delete_user(self, user_id: str) -> bool:
+        """Delete a user and all their associated data"""
+        try:
+            # Load users
+            users = self.load_users()
+            
+            # Find and remove user
+            user_found = False
+            updated_users = []
+            for user_data in users:
+                if user_data.get('id') == user_id:
+                    user_found = True
+                    # Don't add this user to updated_users (effectively deleting it)
+                    continue
+                updated_users.append(user_data)
+            
+            if not user_found:
+                return False
+            
+            # Save updated users list
+            self._save_users(updated_users)
+            
+            # Delete all user-associated data
+            # Delete matches
+            matches = self.load_matches()
+            updated_matches = [m for m in matches if m.get('user_id') != user_id]
+            if len(updated_matches) != len(matches):
+                self._save_matches(updated_matches)
+            
+            # Delete settings
+            try:
+                settings_file = self.data_dir / f"settings_{user_id}.json"
+                if settings_file.exists():
+                    settings_file.unlink()
+            except Exception:
+                pass
+            
+            # Delete physical measurements
+            measurements = self.load_physical_measurements()
+            updated_measurements = [m for m in measurements if m.get('user_id') != user_id]
+            if len(updated_measurements) != len(measurements):
+                self._save_physical_measurements(updated_measurements)
+            
+            # Delete achievements
+            achievements = self.load_achievements()
+            updated_achievements = [a for a in achievements if a.get('user_id') != user_id]
+            if len(updated_achievements) != len(achievements):
+                self._save_achievements(updated_achievements)
+            
+            # Delete club history
+            club_history = self.load_club_history()
+            updated_club_history = [c for c in club_history if c.get('user_id') != user_id]
+            if len(updated_club_history) != len(club_history):
+                self._save_club_history(updated_club_history)
+            
+            # Delete training camps
+            training_camps = self.load_training_camps()
+            updated_training_camps = [t for t in training_camps if t.get('user_id') != user_id]
+            if len(updated_training_camps) != len(training_camps):
+                self._save_training_camps(updated_training_camps)
+            
+            # Delete physical metrics
+            physical_metrics = self.load_physical_metrics()
+            updated_physical_metrics = [p for p in physical_metrics if p.get('user_id') != user_id]
+            if len(updated_physical_metrics) != len(physical_metrics):
+                self._save_physical_metrics(updated_physical_metrics)
+            
+            # Delete subscription
+            self.delete_subscription(user_id)
+            
+            # Delete references
+            references = self.load_references()
+            updated_references = [r for r in references if r.get('user_id') != user_id]
+            if len(updated_references) != len(references):
+                self._save_references(updated_references)
+            
+            # Delete reset tokens (if any exist for this user)
+            reset_tokens = self.load_reset_tokens()
+            updated_tokens = []
+            for token_data in reset_tokens:
+                # Check if token belongs to this user
+                token_user = self.get_user_by_id(token_data.get('user_id', ''))
+                if token_user and token_user.id == user_id:
+                    continue  # Skip this token
+                updated_tokens.append(token_data)
+            if len(updated_tokens) != len(reset_tokens):
+                self._save_reset_tokens(updated_tokens)
+            
+            return True
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return False
+    
     def delete_subscription(self, user_id: str) -> bool:
         """Delete a subscription"""
         subscriptions = self.load_subscriptions()

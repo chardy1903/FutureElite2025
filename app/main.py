@@ -329,6 +329,7 @@ def create_app():
             csrf.exempt('main.import_data')
             csrf.exempt('main.physical_data_analysis')
             csrf.exempt('main.cancel_user_subscription')
+            csrf.exempt('main.delete_user')
             csrf.exempt('main.check_overdue_subscriptions')
             csrf.exempt('main.sync_all_subscriptions')
             

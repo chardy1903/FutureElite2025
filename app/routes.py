@@ -3841,6 +3841,45 @@ def api_admin_users():
         return jsonify({'success': False, 'errors': ['Error loading users']}), 500
 
 
+@bp.route('/api/admin/delete-user/<user_id>', methods=['POST'])
+@login_required
+def delete_user(user_id):
+    """Delete a user and all their associated data (admin only)"""
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    current_username = current_user.username.strip() if current_user.username else ''
+    
+    if admin_username and current_username != admin_username:
+        return jsonify({'success': False, 'errors': ['Access denied']}), 403
+    
+    # Prevent admin from deleting themselves
+    if current_username == admin_username:
+        user_to_delete = storage.get_user_by_id(user_id)
+        if user_to_delete and user_to_delete.username == admin_username:
+            return jsonify({'success': False, 'errors': ['Cannot delete your own admin account']}), 400
+    
+    try:
+        # Verify user exists
+        user = storage.get_user_by_id(user_id)
+        if not user:
+            return jsonify({'success': False, 'errors': ['User not found']}), 404
+        
+        # Delete user and all associated data
+        success = storage.delete_user(user_id)
+        
+        if success:
+            current_app.logger.info(f"User {user.username} (ID: {user_id}) deleted by admin {current_username}")
+            return jsonify({
+                'success': True,
+                'message': f'User {user.username} and all associated data have been deleted'
+            })
+        else:
+            return jsonify({'success': False, 'errors': ['Failed to delete user']}), 500
+            
+    except Exception as e:
+        current_app.logger.error(f"Error deleting user {user_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'errors': [str(e)]}), 500
+
+
 @bp.route('/api/admin/check-overdue-subscriptions', methods=['POST'])
 @login_required
 def check_overdue_subscriptions():
