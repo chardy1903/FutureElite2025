@@ -2466,13 +2466,17 @@ def physical_data_analysis():
         # Compare player metrics to elite benchmarks
         comparisons = {}
         
-        # Height comparison - use settings (current snapshot) or latest measurement
-        height_for_comparison = settings.height_cm
-        if not height_for_comparison and measurements:
+        # Height comparison - use latest measurement (most accurate) or fall back to settings
+        height_for_comparison = None
+        if measurements:
             valid_measurements = [m for m in measurements if m.height_cm is not None]
             if valid_measurements:
                 latest_measurement = max(valid_measurements, key=lambda m: datetime.strptime(m.date, "%d %b %Y"))
                 height_for_comparison = latest_measurement.height_cm
+        
+        # Fall back to settings if no measurements available
+        if not height_for_comparison:
+            height_for_comparison = settings.height_cm
         
         if height_for_comparison:
             comparisons['height'] = compare_to_elite(
