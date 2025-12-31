@@ -406,7 +406,7 @@
                         link.style.display = 'none';
                     });
                     if (adminLink) {
-                        adminLink.style.display = 'block';
+                        adminLink.style.display = 'inline-block'; // Use inline-block for horizontal layout
                         // Add to mobile menu
                         const mobileLink = document.createElement('a');
                         mobileLink.href = adminLink.href;
@@ -418,7 +418,7 @@
                 } else {
                     // Regular users: show all player-facing links, hide Admin link
                     playerNavLinks.forEach(link => {
-                        link.style.display = 'block';
+                        link.style.display = 'inline-block'; // Use inline-block for horizontal layout instead of block
                         // Add to mobile menu
                         const mobileLink = document.createElement('a');
                         mobileLink.href = link.href;
