@@ -151,7 +151,10 @@ def create_app():
                         self._auth_endpoints = {
                             'auth.login', 'auth.register', 'auth.forgot_password',
                             'main.import_excel', 'main.import_data', 'main.scout_pdf', 'main.generate_pdf',
-                            'subscription.get_subscription_status'
+                            'subscription.get_subscription_status', 'main.physical_data_analysis',
+                            'main.cancel_user_subscription', 'main.delete_user',
+                            'main.check_overdue_subscriptions', 'main.sync_all_subscriptions',
+                            'main.send_contact_email'
                         }
                     
                     def __contains__(self, item):
