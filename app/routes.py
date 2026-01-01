@@ -4248,6 +4248,8 @@ def faq():
 @bp.route('/example-report')
 def example_report():
     """Example Report Preview page"""
+    # Explicitly use support@futureelite.pro (can be overridden by SUPPORT_EMAIL env var)
+    support_email = os.environ.get('SUPPORT_EMAIL', '').strip() or 'support@futureelite.pro'
     return render_template('legal/example_report.html',
-                         support_email=SUPPORT_EMAIL,
+                         support_email=support_email,
                          current_year=CURRENT_YEAR)
