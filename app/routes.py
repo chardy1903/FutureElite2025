@@ -4134,6 +4134,96 @@ def contact():
                          support_email=SUPPORT_EMAIL,
                          current_year=CURRENT_YEAR)
 
+
+@bp.route('/api/contact', methods=['POST'])
+def send_contact_email():
+    """Send contact form email"""
+    try:
+        data = request.get_json() if request.is_json else request.form.to_dict()
+        
+        # Validate required fields
+        name = data.get('name', '').strip()
+        email = data.get('email', '').strip()
+        category = data.get('category', '').strip()
+        subject = data.get('subject', '').strip()
+        message = data.get('message', '').strip()
+        
+        if not all([name, email, category, subject, message]):
+            return jsonify({'success': False, 'errors': ['All fields are required']}), 400
+        
+        # Check if email sending is enabled
+        admin_email = os.environ.get('ADMIN_EMAIL', '').strip() or SUPPORT_EMAIL
+        smtp_enabled = os.environ.get('SMTP_ENABLED', '').lower() in ('true', '1', 'on')
+        
+        if not smtp_enabled:
+            # Email not configured - return error so client can fallback to mailto
+            return jsonify({
+                'success': False,
+                'errors': ['Email sending is not configured. Please use the email address directly.']
+            }), 503
+        
+        # Get SMTP configuration
+        smtp_host = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
+        smtp_port = int(os.environ.get('SMTP_PORT', '587'))
+        smtp_user = os.environ.get('SMTP_USER', '').strip()
+        smtp_password = os.environ.get('SMTP_PASSWORD', '').strip()
+        
+        if not smtp_user or not smtp_password:
+            return jsonify({
+                'success': False,
+                'errors': ['Email sending is not configured. Please use the email address directly.']
+            }), 503
+        
+        # Create email
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        
+        msg = MIMEMultipart()
+        from_email = os.environ.get('FROM_EMAIL', '').strip() or 'admin@futureelite.pro'
+        msg['From'] = from_email
+        msg['Reply-To'] = email  # Set reply-to to the user's email
+        msg['To'] = admin_email
+        msg['Subject'] = f"[{category.upper()}] {subject}"
+        
+        body = f"""
+Contact Form Submission from FutureElite
+
+Name: {name}
+Email: {email}
+Category: {category}
+
+Subject: {subject}
+
+Message:
+{message}
+
+---
+This message was sent from the FutureElite contact form.
+        """
+        
+        msg.attach(MIMEText(body, 'plain'))
+        
+        # Send email
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.send_message(msg)
+        
+        current_app.logger.info(f"Contact form email sent from {email} to {admin_email}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Your message has been sent successfully. We will respond within 24-48 hours.'
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Failed to send contact form email: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'errors': [f'Failed to send email: {str(e)}']
+        }), 500
+
 @bp.route('/faq')
 def faq():
     """Frequently Asked Questions page"""

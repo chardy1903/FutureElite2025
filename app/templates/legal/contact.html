@@ -128,28 +128,49 @@
 
 {% block scripts %}
 <script>
-function submitContactForm(event) {
+async function submitContactForm(event) {
     event.preventDefault();
     
     const form = document.getElementById('contactForm');
     const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries());
     
-    // Build mailto link
-    const subject = encodeURIComponent(data.category ? `[${data.category.toUpperCase()}] ${data.subject}` : data.subject);
-    const body = encodeURIComponent(
-        `Name: ${data.name}\n` +
-        `Email: ${data.email}\n` +
-        `Category: ${data.category}\n\n` +
-        `Message:\n${data.message}`
-    );
-    const mailtoLink = `mailto:{{ support_email }}?subject=${subject}&body=${body}`;
-    
-    // Open mailto link
-    window.location.href = mailtoLink;
-    
-    // Show confirmation
-    showToast('Opening your email client...', 'success');
+    try {
+        showLoading('Sending message...');
+        
+        // Send to server endpoint
+        const result = await apiCall('/api/contact', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        
+        if (result.success) {
+            hideLoading();
+            showToast('Message sent successfully! We will respond within 24-48 hours.', 'success');
+            form.reset();
+        } else {
+            throw new Error(result.errors?.[0] || 'Failed to send message');
+        }
+    } catch (error) {
+        hideLoading();
+        console.error('Error sending contact form:', error);
+        
+        // Fallback to mailto if server fails
+        if (error.message.includes('Failed to send') || error.message.includes('SMTP')) {
+            const subject = encodeURIComponent(data.category ? `[${data.category.toUpperCase()}] ${data.subject}` : data.subject);
+            const body = encodeURIComponent(
+                `Name: ${data.name}\n` +
+                `Email: ${data.email}\n` +
+                `Category: ${data.category}\n\n` +
+                `Message:\n${data.message}`
+            );
+            const mailtoLink = `mailto:{{ support_email }}?subject=${subject}&body=${body}`;
+            window.location.href = mailtoLink;
+            showToast('Email sending not configured. Opening your email client instead...', 'info');
+        } else {
+            showToast(error.message, 'error');
+        }
+    }
 }
 </script>
 {% endblock %}
