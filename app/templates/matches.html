@@ -505,10 +505,16 @@ async function deleteMatch(matchId) {
     try {
         showLoading('Deleting match...');
         
-        await apiCall(`/matches/${matchId}`, { method: 'DELETE' });
+        // apiCall now handles deletion from both server and client storage
+        const result = await apiCall(`/matches/${matchId}`, { method: 'DELETE' });
         
         hideLoading();
-        showToast('Match deleted successfully!');
+        
+        if (result && result.success !== false) {
+            showToast('Match deleted successfully!');
+        } else {
+            showToast('Match deleted from local storage (may not exist on server)', 'info');
+        }
         
         // Reload data to show updated matches
         await loadMatchesData();
@@ -516,6 +522,7 @@ async function deleteMatch(matchId) {
     } catch (error) {
         hideLoading();
         console.error('Error deleting match:', error);
+        showToast('Error deleting match: ' + (error.message || 'Unknown error'), 'error');
     }
 }
 
