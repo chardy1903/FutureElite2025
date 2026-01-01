@@ -1364,9 +1364,8 @@ def import_excel():
         # Get import mode
         import_mode = request.form.get('import_mode', 'replace')  # 'replace' or 'append'
         
-        # Save file temporarily
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
-        file.save(temp_file.name)
+        # File is already saved in temp_file from above, reuse it
+        # No need to save again - the file object can only be read once
         
         # Check file size (max 10MB for Excel import)
         file_size = os.path.getsize(temp_file.name)
