@@ -1358,11 +1358,31 @@ async function deleteMeasurement(id) {
     try {
         showLoading('Deleting measurement...');
         
-        const result = await apiCall(`/api/physical-measurements/${id}`, {
-            method: 'DELETE'
-        });
+        // Try server first
+        let result;
+        try {
+            result = await apiCall(`/api/physical-measurements/${id}`, {
+                method: 'DELETE'
+            });
+        } catch (serverError) {
+            // If server delete fails, try deleting from client storage
+            console.warn('Server delete failed, trying client storage:', serverError);
+            try {
+                await clientStorage.deletePhysicalMeasurement(id);
+                result = { success: true };
+            } catch (clientError) {
+                throw new Error('Failed to delete measurement from both server and client storage');
+            }
+        }
         
         if (result.success) {
+            // Also delete from client storage to keep in sync
+            try {
+                await clientStorage.deletePhysicalMeasurement(id);
+            } catch (e) {
+                console.warn('Failed to delete from client storage:', e);
+            }
+            
             hideLoading();
             showToast('Measurement deleted successfully!');
             

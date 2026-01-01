@@ -236,7 +236,7 @@ def create_app():
                 'style-src': "'self' 'unsafe-inline'",  # unsafe-inline needed for inline styles
                 'img-src': "'self' data: https:",
                 'font-src': "'self' data:",
-                'connect-src': "'self' https://api.stripe.com",
+                'connect-src': "'self' https://api.stripe.com https://cdn.jsdelivr.net",
                 # Allow Stripe Checkout iframes
                 'frame-src': "'self' https://js.stripe.com https://hooks.stripe.com",
             },
