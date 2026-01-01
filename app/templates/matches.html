@@ -662,7 +662,22 @@ async function loadMatchesData() {
                                 matchMap.set(m.id, m);
                             }
                         });
-                        // Sync to client storage
+                        
+                        // Clean up client storage: remove all matches, then add only server matches
+                        // This ensures no duplicates remain in client storage
+                        try {
+                            const allClientMatches = await clientStorage.getAllMatches();
+                            for (const cm of allClientMatches) {
+                                if (cm && cm.id) {
+                                    await clientStorage.deleteMatch(cm.id);
+                                }
+                            }
+                            console.log('Cleared client storage matches');
+                        } catch (e) {
+                            console.warn('Failed to clear client storage:', e);
+                        }
+                        
+                        // Sync server matches to client storage (fresh copy, no duplicates)
                         for (const m of serverMatches) {
                             try {
                                 await clientStorage.saveMatch(m);
@@ -670,9 +685,39 @@ async function loadMatchesData() {
                                 console.warn('Failed to sync match to client storage:', e);
                             }
                         }
+                        console.log(`Synced ${serverMatches.length} matches from server to client storage`);
                     }
                 } catch (e) {
                     console.warn('Failed to reload from server after sync:', e);
+                }
+            } else {
+                // Even if no matches were synced, ensure client storage matches server
+                // This helps remove any duplicates that might exist
+                try {
+                    const serverData = await apiCall('/api/matches');
+                    if (serverData.success && serverData.matches) {
+                        const serverMatchIds = new Set(serverData.matches.map(m => m.id));
+                        const allClientMatches = await clientStorage.getAllMatches();
+                        
+                        // Remove any client matches that don't exist on server
+                        for (const cm of allClientMatches) {
+                            if (cm && cm.id && !serverMatchIds.has(cm.id)) {
+                                await clientStorage.deleteMatch(cm.id);
+                                console.log(`Removed orphaned match ${cm.id} from client storage`);
+                            }
+                        }
+                        
+                        // Ensure all server matches are in client storage
+                        for (const sm of serverData.matches) {
+                            try {
+                                await clientStorage.saveMatch(sm);
+                            } catch (e) {
+                                console.warn('Failed to sync match to client storage:', e);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to sync client storage with server:', e);
                 }
             }
         }
