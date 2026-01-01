@@ -916,12 +916,13 @@ async function loadMeasurements() {
         
         // Load measurements from server first (most up-to-date with correct date format)
         let measurements = [];
+        let serverMeasurements = [];
         try {
             const serverData = await apiCall('/api/physical-measurements');
             if (serverData.success && serverData.measurements) {
-                measurements = serverData.measurements;
+                serverMeasurements = serverData.measurements;
                 // Sync to client storage
-                for (const m of measurements) {
+                for (const m of serverMeasurements) {
                     try {
                         await clientStorage.savePhysicalMeasurement(m);
                     } catch (e) {
@@ -931,8 +932,34 @@ async function loadMeasurements() {
             }
         } catch (e) {
             console.warn('Could not load measurements from server, using client storage:', e);
-            measurements = await clientStorage.getAllPhysicalMeasurements();
         }
+        
+        // Also load from client storage to catch any measurements that might have been filtered out by server validation
+        let clientMeasurements = [];
+        try {
+            clientMeasurements = await clientStorage.getAllPhysicalMeasurements();
+        } catch (e) {
+            console.warn('Could not load measurements from client storage:', e);
+        }
+        
+        // Merge server and client measurements, prioritizing server data but including any client-only entries
+        const measurementMap = new Map();
+        
+        // First add all server measurements
+        serverMeasurements.forEach(m => {
+            if (m && m.id) {
+                measurementMap.set(m.id, m);
+            }
+        });
+        
+        // Then add any client measurements that aren't in server data
+        clientMeasurements.forEach(m => {
+            if (m && m.id && !measurementMap.has(m.id)) {
+                measurementMap.set(m.id, m);
+            }
+        });
+        
+        measurements = Array.from(measurementMap.values());
         
         const tbody = document.getElementById('measurementsTableBody');
         
