@@ -1067,13 +1067,19 @@ def import_data(file_path=None, filename=None):
                 return jsonify({'success': False, 'errors': ['Failed to import data']}), 400
         
         # Import from ZIP file (existing functionality)
+        # Only process as ZIP if it's actually a ZIP file
+        if not is_zip:
+            if temp_file:
+                os.unlink(temp_file_path)
+            return jsonify({'success': False, 'errors': ['File must be a ZIP file (.zip) for full backup import']}), 400
+        
         # Security: ZIP bomb protection - check uncompressed size and file count
         MAX_UNCOMPRESSED_SIZE = 50 * 1024 * 1024  # 50MB
         MAX_FILES_IN_ZIP = 100
         MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB per file
         
         # Extract and import data
-        with zipfile.ZipFile(temp_file.name, 'r') as zip_file:
+        with zipfile.ZipFile(temp_file_path, 'r') as zip_file:
             # Security: Check number of files
             file_list = zip_file.namelist()
             if len(file_list) > MAX_FILES_IN_ZIP:
