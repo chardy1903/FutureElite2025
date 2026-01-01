@@ -4094,8 +4094,10 @@ def sync_all_subscriptions():
 @bp.route('/privacy')
 def privacy():
     """Privacy Policy page"""
+    # Explicitly use support@futureelite.pro (can be overridden by SUPPORT_EMAIL env var)
+    support_email = os.environ.get('SUPPORT_EMAIL', '').strip() or 'support@futureelite.pro'
     return render_template('legal/privacy.html', 
-                         support_email=SUPPORT_EMAIL,
+                         support_email=support_email,
                          current_year=CURRENT_YEAR)
 
 @bp.route('/terms')
@@ -4128,9 +4130,11 @@ def disclaimers():
 @bp.route('/subscription-info')
 def subscription_info():
     """Subscription & Billing Information page"""
+    # Explicitly use support@futureelite.pro (can be overridden by SUPPORT_EMAIL env var)
+    support_email = os.environ.get('SUPPORT_EMAIL', '').strip() or 'support@futureelite.pro'
     return render_template('legal/subscription_info.html',
                          pricing=SUBSCRIPTION_PRICING,
-                         support_email=SUPPORT_EMAIL,
+                         support_email=support_email,
                          current_year=CURRENT_YEAR)
 
 @bp.route('/contact')
