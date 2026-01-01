@@ -3230,13 +3230,20 @@ def generate_scout_pdf_route():
 
 
 @bp.route('/club-history')
+@login_required
 def club_history_page():
     """Club History page"""
-    settings = storage.load_settings()
-    club_history = storage.get_all_club_history()
+    # Redirect admin users to admin page
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    if admin_username and current_user.username == admin_username:
+        return redirect(url_for('main.admin_users'))
+    
+    user_id = current_user.id
+    settings = storage.load_settings(user_id)
+    club_history = storage.get_all_club_history(user_id)
     # Sort by season descending (most recent first)
     club_history.sort(key=lambda x: x.season, reverse=True)
-    return render_template('club_history.html', settings=settings, club_history=club_history)
+    return render_template('club_history.html', settings=settings, club_history=club_history, current_year=CURRENT_YEAR)
 
 
 @bp.route('/api/club-history')
@@ -3255,9 +3262,11 @@ def get_club_history():
 
 
 @bp.route('/api/club-history/<entry_id>')
+@login_required
 def get_club_history_entry(entry_id):
     """Get a specific club history entry"""
-    entry = storage.get_club_history_entry(entry_id)
+    user_id = current_user.id
+    entry = storage.get_club_history_entry(entry_id, user_id)
     if entry:
         return jsonify({'success': True, 'club_history': entry.model_dump()})
     else:
@@ -3337,9 +3346,11 @@ def update_club_history(entry_id):
 
 
 @bp.route('/api/club-history/<entry_id>', methods=['DELETE'])
+@login_required
 def delete_club_history(entry_id):
     """Delete a club history entry"""
-    success = storage.delete_club_history_entry(entry_id)
+    user_id = current_user.id
+    success = storage.delete_club_history_entry(entry_id, user_id)
     if success:
         return jsonify({'success': True})
     else:
@@ -3347,13 +3358,20 @@ def delete_club_history(entry_id):
 
 
 @bp.route('/training-camps')
+@login_required
 def training_camps_page():
     """Training camps management page"""
-    settings = storage.load_settings()
-    training_camps = storage.get_all_training_camps()
+    # Redirect admin users to admin page
+    admin_username = os.environ.get('ADMIN_USERNAME', '').strip()
+    if admin_username and current_user.username == admin_username:
+        return redirect(url_for('main.admin_users'))
+    
+    user_id = current_user.id
+    settings = storage.load_settings(user_id)
+    training_camps = storage.get_all_training_camps(user_id)
     # Sort by start date (most recent first)
     training_camps.sort(key=lambda x: datetime.strptime(x.start_date, "%d %b %Y"), reverse=True)
-    return render_template('training_camps.html', settings=settings, training_camps=training_camps)
+    return render_template('training_camps.html', settings=settings, training_camps=training_camps, current_year=CURRENT_YEAR)
 
 
 @bp.route('/api/training-camps')
@@ -3372,9 +3390,11 @@ def get_training_camps():
 
 
 @bp.route('/api/training-camps/<camp_id>')
+@login_required
 def get_training_camp(camp_id):
     """Get a specific training camp entry"""
-    camp = storage.get_training_camp(camp_id)
+    user_id = current_user.id
+    camp = storage.get_training_camp(camp_id, user_id)
     if camp:
         return jsonify({'success': True, 'training_camp': camp.model_dump()})
     else:
@@ -3466,9 +3486,11 @@ def update_training_camp(camp_id):
 
 
 @bp.route('/api/training-camps/<camp_id>', methods=['DELETE'])
+@login_required
 def delete_training_camp(camp_id):
     """Delete a training camp entry"""
-    success = storage.delete_training_camp(camp_id)
+    user_id = current_user.id
+    success = storage.delete_training_camp(camp_id, user_id)
     if success:
         return jsonify({'success': True})
     else:

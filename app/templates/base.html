@@ -452,7 +452,7 @@
                 // Redirect admin users from player pages to admin page
                 if (isAdmin) {
                     const currentPath = window.location.pathname;
-                    const playerPages = ['/', '/dashboard', '/settings', '/matches', '/achievements', '/player-profile', '/physical-data', '/physical-metrics', '/references', '/homepage'];
+                    const playerPages = ['/', '/dashboard', '/settings', '/matches', '/achievements', '/player-profile', '/physical-data', '/physical-metrics', '/club-history', '/training-camps', '/references', '/homepage'];
                     // Only redirect if not already on admin page
                     if (currentPath !== '/admin/users' && (playerPages.includes(currentPath) || currentPath.startsWith('/matches/') || currentPath.startsWith('/achievements/'))) {
                         console.log('Redirecting admin user from', currentPath, 'to /admin/users');
