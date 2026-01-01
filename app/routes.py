@@ -1713,8 +1713,8 @@ def import_excel():
                 continue
         
         # Clean up temp file
-        if temp_file and os.path.exists(temp_file_path):
-            os.unlink(temp_file_path)
+        if temp_file and os.path.exists(temp_file.name):
+            os.unlink(temp_file.name)
         
         if not imported_matches:
             error_msg = 'No valid matches found in Excel file.'
