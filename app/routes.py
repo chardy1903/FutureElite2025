@@ -949,23 +949,32 @@ def import_data(file_path=None, filename=None):
         if not (is_excel or is_zip):
             return jsonify({'success': False, 'errors': ['File must be an Excel file (.xlsx) or ZIP file (.zip)']}), 400
         
-        # Create temporary file
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
-        file.save(temp_file.name)
+        # Create temporary file or use provided file path
+        if file_path:
+            # Use provided file path
+            temp_file_path = file_path
+            temp_file = None  # We didn't create this file, so don't delete it
+        else:
+            # Save uploaded file to temp location
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
+            file.save(temp_file.name)
+            temp_file_path = temp_file.name
         
         # Security: Check file size (max 10MB)
-        file_size = os.path.getsize(temp_file.name)
+        file_size = os.path.getsize(temp_file_path)
         if file_size > 10 * 1024 * 1024:
-            os.unlink(temp_file.name)
+            if temp_file:
+                os.unlink(temp_file_path)
             return jsonify({'success': False, 'errors': ['File too large. Maximum size is 10MB']}), 400
         
         # Import from Excel file
         if is_excel:
             if not EXCEL_SUPPORT:
-                os.unlink(temp_file.name)
+                if temp_file:
+                    os.unlink(temp_file_path)
                 return jsonify({'success': False, 'errors': ['Excel support not available. Please install openpyxl: pip install openpyxl']}), 400
             
-            workbook = openpyxl.load_workbook(temp_file.name, data_only=True)
+            workbook = openpyxl.load_workbook(temp_file_path, data_only=True)
             
             # Initialize data structures
             matches_data = []
