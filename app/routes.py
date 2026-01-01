@@ -4101,22 +4101,28 @@ def privacy():
 @bp.route('/terms')
 def terms():
     """Terms & Conditions page"""
+    # Explicitly use support@futureelite.pro (can be overridden by SUPPORT_EMAIL env var)
+    support_email = os.environ.get('SUPPORT_EMAIL', '').strip() or 'support@futureelite.pro'
     return render_template('legal/terms.html',
-                         support_email=SUPPORT_EMAIL,
+                         support_email=support_email,
                          current_year=CURRENT_YEAR)
 
 @bp.route('/safeguarding')
 def safeguarding():
     """Child Safety & Safeguarding page"""
+    # Explicitly use support@futureelite.pro (can be overridden by SUPPORT_EMAIL env var)
+    support_email = os.environ.get('SUPPORT_EMAIL', '').strip() or 'support@futureelite.pro'
     return render_template('legal/safeguarding.html',
-                         support_email=SUPPORT_EMAIL,
+                         support_email=support_email,
                          current_year=CURRENT_YEAR)
 
 @bp.route('/disclaimers')
 def disclaimers():
     """Disclaimers page (PHV, Accuracy, etc.)"""
+    # Explicitly use support@futureelite.pro (can be overridden by SUPPORT_EMAIL env var)
+    support_email = os.environ.get('SUPPORT_EMAIL', '').strip() or 'support@futureelite.pro'
     return render_template('legal/disclaimers.html',
-                         support_email=SUPPORT_EMAIL,
+                         support_email=support_email,
                          current_year=CURRENT_YEAR)
 
 @bp.route('/subscription-info')
@@ -4130,7 +4136,7 @@ def subscription_info():
 @bp.route('/contact')
 def contact():
     """Contact & Support page"""
-    # Use support@futureelite.pro explicitly to ensure correct email
+    # Explicitly use support@futureelite.pro (can be overridden by SUPPORT_EMAIL env var)
     support_email = os.environ.get('SUPPORT_EMAIL', '').strip() or 'support@futureelite.pro'
     return render_template('legal/contact.html',
                          support_email=support_email,
@@ -4229,8 +4235,10 @@ This message was sent from the FutureElite contact form.
 @bp.route('/faq')
 def faq():
     """Frequently Asked Questions page"""
+    # Explicitly use support@futureelite.pro (can be overridden by SUPPORT_EMAIL env var)
+    support_email = os.environ.get('SUPPORT_EMAIL', '').strip() or 'support@futureelite.pro'
     return render_template('legal/faq.html',
-                         support_email=SUPPORT_EMAIL,
+                         support_email=support_email,
                          current_year=CURRENT_YEAR)
 
 @bp.route('/example-report')
