@@ -3247,10 +3247,12 @@ def club_history_page():
 
 
 @bp.route('/api/club-history')
+@login_required
 def get_club_history():
     """Get all club history entries"""
     try:
-        club_history = storage.get_all_club_history()
+        user_id = current_user.id
+        club_history = storage.get_all_club_history(user_id)
         # Sort by season descending
         club_history.sort(key=lambda x: x.season, reverse=True)
         return jsonify({
@@ -3258,6 +3260,7 @@ def get_club_history():
             'club_history': [h.model_dump() for h in club_history]
         })
     except Exception as e:
+        current_app.logger.error(f"Error getting club history: {e}", exc_info=True)
         return jsonify({'success': False, 'errors': [str(e)]}), 500
 
 
@@ -3375,10 +3378,12 @@ def training_camps_page():
 
 
 @bp.route('/api/training-camps')
+@login_required
 def get_training_camps():
     """Get all training camp entries"""
     try:
-        training_camps = storage.get_all_training_camps()
+        user_id = current_user.id
+        training_camps = storage.get_all_training_camps(user_id)
         # Sort by start date descending
         training_camps.sort(key=lambda x: datetime.strptime(x.start_date, "%d %b %Y"), reverse=True)
         return jsonify({
@@ -3386,6 +3391,7 @@ def get_training_camps():
             'training_camps': [c.model_dump() for c in training_camps]
         })
     except Exception as e:
+        current_app.logger.error(f"Error getting training camps: {e}", exc_info=True)
         return jsonify({'success': False, 'errors': [str(e)]}), 500
 
 
