@@ -1362,10 +1362,29 @@ async function deleteMeasurement(id) {
         let result;
         let serverSuccess = false;
         try {
-            result = await apiCall(`/api/physical-measurements/${id}`, {
-                method: 'DELETE'
-            });
-            serverSuccess = result.success;
+            // Suppress error toast for 404 - we'll handle it gracefully
+            const originalShowToast = window.showToast;
+            let errorSuppressed = false;
+            window.showToast = function(...args) {
+                // Suppress error toasts for measurement deletion 404s
+                if (args[1] === 'error' && args[0]?.includes('not found')) {
+                    errorSuppressed = true;
+                    return; // Don't show the toast
+                }
+                if (originalShowToast) {
+                    originalShowToast.apply(this, args);
+                }
+            };
+            
+            try {
+                result = await apiCall(`/api/physical-measurements/${id}`, {
+                    method: 'DELETE'
+                });
+                serverSuccess = result.success;
+            } finally {
+                // Restore original showToast
+                window.showToast = originalShowToast;
+            }
         } catch (serverError) {
             // If server delete fails (404 or other error), try deleting from client storage
             console.warn('Server delete failed, trying client storage:', serverError.message);
