@@ -905,31 +905,44 @@ def export_data():
                         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         
     except (IOError, OSError) as e:
-        if temp_file and os.path.exists(temp_file.name):
-            os.unlink(temp_file.name)
+        if temp_file and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
         return jsonify({'success': False, 'errors': [f'Error creating export: {str(e)}']}), 500
     except Exception as e:
-        if temp_file and os.path.exists(temp_file.name):
-            os.unlink(temp_file.name)
+        if temp_file and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
         return jsonify({'success': False, 'errors': [str(e)]}), 500
 
 
 @bp.route('/import', methods=['POST'])
 @login_required
-def import_data():
-    """Import data from Excel or ZIP file"""
+def import_data(file_path=None, filename=None):
+    """Import data from Excel or ZIP file
+    
+    Args:
+        file_path: Optional path to a file. If provided, uses this instead of request.files['file']
+        filename: Optional filename. If provided with file_path, uses this instead of file.filename
+    """
     temp_file = None
     try:
         user_id = current_user.id
-        if 'file' not in request.files:
-            return jsonify({'success': False, 'errors': ['No file provided']}), 400
         
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'success': False, 'errors': ['No file selected']}), 400
-        
-        # Validate filename to prevent path traversal
-        filename = os.path.basename(file.filename)
+        # If file_path is provided, use it directly
+        if file_path and os.path.exists(file_path):
+            file = None
+            if filename is None:
+                filename = os.path.basename(file_path)
+        else:
+            # Use file from request
+            if 'file' not in request.files:
+                return jsonify({'success': False, 'errors': ['No file provided']}), 400
+            
+            file = request.files['file']
+            if file.filename == '':
+                return jsonify({'success': False, 'errors': ['No file selected']}), 400
+            
+            # Validate filename to prevent path traversal
+            filename = os.path.basename(file.filename)
         is_excel = filename.endswith('.xlsx') or filename.endswith('.xls')
         is_zip = filename.endswith('.zip')
         
@@ -1036,8 +1049,8 @@ def import_data():
             success = storage.import_data(import_data, user_id)
             
             # Clean up
-            if temp_file and os.path.exists(temp_file.name):
-                os.unlink(temp_file.name)
+            if temp_file and os.path.exists(temp_file_path):
+                os.unlink(temp_file_path)
             
             if success:
                 return jsonify({'success': True, 'message': 'Data imported successfully from Excel file'})
@@ -1055,7 +1068,8 @@ def import_data():
             # Security: Check number of files
             file_list = zip_file.namelist()
             if len(file_list) > MAX_FILES_IN_ZIP:
-                os.unlink(temp_file.name)
+                if temp_file:
+                    os.unlink(temp_file_path)
                 return jsonify({'success': False, 'errors': [f'Too many files in archive. Maximum is {MAX_FILES_IN_ZIP} files.']}), 400
             
             # Security: Check uncompressed size
@@ -1063,17 +1077,20 @@ def import_data():
             for file_info in zip_file.infolist():
                 total_size += file_info.file_size
                 if total_size > MAX_UNCOMPRESSED_SIZE:
-                    os.unlink(temp_file.name)
+                    if temp_file:
+                        os.unlink(temp_file_path)
                     return jsonify({'success': False, 'errors': [f'Archive uncompressed size too large. Maximum is {MAX_UNCOMPRESSED_SIZE // (1024*1024)}MB.']}), 400
                 if file_info.file_size > MAX_FILE_SIZE:
-                    os.unlink(temp_file.name)
+                    if temp_file:
+                        os.unlink(temp_file_path)
                     return jsonify({'success': False, 'errors': [f'File {file_info.filename} is too large. Maximum is {MAX_FILE_SIZE // (1024*1024)}MB per file.']}), 400
             
             # Security: Check compression ratio (prevent ZIP bombs)
             if file_size > 0:
                 compression_ratio = total_size / file_size
                 if compression_ratio > 100:  # Suspicious compression ratio
-                    os.unlink(temp_file.name)
+                    if temp_file:
+                        os.unlink(temp_file_path)
                     return jsonify({'success': False, 'errors': ['Suspicious compression ratio detected. File may be a ZIP bomb.']}), 400
             
             # Read files with size limits
@@ -1090,14 +1107,16 @@ def import_data():
             # Read matches data
             matches_json = read_zip_file_safe(zip_file, 'matches.json')
             if matches_json is None:
-                os.unlink(temp_file.name)
+                if temp_file:
+                    os.unlink(temp_file_path)
                 return jsonify({'success': False, 'errors': ['Required file matches.json not found in archive']}), 400
             matches_data = json.loads(matches_json)
             
             # Read settings data
             settings_json = read_zip_file_safe(zip_file, 'settings.json')
             if settings_json is None:
-                os.unlink(temp_file.name)
+                if temp_file:
+                    os.unlink(temp_file_path)
                 return jsonify({'success': False, 'errors': ['Required file settings.json not found in archive']}), 400
             settings_data = json.loads(settings_json)
             
@@ -1150,8 +1169,8 @@ def import_data():
         success = storage.import_data(import_data, user_id)
         
         # Clean up
-        if temp_file and os.path.exists(temp_file.name):
-            os.unlink(temp_file.name)
+        if temp_file and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
         
         if success:
             return jsonify({'success': True})
@@ -1159,15 +1178,15 @@ def import_data():
             return jsonify({'success': False, 'errors': ['Failed to import data']}), 400
         
     except (zipfile.BadZipFile, json.JSONDecodeError, Exception) as e:
-        if temp_file and os.path.exists(temp_file.name):
-            os.unlink(temp_file.name)
+        if temp_file and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
         error_msg = str(e)
         if 'openpyxl' in error_msg.lower() or 'excel' in error_msg.lower():
             return jsonify({'success': False, 'errors': [f'Invalid Excel file format: {error_msg}']}), 400
         return jsonify({'success': False, 'errors': [f'Invalid file format: {error_msg}']}), 400
     except Exception as e:
-        if temp_file and os.path.exists(temp_file.name):
-            os.unlink(temp_file.name)
+        if temp_file and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
         return jsonify({'success': False, 'errors': [str(e)]}), 500
 
 
@@ -1304,33 +1323,17 @@ def import_excel():
         if is_full_backup:
             # Close the workbook check
             workbook_check.close()
-            # The temp_file will be handled by import_data()
-            # We need to recreate the file object for import_data
-            from werkzeug.datastructures import FileStorage
-            import shutil
             temp_file_path = temp_file.name
             temp_file.close()
             
-            # Create a new file object for import_data
-            with open(temp_file_path, 'rb') as f:
-                file_storage = FileStorage(
-                    stream=f,
-                    filename=filename,
-                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                )
-                # Temporarily replace request.files['file'] with our file
-                original_file = request.files.get('file')
-                request.files['file'] = file_storage
-                try:
-                    result = import_data()
-                    return result
-                finally:
-                    # Restore original file
-                    if original_file:
-                        request.files['file'] = original_file
-                    # Clean up temp file
-                    if os.path.exists(temp_file_path):
-                        os.unlink(temp_file_path)
+            # Call import_data with the file path directly (avoids ImmutableMultiDict issue)
+            try:
+                result = import_data(file_path=temp_file_path, filename=filename)
+                return result
+            finally:
+                # Clean up temp file
+                if os.path.exists(temp_file_path):
+                    os.unlink(temp_file_path)
         
         # Get import mode
         import_mode = request.form.get('import_mode', 'replace')  # 'replace' or 'append'
@@ -1685,8 +1688,8 @@ def import_excel():
                 continue
         
         # Clean up temp file
-        if temp_file and os.path.exists(temp_file.name):
-            os.unlink(temp_file.name)
+        if temp_file and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
         
         if not imported_matches:
             error_msg = 'No valid matches found in Excel file.'
@@ -1714,12 +1717,12 @@ def import_excel():
         return jsonify(response)
         
     except (IOError, OSError, ValueError) as e:
-        if temp_file and os.path.exists(temp_file.name):
-            os.unlink(temp_file.name)
+        if temp_file and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
         return jsonify({'success': False, 'errors': [f'Invalid Excel file: {str(e)}']}), 400
     except Exception as e:
-        if temp_file and os.path.exists(temp_file.name):
-            os.unlink(temp_file.name)
+        if temp_file and os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
         return jsonify({'success': False, 'errors': [f'Error importing Excel: {str(e)}']}), 500
 
 
