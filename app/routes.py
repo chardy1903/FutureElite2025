@@ -1331,13 +1331,18 @@ def import_excel():
         file.save(temp_file.name)
         
         # Check if this is a full backup (has multiple sheets) or match-only import
-        workbook_check = openpyxl.load_workbook(temp_file.name, data_only=True)
-        is_full_backup = len(workbook_check.sheetnames) > 1 or 'Settings' in workbook_check.sheetnames or 'Physical Measurements' in workbook_check.sheetnames
+        try:
+            workbook_check = openpyxl.load_workbook(temp_file.name, data_only=True)
+            is_full_backup = len(workbook_check.sheetnames) > 1 or 'Settings' in workbook_check.sheetnames or 'Physical Measurements' in workbook_check.sheetnames
+            workbook_check.close()
+        except Exception as e:
+            current_app.logger.error(f"Error checking workbook for full backup: {e}", exc_info=True)
+            if temp_file and os.path.exists(temp_file.name):
+                os.unlink(temp_file.name)
+            return jsonify({'success': False, 'errors': [f'Error reading Excel file: {str(e)}']}), 500
         
         # If it's a full backup, use the main import route which handles full backups
         if is_full_backup:
-            # Close the workbook check
-            workbook_check.close()
             temp_file_path = temp_file.name
             temp_file.close()
             
@@ -1345,6 +1350,12 @@ def import_excel():
             try:
                 result = import_data(file_path=temp_file_path, filename=filename)
                 return result
+            except Exception as e:
+                current_app.logger.error(f"Error in import_data for full backup: {e}", exc_info=True)
+                # Clean up temp file
+                if os.path.exists(temp_file_path):
+                    os.unlink(temp_file_path)
+                return jsonify({'success': False, 'errors': [f'Error importing full backup: {str(e)}']}), 500
             finally:
                 # Clean up temp file
                 if os.path.exists(temp_file_path):
