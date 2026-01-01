@@ -345,6 +345,22 @@ def delete_match(match_id):
         return jsonify({'success': False, 'errors': ['Match not found']}), 404
 
 
+@bp.route('/api/matches')
+@login_required
+def get_all_matches():
+    """Get all matches for the current user"""
+    try:
+        user_id = current_user.id
+        matches = storage.get_all_matches(user_id)
+        return jsonify({
+            'success': True,
+            'matches': [m.model_dump() for m in matches]
+        })
+    except Exception as e:
+        current_app.logger.error(f"Error getting matches: {e}", exc_info=True)
+        return jsonify({'success': False, 'errors': [str(e)]}), 500
+
+
 @bp.route('/matches/<match_id>')
 @login_required
 def get_match(match_id):
@@ -1721,6 +1737,20 @@ def import_excel():
             if errors:
                 error_msg += f' Found {len(errors)} error(s).'
             return jsonify({'success': False, 'errors': [error_msg] + errors[:20]}), 400
+        
+        # Save matches to server storage
+        user_id = current_user.id
+        if import_mode == 'replace':
+            # Delete existing matches for this user first
+            existing_matches = storage.load_matches()
+            existing_matches = [m for m in existing_matches if m.get('user_id') != user_id]
+            storage._save_matches(existing_matches)
+        
+        # Save imported matches to server storage
+        for match in imported_matches:
+            storage.save_match(match, user_id)
+        
+        current_app.logger.info(f"Saved {len(imported_matches)} matches to server storage for user {user_id}")
         
         # Convert matches to dictionaries for JSON response
         matches_data = [m.model_dump() for m in imported_matches]

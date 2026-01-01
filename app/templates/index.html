@@ -1015,8 +1015,52 @@ async function loadDashboardData() {
         // Load performance report data
         await loadPerformanceReport(settings);
         
-        // Load recent matches
-        const matches = await clientStorage.getAllMatches();
+        // Load matches from server first (most up-to-date)
+        let matches = [];
+        let serverMatches = [];
+        try {
+            const serverData = await apiCall('/api/matches');
+            if (serverData.success && serverData.matches) {
+                serverMatches = serverData.matches;
+                // Sync to client storage
+                for (const m of serverMatches) {
+                    try {
+                        await clientStorage.saveMatch(m);
+                    } catch (e) {
+                        console.warn('Failed to sync match to client storage:', e);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Could not load matches from server, using client storage:', e);
+        }
+        
+        // Also load from client storage to catch any matches that might have been filtered out
+        let clientMatches = [];
+        try {
+            clientMatches = await clientStorage.getAllMatches();
+        } catch (e) {
+            console.warn('Could not load matches from client storage:', e);
+        }
+        
+        // Merge server and client matches, prioritizing server data
+        const matchMap = new Map();
+        
+        // First add all server matches
+        serverMatches.forEach(m => {
+            if (m && m.id) {
+                matchMap.set(m.id, m);
+            }
+        });
+        
+        // Then add any client matches that aren't in server data
+        clientMatches.forEach(m => {
+            if (m && m.id && !matchMap.has(m.id)) {
+                matchMap.set(m.id, m);
+            }
+        });
+        
+        matches = Array.from(matchMap.values());
         const recentMatches = matches
             .sort((a, b) => {
                 try {
