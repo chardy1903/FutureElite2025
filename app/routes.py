@@ -4130,8 +4130,10 @@ def subscription_info():
 @bp.route('/contact')
 def contact():
     """Contact & Support page"""
+    # Use support@futureelite.pro explicitly to ensure correct email
+    support_email = os.environ.get('SUPPORT_EMAIL', '').strip() or 'support@futureelite.pro'
     return render_template('legal/contact.html',
-                         support_email=SUPPORT_EMAIL,
+                         support_email=support_email,
                          current_year=CURRENT_YEAR)
 
 
