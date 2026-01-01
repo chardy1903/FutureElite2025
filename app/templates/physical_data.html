@@ -1360,42 +1360,58 @@ async function deleteMeasurement(id) {
         
         // Try server first
         let result;
+        let serverSuccess = false;
         try {
             result = await apiCall(`/api/physical-measurements/${id}`, {
                 method: 'DELETE'
             });
+            serverSuccess = result.success;
         } catch (serverError) {
-            // If server delete fails, try deleting from client storage
-            console.warn('Server delete failed, trying client storage:', serverError);
+            // If server delete fails (404 or other error), try deleting from client storage
+            console.warn('Server delete failed, trying client storage:', serverError.message);
+            serverSuccess = false;
+        }
+        
+        // If server delete failed, try client storage
+        if (!serverSuccess) {
             try {
+                await ensureStorageReady();
                 await clientStorage.deletePhysicalMeasurement(id);
                 result = { success: true };
+                console.log('Successfully deleted from client storage');
             } catch (clientError) {
-                throw new Error('Failed to delete measurement from both server and client storage');
+                hideLoading();
+                console.error('Failed to delete from client storage:', clientError);
+                showToast('Failed to delete measurement. It may not exist.', 'error');
+                return;
+            }
+        } else {
+            // Server delete succeeded, also delete from client storage to keep in sync
+            try {
+                await ensureStorageReady();
+                await clientStorage.deletePhysicalMeasurement(id);
+            } catch (e) {
+                console.warn('Failed to delete from client storage (sync):', e);
             }
         }
         
-        if (result.success) {
-            // Also delete from client storage to keep in sync
-            try {
-                await clientStorage.deletePhysicalMeasurement(id);
-            } catch (e) {
-                console.warn('Failed to delete from client storage:', e);
-            }
-            
+        if (result && result.success) {
             hideLoading();
-            showToast('Measurement deleted successfully!');
+            showToast('Measurement deleted successfully!', 'success');
             
             // Reload data
             await loadMeasurements();
             await loadAnalysis();
         } else {
-            throw new Error(result.errors?.[0] || 'Error deleting measurement');
+            throw new Error(result?.errors?.[0] || 'Error deleting measurement');
         }
     } catch (error) {
         hideLoading();
         console.error('Error deleting measurement:', error);
-        showToast(error.message, 'error');
+        // Only show error if it's not already handled
+        if (!error.message.includes('Failed to delete')) {
+            showToast(error.message, 'error');
+        }
     }
 }
 </script>
