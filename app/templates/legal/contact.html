@@ -155,8 +155,11 @@ async function submitContactForm(event) {
         hideLoading();
         console.error('Error sending contact form:', error);
         
-        // Fallback to mailto if server fails
-        if (error.message.includes('Failed to send') || error.message.includes('SMTP')) {
+        // Fallback to mailto if server fails or SMTP not configured
+        if (error.message.includes('Failed to send') || 
+            error.message.includes('SMTP') || 
+            error.message.includes('not configured') ||
+            error.message.includes('Email sending')) {
             const subject = encodeURIComponent(data.category ? `[${data.category.toUpperCase()}] ${data.subject}` : data.subject);
             const body = encodeURIComponent(
                 `Name: ${data.name}\n` +
