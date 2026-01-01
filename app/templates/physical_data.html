@@ -946,19 +946,42 @@ async function loadMeasurements() {
         measurements.sort((a, b) => {
             try {
                 let dateA, dateB;
-                // Check if date is in "dd MMM yyyy" format
-                if (a.date.includes(' ')) {
-                    dateA = new Date(a.date.split(' ').reverse().join('-'));
-                } else {
-                    dateA = new Date(a.date);
-                }
-                if (b.date.includes(' ')) {
-                    dateB = new Date(b.date.split(' ').reverse().join('-'));
-                } else {
-                    dateB = new Date(b.date);
-                }
+                
+                // Parse date in "dd MMM yyyy" format (e.g., "31 Dec 2025")
+                const parseDate = (dateStr) => {
+                    if (!dateStr) return new Date(0);
+                    
+                    // Check if it's already in ISO format (YYYY-MM-DD)
+                    if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                        return new Date(dateStr);
+                    }
+                    
+                    // Parse "dd MMM yyyy" format
+                    const months = {
+                        'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+                        'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+                        'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+                    };
+                    
+                    const parts = dateStr.trim().split(' ');
+                    if (parts.length === 3) {
+                        const day = parts[0].padStart(2, '0');
+                        const month = months[parts[1]] || '01';
+                        const year = parts[2];
+                        return new Date(`${year}-${month}-${day}`);
+                    }
+                    
+                    // Fallback to standard Date parsing
+                    return new Date(dateStr);
+                };
+                
+                dateA = parseDate(a.date);
+                dateB = parseDate(b.date);
+                
+                // Sort descending (newest first)
                 return dateB - dateA;
-            } catch {
+            } catch (e) {
+                console.warn('Error sorting measurements by date:', e);
                 return 0;
             }
         });
