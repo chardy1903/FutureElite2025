@@ -1054,11 +1054,38 @@ async function loadDashboardData() {
         });
         
         // Then add any client matches that aren't in server data
+        // Also sync these client-only matches to the server
+        const clientOnlyMatches = [];
         clientMatches.forEach(m => {
             if (m && m.id && !matchMap.has(m.id)) {
                 matchMap.set(m.id, m);
+                clientOnlyMatches.push(m);
             }
         });
+        
+        // Sync client-only matches to server (for matches imported before the fix)
+        if (clientOnlyMatches.length > 0) {
+            console.log(`Found ${clientOnlyMatches.length} client-only matches, syncing to server...`);
+            for (const match of clientOnlyMatches) {
+                try {
+                    // Check if match already exists on server by trying to get it
+                    const existingMatch = await apiCall(`/matches/${match.id}`);
+                    if (!existingMatch.success) {
+                        // Match doesn't exist on server, create it
+                        await apiCall('/matches', {
+                            method: 'POST',
+                            body: JSON.stringify(match),
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        console.log(`Synced match ${match.id} to server`);
+                    }
+                } catch (e) {
+                    console.warn(`Failed to sync match ${match.id} to server:`, e);
+                }
+            }
+        }
         
         matches = Array.from(matchMap.values());
         const recentMatches = matches
