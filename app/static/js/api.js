@@ -348,7 +348,49 @@ window.apiCall = async function(url, options = {}) {
                 }
             } else if (url.startsWith('/matches/') && method === 'DELETE') {
                 const matchId = url.split('/matches/')[1];
-                return await clientAPI.deleteMatch(matchId);
+                // DELETE should go to server first, then sync to client
+                try {
+                    // Security: Get CSRF token for state-changing request
+                    const csrfToken = await csrfManager.getToken();
+                    const headers = {};
+                    if (csrfToken) {
+                        headers['X-CSRFToken'] = csrfToken;
+                    }
+                    
+                    const response = await fetch(url, {
+                        method: 'DELETE',
+                        headers: headers,
+                        credentials: 'include'
+                    });
+                    
+                    const result = await response.json();
+                    
+                    // Also delete from client storage
+                    try {
+                        await clientAPI.deleteMatch(matchId);
+                    } catch (e) {
+                        console.warn('Failed to delete match from client storage:', e);
+                    }
+                    
+                    if (!response.ok) {
+                        // If server says not found, but we deleted from client, that's okay
+                        if (response.status === 404) {
+                            return { success: true, message: 'Match deleted from client storage' };
+                        }
+                        throw new Error(result.errors ? result.errors.join(', ') : 'Request failed');
+                    }
+                    
+                    return result;
+                } catch (error) {
+                    console.error('Error calling server API:', error);
+                    // Even if server fails, try to delete from client
+                    try {
+                        await clientAPI.deleteMatch(matchId);
+                        return { success: true, message: 'Match deleted from client storage (server delete failed)' };
+                    } catch (e) {
+                        throw error; // Re-throw original error if client delete also fails
+                    }
+                }
             } else if (url === '/matches' && method === 'POST') {
                 // POST should go to server first for validation and subscription checks, then sync to client
                 // Use fetch directly to ensure it goes to server

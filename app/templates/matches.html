@@ -617,23 +617,55 @@ async function loadMatchesData() {
         // Sync client-only matches to server (for matches imported before the fix)
         if (clientOnlyMatches.length > 0) {
             console.log(`Found ${clientOnlyMatches.length} client-only matches, syncing to server...`);
+            let syncedCount = 0;
             for (const match of clientOnlyMatches) {
                 try {
                     // Check if match already exists on server by trying to get it
                     const existingMatch = await apiCall(`/matches/${match.id}`);
                     if (!existingMatch.success) {
                         // Match doesn't exist on server, create it
-                        await apiCall('/matches', {
+                        const result = await apiCall('/matches', {
                             method: 'POST',
                             body: JSON.stringify(match),
                             headers: {
                                 'Content-Type': 'application/json'
                             }
                         });
-                        console.log(`Synced match ${match.id} to server`);
+                        if (result.success) {
+                            syncedCount++;
+                            console.log(`Synced match ${match.id} to server`);
+                        }
                     }
                 } catch (e) {
                     console.warn(`Failed to sync match ${match.id} to server:`, e);
+                }
+            }
+            
+            // If we synced any matches, reload from server to get the updated list
+            if (syncedCount > 0) {
+                console.log(`Synced ${syncedCount} matches, reloading from server...`);
+                try {
+                    const serverData = await apiCall('/api/matches');
+                    if (serverData.success && serverData.matches) {
+                        serverMatches = serverData.matches;
+                        // Update matchMap with fresh server data
+                        matchMap.clear();
+                        serverMatches.forEach(m => {
+                            if (m && m.id) {
+                                matchMap.set(m.id, m);
+                            }
+                        });
+                        // Sync to client storage
+                        for (const m of serverMatches) {
+                            try {
+                                await clientStorage.saveMatch(m);
+                            } catch (e) {
+                                console.warn('Failed to sync match to client storage:', e);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to reload from server after sync:', e);
                 }
             }
         }
