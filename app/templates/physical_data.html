@@ -943,7 +943,11 @@ async function loadMeasurements() {
         
         // Sort by date (newest first)
         // Handle both "dd MMM yyyy" and "YYYY-MM-DD" formats
-        measurements.sort((a, b) => {
+        // Filter out any measurements without valid dates before sorting
+        const validMeasurements = measurements.filter(m => m && m.date);
+        const invalidMeasurements = measurements.filter(m => !m || !m.date);
+        
+        validMeasurements.sort((a, b) => {
             try {
                 let dateA, dateB;
                 
@@ -968,11 +972,22 @@ async function loadMeasurements() {
                         const day = parts[0].padStart(2, '0');
                         const month = months[parts[1]] || '01';
                         const year = parts[2];
-                        return new Date(`${year}-${month}-${day}`);
+                        const dateObj = new Date(`${year}-${month}-${day}`);
+                        // Validate the date
+                        if (isNaN(dateObj.getTime())) {
+                            console.warn('Invalid date:', dateStr);
+                            return new Date(0);
+                        }
+                        return dateObj;
                     }
                     
                     // Fallback to standard Date parsing
-                    return new Date(dateStr);
+                    const dateObj = new Date(dateStr);
+                    if (isNaN(dateObj.getTime())) {
+                        console.warn('Invalid date:', dateStr);
+                        return new Date(0);
+                    }
+                    return dateObj;
                 };
                 
                 dateA = parseDate(a.date);
@@ -981,10 +996,13 @@ async function loadMeasurements() {
                 // Sort descending (newest first)
                 return dateB - dateA;
             } catch (e) {
-                console.warn('Error sorting measurements by date:', e);
+                console.warn('Error sorting measurements by date:', e, a, b);
                 return 0;
             }
         });
+        
+        // Combine sorted valid measurements with invalid ones at the end
+        measurements = [...validMeasurements, ...invalidMeasurements];
         
         tbody.innerHTML = measurements.map(m => {
             const includeInReport = m.include_in_report !== false; // Default to true if not set
@@ -1235,7 +1253,20 @@ async function addMeasurement() {
             weightInput.value = '';
             notesInput.value = '';
             
-            // Reload data
+            // If server returned the measurement, add it directly to the table before reloading
+            if (result.measurement) {
+                // Save to client storage immediately
+                try {
+                    await clientStorage.savePhysicalMeasurement(result.measurement);
+                } catch (e) {
+                    console.warn('Failed to save measurement to client storage:', e);
+                }
+            }
+            
+            // Small delay to ensure server has persisted the data
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Reload data from server (most up-to-date)
             await loadMeasurements();
             await loadAnalysis();
         } else {
