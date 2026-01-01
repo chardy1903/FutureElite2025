@@ -349,6 +349,8 @@ window.apiCall = async function(url, options = {}) {
             } else if (url.startsWith('/matches/') && method === 'DELETE') {
                 const matchId = url.split('/matches/')[1];
                 // DELETE should go to server first, then sync to client
+                // Always delete from client storage, even if server delete fails
+                let serverDeleted = false;
                 try {
                     // Security: Get CSRF token for state-changing request
                     const csrfToken = await csrfManager.getToken();
@@ -363,32 +365,43 @@ window.apiCall = async function(url, options = {}) {
                         credentials: 'include'
                     });
                     
-                    const result = await response.json();
-                    
-                    // Also delete from client storage
+                    // Parse JSON response if available
+                    let result = null;
                     try {
-                        await clientAPI.deleteMatch(matchId);
-                    } catch (e) {
-                        console.warn('Failed to delete match from client storage:', e);
-                    }
-                    
-                    if (!response.ok) {
-                        // If server says not found, but we deleted from client, that's okay
-                        if (response.status === 404) {
-                            return { success: true, message: 'Match deleted from client storage' };
+                        const text = await response.text();
+                        if (text) {
+                            result = JSON.parse(text);
                         }
-                        throw new Error(result.errors ? result.errors.join(', ') : 'Request failed');
+                    } catch (e) {
+                        // Response might not be JSON, that's okay
+                        console.warn('Could not parse DELETE response as JSON:', e);
                     }
                     
-                    return result;
+                    if (response.ok) {
+                        serverDeleted = true;
+                    } else if (response.status === 404) {
+                        // Match not found on server - that's okay, we'll delete from client
+                        console.log(`Match ${matchId} not found on server, will delete from client storage only`);
+                    }
                 } catch (error) {
-                    console.error('Error calling server API:', error);
-                    // Even if server fails, try to delete from client
-                    try {
-                        await clientAPI.deleteMatch(matchId);
-                        return { success: true, message: 'Match deleted from client storage (server delete failed)' };
-                    } catch (e) {
-                        throw error; // Re-throw original error if client delete also fails
+                    console.warn('Error calling server DELETE API:', error);
+                    // Continue to delete from client storage even if server call failed
+                }
+                
+                // Always delete from client storage
+                try {
+                    await clientAPI.deleteMatch(matchId);
+                    if (serverDeleted) {
+                        return { success: true, message: 'Match deleted successfully' };
+                    } else {
+                        return { success: true, message: 'Match deleted from client storage (not found on server)' };
+                    }
+                } catch (e) {
+                    console.error('Failed to delete match from client storage:', e);
+                    if (serverDeleted) {
+                        return { success: true, message: 'Match deleted from server (client delete failed)' };
+                    } else {
+                        throw new Error('Failed to delete match from both server and client storage');
                     }
                 }
             } else if (url === '/matches' && method === 'POST') {
