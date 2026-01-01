@@ -349,7 +349,7 @@ def create_app():
                 csrf.exempt(get_subscription_status)
                 csrf.exempt(create_checkout_session)
                 # Import route functions for direct exemption
-                from app.routes import import_excel, import_data, generate_scout_pdf_route, generate_pdf, sync_all_subscriptions, physical_data_analysis, delete_user
+                from app.routes import import_excel, import_data, generate_scout_pdf_route, generate_pdf, sync_all_subscriptions, physical_data_analysis, delete_user, send_contact_email
                 csrf.exempt(import_excel)
                 csrf.exempt(import_data)
                 csrf.exempt(physical_data_analysis)
