@@ -357,6 +357,7 @@ def create_app():
                 csrf.exempt(generate_pdf)
                 csrf.exempt(sync_all_subscriptions)
                 csrf.exempt(delete_user)
+                csrf.exempt(send_contact_email)
             except Exception:
                 # Function reference exemption failed (likely due to decorator wrapping)
                 # Endpoint name exemptions above should be sufficient
