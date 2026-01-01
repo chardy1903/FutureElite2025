@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 
 # Support email - can be overridden by environment variable
-SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', 'support@futureelite.com')
+SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', 'support@futureelite.pro')
 
 # Subscription pricing (USD)
 SUBSCRIPTION_PRICING = {
