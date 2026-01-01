@@ -341,7 +341,7 @@ def create_app():
             try:
                 from .auth_routes import login, register, forgot_password
                 from .subscription_routes import stripe_webhook, get_subscription_status, create_checkout_session
-                from .routes import import_excel, import_data, generate_scout_pdf_route, generate_pdf, cancel_user_subscription, check_overdue_subscriptions, sync_all_subscriptions
+                from .routes import import_excel, import_data, generate_scout_pdf_route, generate_pdf, cancel_user_subscription, check_overdue_subscriptions, sync_all_subscriptions, send_contact_email
                 csrf.exempt(login)
                 csrf.exempt(register)
                 csrf.exempt(forgot_password)
