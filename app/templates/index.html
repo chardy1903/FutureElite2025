@@ -11,7 +11,11 @@
     </div>
 
     <!-- Action Buttons -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+        <!-- PLAYER RESUME BUTTON - TESTING VISIBILITY -->
+        <button id="playerResumeButton" onclick="generatePlayerResumePDF()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors border-4 border-yellow-400" style="font-weight: bold; font-size: 16px;">
+            🎯 Player Resume
+        </button>
         <button onclick="openMatchModal()" class="bg-qadsiah-red text-white px-6 py-3 rounded-lg font-medium hover:bg-red-700 transition-colors">
             Log Match
         </button>
@@ -661,6 +665,57 @@ function showPremiumFeatureMessage(featureName) {
     });
 }
 
+// Helper function to detect mobile devices
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+           (window.matchMedia && window.matchMedia('(max-width: 768px)').matches);
+}
+
+// Helper function to handle PDF download/viewing on both mobile and desktop
+function handlePDFDownload(blob, filename, reportType = 'PDF') {
+    const url = window.URL.createObjectURL(blob);
+    
+    if (isMobileDevice()) {
+        // On mobile, open PDF in new window so users can view and use browser's share/download
+        const newWindow = window.open(url, '_blank');
+        if (newWindow) {
+            // Wait a bit for the PDF to load, then show helpful message
+            setTimeout(() => {
+                showToast(
+                    `${reportType} opened in new tab. Use your browser's share button to save it.`,
+                    'success',
+                    8000
+                );
+            }, 500);
+        } else {
+            // If popup blocked, fall back to download
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast(
+                `${reportType} download started. Check your Downloads folder or Files app.`,
+                'success',
+                8000
+            );
+        }
+        // Don't revoke URL immediately on mobile - let the browser handle it
+        setTimeout(() => window.URL.revokeObjectURL(url), 10000);
+    } else {
+        // On desktop, use standard download
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        showToast(`${reportType} generated and downloaded successfully!`, 'success');
+    }
+}
+
 async function generateScoutPDF() {
     try {
         // Check subscription before generating
@@ -718,24 +773,90 @@ async function generateScoutPDF() {
             throw new Error(error.errors ? error.errors.join(', ') : 'Failed to generate scout PDF');
         }
         
-        // Get the PDF blob
+        // Get the PDF blob and filename
         const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'scout_report.pdf';
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
+        const contentDisposition = response.headers.get('Content-Disposition');
+        const filename = contentDisposition?.split('filename=')[1]?.replace(/"/g, '') || 'scout_report.pdf';
         
         hideLoading();
-        showToast('Scout report generated successfully!', 'success');
+        handlePDFDownload(blob, filename, 'Scout report');
         
     } catch (error) {
         hideLoading();
         console.error('Error generating scout PDF:', error);
         showToast('Error generating scout PDF: ' + error.message, 'error');
+    }
+}
+
+async function generatePlayerResumePDF() {
+    try {
+        // Check subscription before generating
+        const hasAccess = await checkSubscriptionAccess();
+        if (!hasAccess) {
+            showPremiumFeatureMessage('Player Resume Generation');
+            return;
+        }
+        
+        showLoading('Generating player resume...');
+        
+        // Get current period selection (default to 'season' for Player Resume)
+        const period = document.getElementById('statsPeriod')?.value || 'season';
+        
+        // Get all data from client storage
+        await ensureStorageReady();
+        let data = await clientStorage.exportData();
+        
+        // Load latest settings from server to ensure we have player profile data
+        try {
+            const serverSettings = await apiCall('/api/settings');
+            if (serverSettings.success && serverSettings.settings) {
+                // Merge server settings (source of truth) with client settings
+                data.settings = { ...data.settings, ...serverSettings.settings };
+            }
+        } catch (e) {
+            console.warn('Could not load settings from server, using client storage:', e);
+        }
+        
+        data.period = period;
+        
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        
+        // Add CSRF token if available
+        try {
+            const csrfToken = await csrfManager.getToken();
+            if (csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+        } catch (error) {
+            console.warn('Failed to get CSRF token:', error);
+        }
+        
+        const response = await fetch('/player-resume-pdf', {
+            method: 'POST',
+            headers: headers,
+            credentials: 'include',
+            body: JSON.stringify(data)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.errors ? error.errors.join(', ') : 'Failed to generate player resume PDF');
+        }
+        
+        // Get the PDF blob and filename
+        const blob = await response.blob();
+        const contentDisposition = response.headers.get('Content-Disposition');
+        const filename = contentDisposition?.split('filename=')[1]?.replace(/"/g, '') || 'player_resume.pdf';
+        
+        hideLoading();
+        handlePDFDownload(blob, filename, 'Player Resume');
+        
+    } catch (error) {
+        hideLoading();
+        console.error('Error generating player resume PDF:', error);
+        showToast('Error generating player resume PDF: ' + error.message, 'error');
     }
 }
 
@@ -805,19 +926,11 @@ async function generatePDF() {
             }
         }
         
-        // Create blob and download
+        // Get the PDF blob
         const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
         
         hideLoading();
-        showToast('PDF generated and downloaded successfully!');
+        handlePDFDownload(blob, filename, 'PDF report');
         
     } catch (error) {
         hideLoading();
@@ -1091,9 +1204,19 @@ async function loadDashboardData() {
         const recentMatches = matches
             .sort((a, b) => {
                 try {
-                    const dateA = new Date(a.date.split(' ').reverse().join('-'));
-                    const dateB = new Date(b.date.split(' ').reverse().join('-'));
-                    return dateB - dateA;
+                    // Parse date format "DD Mon YYYY" (e.g., "28 Aug 2025")
+                    const parseDate = (dateStr) => {
+                        if (!dateStr) return new Date(0);
+                        const parts = dateStr.trim().split(' ');
+                        if (parts.length !== 3) return new Date(0);
+                        // Convert "DD Mon YYYY" to "Mon DD, YYYY" for Date parsing
+                        return new Date(`${parts[1]} ${parts[0]}, ${parts[2]}`);
+                    };
+                    const dateA = parseDate(a.date);
+                    const dateB = parseDate(b.date);
+                    // Return negative if B is more recent (newer), positive if A is more recent
+                    // This puts most recent (newest) dates first
+                    return dateB.getTime() - dateA.getTime();
                 } catch {
                     return 0;
                 }
@@ -1430,8 +1553,45 @@ async function loadPerformanceReport(settings) {
     }
 }
 
+// Immediate debug check (runs as soon as script loads)
+(function() {
+    setTimeout(function() {
+        const playerResumeBtn = document.getElementById('playerResumeButton');
+        const allButtons = document.querySelectorAll('button');
+        console.log('=== PLAYER RESUME BUTTON DEBUG ===');
+        console.log('Total buttons found:', allButtons.length);
+        console.log('Player Resume button by ID:', playerResumeBtn ? 'FOUND ✅' : 'NOT FOUND ❌');
+        
+        // Check all buttons for "Player Resume" text
+        allButtons.forEach((btn, idx) => {
+            if (btn.textContent && btn.textContent.trim().includes('Player Resume')) {
+                console.log(`✅ Found "Player Resume" button at index ${idx}:`, btn);
+                console.log('Button classes:', btn.className);
+                console.log('Button onclick:', btn.getAttribute('onclick'));
+            }
+        });
+        
+        // Check if button exists in HTML source
+        const htmlContent = document.documentElement.innerHTML;
+        if (htmlContent.includes('Player Resume')) {
+            console.log('✅ "Player Resume" text found in HTML source');
+        } else {
+            console.error('❌ "Player Resume" text NOT found in HTML source!');
+        }
+        console.log('================================');
+    }, 1000);
+})();
+
 // Load dashboard data on page load
 document.addEventListener('DOMContentLoaded', function() {
+    // Debug: Check if Player Resume button exists
+    const playerResumeBtn = document.getElementById('playerResumeButton');
+    if (playerResumeBtn) {
+        console.log('✅ Player Resume button found in DOM (on DOMContentLoaded)');
+    } else {
+        console.error('❌ Player Resume button NOT found in DOM (on DOMContentLoaded)!');
+    }
+    
     loadDashboardData();
 });
 </script>

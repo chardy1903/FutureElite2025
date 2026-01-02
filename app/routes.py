@@ -33,7 +33,7 @@ except ImportError:
 from .models import Match, MatchCategory, MatchResult, AppSettings, PhysicalMeasurement, Achievement, ClubHistory, TrainingCamp, PhysicalMetrics, Reference, SubscriptionStatus, Subscription, User
 from .storage import StorageManager
 from .utils import validate_match_data, parse_input_date, format_date_for_input
-from .pdf import generate_season_pdf, generate_scout_pdf
+from .pdf import generate_season_pdf, generate_scout_pdf, generate_player_resume_pdf
 from .phv_calculator import calculate_phv, validate_measurements_for_phv, calculate_predicted_adult_height, calculate_age_at_date
 from .elite_benchmarks import get_elite_benchmarks_for_age, compare_to_elite
 from .config import SUPPORT_EMAIL, SUBSCRIPTION_PRICING, CURRENT_YEAR
@@ -3256,6 +3256,275 @@ def generate_scout_pdf_route():
         error_details = traceback.format_exc()
         print(f"Error generating scout PDF: {error_details}")
         current_app.logger.error(f"Scout PDF generation error: {error_details}")
+        return jsonify({'success': False, 'errors': [str(e)]}), 500
+
+
+@bp.route('/player-resume-pdf', methods=['POST'])
+@login_required
+def generate_player_resume_pdf_route():
+    """Generate Player Resume PDF report - accepts data from client"""
+    try:
+        # Check subscription status - try multiple methods
+        subscription = storage.get_subscription_by_user_id(current_user.id)
+        
+        # If no subscription found by user_id, check if there's exactly one active subscription
+        if not subscription:
+            subscriptions = storage.load_subscriptions()
+            active_subs = [s for s in subscriptions if s.get('status', '').lower() == 'active']
+            
+            if len(active_subs) == 1:
+                sub_data = active_subs[0]
+                try:
+                    if 'status' in sub_data and isinstance(sub_data['status'], str):
+                        sub_data['status'] = SubscriptionStatus(sub_data['status'].lower())
+                    subscription = Subscription(**sub_data)
+                    subscription.user_id = current_user.id
+                    storage.save_subscription(subscription)
+                    current_app.logger.info(f"Updated subscription user_id from {sub_data.get('user_id')} to {current_user.id}")
+                except Exception as e:
+                    current_app.logger.error(f"Error updating subscription: {e}")
+                    subscription = None
+        
+        # Check if subscription is active
+        is_active = False
+        if subscription:
+            status_value = subscription.status.value if hasattr(subscription.status, 'value') else str(subscription.status)
+            is_active = status_value.lower() == SubscriptionStatus.ACTIVE.value.lower()
+        
+        if not subscription or not is_active:
+            current_app.logger.warning(f"Player Resume PDF generation blocked for user {current_user.id}: subscription={subscription is not None}, is_active={is_active}")
+            return jsonify({
+                'success': False,
+                'errors': ['Player Resume generation is a premium feature. Please subscribe to unlock this feature.'],
+                'debug': {
+                    'has_subscription': subscription is not None,
+                    'status': subscription.status if subscription else None,
+                    'user_id': current_user.id
+                }
+            }), 403
+        
+        data = request.get_json() if request.is_json else {}
+        user_id = current_user.id
+        
+        # Get data from request (client-side storage)
+        matches_data = data.get('matches', [])
+        settings_data = data.get('settings', {})
+        physical_measurements_data = data.get('physical_measurements', [])
+        achievements_data = data.get('achievements', [])
+        club_history_data = data.get('club_history', [])
+        training_camps_data = data.get('training_camps', [])
+        physical_metrics_data = data.get('physical_metrics', [])
+        references_data = data.get('references', [])
+        period = data.get('period', 'season')  # Default to 'season' for Player Resume
+        
+        # Validate period
+        valid_periods = ['all_time', 'season', '12_months', '6_months', '3_months', 'last_month']
+        if period not in valid_periods:
+            period = 'season'
+        
+        # Load settings from server (most up-to-date, includes player profile data)
+        try:
+            server_settings = storage.load_settings(user_id)
+            if server_settings:
+                server_dict = server_settings.model_dump()
+                for key, value in settings_data.items():
+                    if (key not in server_dict or 
+                        server_dict[key] is None or 
+                        server_dict[key] == '' or
+                        (isinstance(server_dict[key], list) and len(server_dict[key]) == 0)):
+                        if value is not None and value != '' and not (isinstance(value, list) and len(value) == 0):
+                            server_dict[key] = value
+                settings_data = server_dict
+        except Exception as e:
+            print(f"Warning: Could not load settings from server: {e}")
+            pass
+        
+        # Convert data to model objects
+        from .models import Match, AppSettings, PhysicalMeasurement, PhysicalMetrics, Achievement, ClubHistory, TrainingCamp, Reference
+        from .utils import parse_input_date
+        
+        matches = [Match(**m) for m in matches_data]
+        settings = AppSettings(**settings_data) if settings_data else AppSettings()
+        
+        # Convert physical measurement dates from YYYY-MM-DD to dd MMM yyyy format if needed
+        cleaned_measurements_data = []
+        for pm in physical_measurements_data:
+            if not pm or not isinstance(pm, dict):
+                continue
+            cleaned_pm = pm.copy()
+            if 'date' in cleaned_pm and cleaned_pm['date']:
+                date_str = str(cleaned_pm['date']).strip()
+                if date_str:
+                    if not re.match(r'^\d{1,2} [A-Za-z]{3} \d{4}', date_str):
+                        if re.match(r'^\d{4}-\d{2}-\d{2}', date_str):
+                            try:
+                                converted_date = parse_input_date(date_str)
+                                if converted_date != date_str and re.match(r'^\d{1,2} [A-Za-z]{3} \d{4}', converted_date):
+                                    cleaned_pm['date'] = converted_date
+                                else:
+                                    continue
+                            except Exception as e:
+                                continue
+                        else:
+                            try:
+                                converted_date = parse_input_date(date_str)
+                                if converted_date != date_str and re.match(r'^\d{1,2} [A-Za-z]{3} \d{4}', converted_date):
+                                    cleaned_pm['date'] = converted_date
+                                else:
+                                    continue
+                            except Exception as e:
+                                continue
+            cleaned_measurements_data.append(cleaned_pm)
+        
+        physical_measurements = [PhysicalMeasurement(**pm) for pm in cleaned_measurements_data]
+        
+        # Convert achievement dates
+        cleaned_achievements_data = []
+        for a in achievements_data:
+            cleaned_a = a.copy()
+            if 'date' in cleaned_a and cleaned_a['date']:
+                date_str = str(cleaned_a['date']).strip()
+                if '-' in date_str and len(date_str) == 10 and date_str.count('-') == 2:
+                    try:
+                        cleaned_a['date'] = parse_input_date(date_str)
+                    except Exception as e:
+                        continue
+            cleaned_achievements_data.append(cleaned_a)
+        
+        achievements = [Achievement(**a) for a in cleaned_achievements_data]
+        club_history = [ClubHistory(**ch) for ch in club_history_data]
+        training_camps = [TrainingCamp(**tc) for tc in training_camps_data]
+        
+        # Convert physical metrics dates and clean numeric fields
+        cleaned_metrics_data = []
+        numeric_fields = [
+            'sprint_speed_ms', 'sprint_speed_kmh', 'sprint_10m_sec', 'sprint_20m_sec', 'sprint_30m_sec',
+            'vertical_jump_cm', 'standing_long_jump_cm', 'countermovement_jump_cm',
+            'agility_time_sec', 'yo_yo_test_level', 'beep_test_level',
+            'bench_press_kg', 'squat_kg', 'deadlift_kg',
+            'vo2_max', 'sit_and_reach_cm'
+        ]
+        integer_fields = ['max_heart_rate', 'resting_heart_rate']
+        
+        for pm in physical_metrics_data:
+            if not pm or not isinstance(pm, dict):
+                continue
+            cleaned_pm = {}
+            for field in numeric_fields:
+                cleaned_pm[field] = None
+            for field in integer_fields:
+                cleaned_pm[field] = None
+            
+            for key, value in pm.items():
+                if key in numeric_fields:
+                    if value is None or value == '' or (isinstance(value, str) and value.strip() == ''):
+                        cleaned_pm[key] = None
+                    else:
+                        try:
+                            cleaned_pm[key] = float(value)
+                        except (ValueError, TypeError):
+                            cleaned_pm[key] = None
+                elif key in integer_fields:
+                    if value is None or value == '' or (isinstance(value, str) and value.strip() == ''):
+                        cleaned_pm[key] = None
+                    else:
+                        try:
+                            cleaned_pm[key] = int(value)
+                        except (ValueError, TypeError):
+                            cleaned_pm[key] = None
+                else:
+                    cleaned_pm[key] = value
+            
+            if 'date' in cleaned_pm and cleaned_pm['date']:
+                date_str = str(cleaned_pm['date']).strip()
+                if date_str:
+                    if not re.match(r'^\d{1,2} [A-Za-z]{3} \d{4}', date_str):
+                        if re.match(r'^\d{4}-\d{2}-\d{2}', date_str):
+                            try:
+                                converted_date = parse_input_date(date_str)
+                                if converted_date != date_str and re.match(r'^\d{1,2} [A-Za-z]{3} \d{4}', converted_date):
+                                    cleaned_pm['date'] = converted_date
+                                else:
+                                    continue
+                            except Exception as e:
+                                continue
+                        else:
+                            try:
+                                converted_date = parse_input_date(date_str)
+                                if converted_date != date_str and re.match(r'^\d{1,2} [A-Za-z]{3} \d{4}', converted_date):
+                                    cleaned_pm['date'] = converted_date
+                                else:
+                                    continue
+                            except Exception as e:
+                                continue
+            
+            if 'date' in cleaned_pm and cleaned_pm['date']:
+                cleaned_metrics_data.append(cleaned_pm)
+        
+        physical_metrics = []
+        for i, pm in enumerate(cleaned_metrics_data):
+            try:
+                safe_pm = {}
+                safe_pm['id'] = pm.get('id', datetime.now().strftime("%Y%m%d_%H%M%S"))
+                safe_pm['date'] = pm.get('date')
+                safe_pm['notes'] = pm.get('notes')
+                
+                for field in numeric_fields:
+                    val = pm.get(field)
+                    if val is None or val == '' or (isinstance(val, str) and not val.strip()):
+                        continue
+                    try:
+                        safe_pm[field] = float(val)
+                    except (ValueError, TypeError):
+                        continue
+                
+                for field in integer_fields:
+                    val = pm.get(field)
+                    if val is None or val == '' or (isinstance(val, str) and not val.strip()):
+                        continue
+                    try:
+                        safe_pm[field] = int(val)
+                    except (ValueError, TypeError):
+                        continue
+                
+                physical_metrics.append(PhysicalMetrics(**safe_pm))
+            except Exception as e:
+                print(f"Error creating PhysicalMetrics for metric {i}: {e}")
+                continue
+        
+        references = [Reference(**r) for r in references_data]
+        
+        # Create output directory
+        output_dir = os.path.join(current_app.root_path, '..', 'output')
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Generate PDF with period filter
+        pdf_path = generate_player_resume_pdf(
+            matches, 
+            settings, 
+            achievements, 
+            club_history, 
+            physical_measurements,
+            training_camps,
+            physical_metrics,
+            references,
+            output_dir,
+            period=period
+        )
+        
+        # Return the PDF file directly
+        return send_file(
+            pdf_path,
+            as_attachment=True,
+            download_name=os.path.basename(pdf_path),
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error generating player resume PDF: {error_details}")
+        current_app.logger.error(f"Player Resume PDF generation error: {error_details}")
         return jsonify({'success': False, 'errors': [str(e)]}), 500
 
 

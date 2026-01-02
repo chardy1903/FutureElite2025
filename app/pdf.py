@@ -2033,3 +2033,1059 @@ class ScoutPDFGenerator(PDFGenerator):
         elements.append(metrics_table)
         
         return elements
+
+
+def generate_player_resume_pdf(
+    matches: List[Match], 
+    settings: AppSettings, 
+    achievements: List[Achievement],
+    club_history: List[ClubHistory],
+    physical_measurements: List[PhysicalMeasurement] = None,
+    training_camps: List[TrainingCamp] = None,
+    physical_metrics: List[PhysicalMetrics] = None,
+    references: List[Reference] = None,
+    output_dir: str = "output",
+    period: str = 'season'
+) -> str:
+    """Generate a comprehensive Player Resume PDF report
+    
+    Args:
+        matches: List of all matches
+        settings: App settings
+        achievements: List of achievements
+        club_history: List of club history entries
+        physical_measurements: List of physical measurements
+        training_camps: List of training camps
+        physical_metrics: List of physical metrics
+        references: List of references
+        output_dir: Output directory
+        period: Time period filter ('all_time', 'season', '12_months', '6_months', '3_months', 'last_month')
+    """
+    # Ensure output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Generate filename
+    from .utils import generate_pdf_filename
+    base_filename = generate_pdf_filename(settings)
+    filename = base_filename.replace('.pdf', '_Player_Resume.pdf')
+    output_path = os.path.join(output_dir, filename)
+    
+    # Generate PDF
+    generator = PlayerResumePDFGenerator(settings)
+    return generator.generate_pdf(matches, output_path, achievements, club_history, physical_measurements or [], training_camps or [], physical_metrics or [], references or [], period=period)
+
+
+class PlayerResumePDFGenerator(PDFGenerator):
+    """Specialized PDF generator for comprehensive Player Resume reports"""
+    
+    def generate_pdf(
+        self, 
+        matches: List[Match], 
+        output_path: str, 
+        achievements: List[Achievement],
+        club_history: List[ClubHistory],
+        physical_measurements: List[PhysicalMeasurement] = None,
+        training_camps: List[TrainingCamp] = None,
+        physical_metrics: List[PhysicalMetrics] = None,
+        references: List[Reference] = None,
+        period: str = 'season'
+    ) -> str:
+        """Generate the complete Player Resume PDF report
+        
+        Args:
+            matches: List of all matches
+            output_path: Path to save the PDF
+            achievements: List of achievements
+            club_history: List of club history entries
+            physical_measurements: List of physical measurements
+            training_camps: List of training camps
+            physical_metrics: List of physical metrics
+            references: List of references
+            period: Time period filter ('all_time', 'season', '12_months', '6_months', '3_months', 'last_month')
+        """
+        # Filter matches by period if specified
+        if period and period != 'all_time':
+            matches = filter_matches_by_period(matches, period, self.settings.season_year)
+        
+        self.period = period  # Store period for use in sections
+        
+        doc = SimpleDocTemplate(
+            output_path,
+            pagesize=A4,  # Portrait for player resume
+            rightMargin=self.margin,
+            leftMargin=self.margin,
+            topMargin=self.margin,
+            bottomMargin=self.margin
+        )
+        
+        story = []
+        
+        # PAGE 1: Cover and Identity
+        cover_elements = self._create_resume_cover_page(physical_measurements or [], physical_metrics)
+        story.extend(cover_elements)
+        story.append(PageBreak())
+        
+        # PAGE 2: Season Performance Summary (aggregated only)
+        performance_elements = self._create_season_performance_summary(matches)
+        if performance_elements:
+            story.extend(performance_elements)
+            story.append(PageBreak())
+        
+        # PAGE 3: Match Contribution Overview (no match list)
+        contribution_elements = self._create_match_contribution_overview(matches)
+        if contribution_elements:
+            story.extend(contribution_elements)
+            story.append(PageBreak())
+        
+        # PAGE 4: Achievements
+        achievements_elements = self._create_resume_achievements_section(achievements)
+        if achievements_elements:
+            story.extend(achievements_elements)
+            story.append(PageBreak())
+        
+        # PAGE 5: Physical Development and Growth Analysis
+        physical_elements = self._create_resume_physical_development_section(physical_measurements or [], physical_metrics)
+        if physical_elements:
+            story.extend(physical_elements)
+            story.append(PageBreak())
+        
+        # PAGE 6: Club History
+        club_history_elements = self._create_resume_club_history_section(club_history)
+        if club_history_elements:
+            story.extend(club_history_elements)
+            story.append(PageBreak())
+        
+        # PAGE 7: Training and Development Exposure
+        training_elements = self._create_resume_training_camps_section(training_camps or [])
+        if training_elements:
+            story.extend(training_elements)
+            story.append(PageBreak())
+        
+        # PAGE 8: References
+        references_elements = self._create_resume_references_section(references or [])
+        if references_elements:
+            story.extend(references_elements)
+        
+        # Add footer
+        story.append(self._create_footer(matches))
+        
+        # Build PDF
+        doc.build(story)
+        return output_path
+    
+    def _create_resume_cover_page(self, physical_measurements: List[PhysicalMeasurement], physical_metrics: List[PhysicalMetrics] = None) -> List:
+        """Create comprehensive cover page with player identity and profile"""
+        elements = []
+        
+        # Title
+        player_name = self.settings.player_name or "Player"
+        title = Paragraph(
+            f"{player_name}<br/>Player Resume",
+            ParagraphStyle(
+                name='ResumeTitle',
+                parent=self.styles['Title'],
+                fontSize=28,
+                spaceAfter=30,
+                alignment=TA_CENTER,
+                textColor=self.primary_color,
+                fontName='Helvetica-Bold',
+                leading=34
+            )
+        )
+        elements.append(title)
+        elements.append(Spacer(1, 20))
+        
+        # Player Photo (if available)
+        if self.settings.player_photo_path and os.path.exists(self.settings.player_photo_path):
+            try:
+                photo_path = self.settings.player_photo_path
+                if not os.path.isabs(photo_path):
+                    if not os.path.exists(photo_path):
+                        app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                        photo_path = os.path.join(app_dir, photo_path)
+                
+                img = Image(photo_path, width=2.5*inch, height=3*inch, kind='proportional')
+                img_table = Table([[img]], colWidths=[7.5*inch])
+                img_style = TableStyle([
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ])
+                img_table.setStyle(img_style)
+                elements.append(img_table)
+                elements.append(Spacer(1, 20))
+            except Exception as e:
+                print(f"Error loading player photo: {e}")
+        
+        # Identity Information
+        identity_data = []
+        
+        # Full name
+        identity_data.append(["Full Name", self.settings.player_name or "Not recorded"])
+        
+        # Current club and age group
+        club_name = self.settings.club_name or "Not recorded"
+        # Calculate age group from date of birth
+        age_group = "Not recorded"
+        if self.settings.date_of_birth:
+            try:
+                from .phv_calculator import calculate_age_at_date
+                current_age = calculate_age_at_date(self.settings.date_of_birth, datetime.now().strftime("%d %b %Y"))
+                if current_age <= 12:
+                    age_group = "U12"
+                elif current_age <= 13:
+                    age_group = "U13"
+                elif current_age <= 14:
+                    age_group = "U14"
+                elif current_age <= 15:
+                    age_group = "U15"
+                elif current_age <= 16:
+                    age_group = "U16"
+                elif current_age <= 17:
+                    age_group = "U17"
+                else:
+                    age_group = "U18+"
+            except:
+                pass
+        
+        identity_data.append(["Current Club", f"{club_name} ({age_group})"])
+        
+        # Selected season
+        identity_data.append(["Season", self.settings.season_year or "Not recorded"])
+        
+        # Position and dominant foot
+        position = self.settings.position or "Not recorded"
+        dominant_foot = self.settings.dominant_foot or "Not recorded"
+        identity_data.append(["Position", position])
+        identity_data.append(["Dominant Foot", dominant_foot])
+        
+        # Date of birth
+        identity_data.append(["Date of Birth", self.settings.date_of_birth or "Not recorded"])
+        
+        # Current height and weight from latest physical measurement
+        latest_height = "Not recorded"
+        latest_weight = "Not recorded"
+        if physical_measurements:
+            valid_measurements = [m for m in physical_measurements if m.height_cm is not None or m.weight_kg is not None]
+            if valid_measurements:
+                sorted_measurements = sorted(valid_measurements, key=lambda x: datetime.strptime(x.date, "%d %b %Y"), reverse=True)
+                latest_measurement = sorted_measurements[0]
+                if latest_measurement.height_cm:
+                    latest_height = f"{latest_measurement.height_cm:.1f} cm"
+                if latest_measurement.weight_kg:
+                    latest_weight = f"{latest_measurement.weight_kg:.1f} kg"
+        
+        # Fallback to settings if no measurements
+        if latest_height == "Not recorded" and self.settings.height_cm:
+            latest_height = f"{self.settings.height_cm:.1f} cm"
+        if latest_weight == "Not recorded" and self.settings.weight_kg:
+            latest_weight = f"{self.settings.weight_kg:.1f} kg"
+        
+        identity_data.append(["Current Height", latest_height])
+        identity_data.append(["Current Weight", latest_weight])
+        
+        # PHV Summary
+        if self.settings.phv_date and self.settings.phv_age:
+            # Determine PHV status
+            try:
+                phv_date_obj = datetime.strptime(self.settings.phv_date, "%d %b %Y")
+                current_date = datetime.now()
+                days_diff = (current_date - phv_date_obj).days
+                
+                if days_diff < 0:
+                    phv_status = "Pre-PHV"
+                elif days_diff < 180:
+                    phv_status = "At PHV"
+                else:
+                    phv_status = "Post-PHV"
+                
+                phv_summary = f"{phv_status} (Age {self.settings.phv_age:.1f} years on {self.settings.phv_date})"
+            except:
+                phv_summary = f"Age {self.settings.phv_age:.1f} years ({self.settings.phv_date})"
+            
+            identity_data.append(["PHV Status", phv_summary])
+        else:
+            identity_data.append(["PHV Status", "Not recorded"])
+        
+        # Predicted adult height with confidence rating
+        if physical_measurements and self.settings.date_of_birth:
+            try:
+                from .phv_calculator import calculate_phv, calculate_predicted_adult_height, calculate_age_at_date
+                from .elite_benchmarks import get_elite_benchmarks_for_age
+                
+                # Get latest measurement for current age
+                valid_measurements = [m for m in physical_measurements if m.height_cm is not None]
+                if valid_measurements:
+                    latest_measurement = max(valid_measurements, key=lambda m: datetime.strptime(m.date, "%d %b %Y"))
+                    current_age = calculate_age_at_date(self.settings.date_of_birth, latest_measurement.date)
+                    
+                    phv_result = calculate_phv(physical_measurements, self.settings.date_of_birth)
+                    predicted_height = calculate_predicted_adult_height(
+                        physical_measurements,
+                        self.settings.date_of_birth,
+                        current_age,
+                        phv_result
+                    )
+                    
+                    if predicted_height:
+                        confidence = predicted_height.get('confidence', 'medium')
+                        height_cm = predicted_height.get('predicted_adult_height_cm', 0)
+                        height_ft_in = predicted_height.get('predicted_adult_height_ft_in', '')
+                        identity_data.append(["Predicted Adult Height", f"{height_cm:.1f} cm ({height_ft_in}) - Confidence: {confidence.title()}"])
+                    else:
+                        identity_data.append(["Predicted Adult Height", "Not recorded"])
+                else:
+                    identity_data.append(["Predicted Adult Height", "Not recorded"])
+            except Exception as e:
+                print(f"Error calculating predicted height: {e}")
+                identity_data.append(["Predicted Adult Height", "Not recorded"])
+        else:
+            identity_data.append(["Predicted Adult Height", "Not recorded"])
+        
+        # Playing profile bullet points
+        if self.settings.playing_profile and len(self.settings.playing_profile) > 0:
+            profile_text = "<br/>".join([f"• {item.strip()}" for item in self.settings.playing_profile if item and item.strip()])
+            identity_data.append(["Playing Profile", profile_text])
+        else:
+            identity_data.append(["Playing Profile", "Not recorded"])
+        
+        # Performance metric context comments
+        if self.settings.performance_metric_comments and len(self.settings.performance_metric_comments) > 0:
+            comments_text = "<br/>".join([f"<b>{key}:</b> {value}" for key, value in self.settings.performance_metric_comments.items() if value])
+            identity_data.append(["Performance Metric Context", comments_text])
+        else:
+            identity_data.append(["Performance Metric Context", "Not recorded"])
+        
+        # Create identity table
+        wrapped_identity_data = []
+        for row_idx, row in enumerate(identity_data):
+            wrapped_row = []
+            for col_idx, cell in enumerate(row):
+                if row_idx == 0:  # Header row (we'll add one)
+                    wrapped_row.append(Paragraph(str(cell), self.styles['TableHeader']))
+                else:
+                    wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
+            wrapped_identity_data.append(wrapped_row)
+        
+        # Add header row
+        header_row = [Paragraph("Attribute", self.styles['TableHeader']), Paragraph("Details", self.styles['TableHeader'])]
+        identity_table_data = [header_row] + [[Paragraph(str(row[0]), self.styles['TableCell']), Paragraph(str(row[1]), self.styles['TableCell'])] for row in identity_data]
+        
+        identity_table = Table(identity_table_data, colWidths=[2.5*inch, 4.5*inch])
+        identity_style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 11),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.light_grey]),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ])
+        identity_table.setStyle(identity_style)
+        elements.append(identity_table)
+        
+        return elements
+    
+    def _create_season_performance_summary(self, matches: List[Match]) -> List:
+        """Create season performance summary with aggregated statistics only"""
+        elements = []
+        
+        elements.append(Paragraph("Season Performance Summary", self.styles['SectionHeader']))
+        elements.append(Spacer(1, 12))
+        
+        completed_matches = [m for m in matches if not m.is_fixture]
+        if not completed_matches:
+            elements.append(Paragraph("No match data available for the selected period.", self.styles['TableCell']))
+            return elements
+        
+        # Calculate aggregated stats
+        total_stats = self._calculate_category_stats(completed_matches)
+        advanced_stats = self._calculate_advanced_stats(completed_matches)
+        
+        # Calculate wins, draws, losses
+        wins = sum(1 for m in completed_matches if m.result and m.result.value == "Win")
+        draws = sum(1 for m in completed_matches if m.result and m.result.value == "Draw")
+        losses = sum(1 for m in completed_matches if m.result and m.result.value == "Loss")
+        
+        # Calculate average minutes per match
+        avg_minutes_per_match = total_stats['minutes'] / total_stats['matches'] if total_stats['matches'] > 0 else 0
+        
+        # Create summary table
+        summary_data = [
+            ['Metric', 'Value'],
+            ['Matches Played', str(total_stats['matches'])],
+            ['Wins', str(wins)],
+            ['Draws', str(draws)],
+            ['Losses', str(losses)],
+            ['Total Goals', str(total_stats['goals'])],
+            ['Total Assists', str(total_stats['assists'])],
+            ['Total Minutes Played', str(total_stats['minutes'])],
+            ['Average Minutes per Match', f"{avg_minutes_per_match:.1f}"],
+            ['Goals per 60 Minutes', f"{advanced_stats['goals_per_60']:.2f}"],
+            ['Assists per 60 Minutes', f"{advanced_stats['assists_per_60']:.2f}"],
+            ['Goal Contributions per 60 Minutes', f"{advanced_stats['contribution_per_60']:.2f}"],
+        ]
+        
+        # Add minutes per goal and minutes per contribution
+        if total_stats['goals'] > 0:
+            min_per_goal = total_stats['minutes'] / total_stats['goals']
+            summary_data.append(['Minutes per Goal', f"{min_per_goal:.0f}"])
+        
+        if (total_stats['goals'] + total_stats['assists']) > 0:
+            min_per_contribution = total_stats['minutes'] / (total_stats['goals'] + total_stats['assists'])
+            summary_data.append(['Minutes per Goal Contribution', f"{min_per_contribution:.0f}"])
+        
+        # Convert to Paragraph objects
+        wrapped_summary_data = []
+        for row_idx, row in enumerate(summary_data):
+            wrapped_row = []
+            for col_idx, cell in enumerate(row):
+                if row_idx == 0:
+                    wrapped_row.append(Paragraph(str(cell), self.styles['TableHeader']))
+                else:
+                    if col_idx == 0:
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
+                    else:
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableCellCenter']))
+            wrapped_summary_data.append(wrapped_row)
+        
+        summary_table = Table(wrapped_summary_data, colWidths=[3.5*inch, 3.5*inch])
+        summary_style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.light_grey]),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ])
+        summary_table.setStyle(summary_style)
+        elements.append(summary_table)
+        
+        return elements
+    
+    def _create_match_contribution_overview(self, matches: List[Match]) -> List:
+        """Create match contribution overview with summary metrics and textual summary"""
+        elements = []
+        
+        elements.append(Paragraph("Match Contribution Overview", self.styles['SectionHeader']))
+        elements.append(Spacer(1, 12))
+        
+        completed_matches = [m for m in matches if not m.is_fixture]
+        if not completed_matches:
+            elements.append(Paragraph("No match data available for the selected period.", self.styles['TableCell']))
+            return elements
+        
+        # Calculate stats
+        total_stats = self._calculate_category_stats(completed_matches)
+        advanced_stats = self._calculate_advanced_stats(completed_matches)
+        
+        # Goal involvement summary
+        goal_involvements = sum(1 for m in completed_matches if m.brodie_goals > 0 or m.brodie_assists > 0)
+        goal_involvement_rate = (goal_involvements / total_stats['matches']) * 100 if total_stats['matches'] > 0 else 0
+        
+        # Contribution rate metrics
+        contribution_rate = advanced_stats['contribution_per_60']
+        
+        # Consistency indicators
+        matches_with_goals = sum(1 for m in completed_matches if m.brodie_goals > 0)
+        matches_with_assists = sum(1 for m in completed_matches if m.brodie_assists > 0)
+        matches_with_contributions = sum(1 for m in completed_matches if (m.brodie_goals + m.brodie_assists) > 0)
+        
+        # Create overview table
+        overview_data = [
+            ['Metric', 'Value'],
+            ['Goal Involvement Rate', f"{goal_involvement_rate:.1f}% ({goal_involvements}/{total_stats['matches']} matches)"],
+            ['Contribution Rate (G+A per 60 min)', f"{contribution_rate:.2f}"],
+            ['Matches with Goals', f"{matches_with_goals} ({matches_with_goals/total_stats['matches']*100:.1f}%)" if total_stats['matches'] > 0 else "0"],
+            ['Matches with Assists', f"{matches_with_assists} ({matches_with_assists/total_stats['matches']*100:.1f}%)" if total_stats['matches'] > 0 else "0"],
+            ['Matches with Contributions', f"{matches_with_contributions} ({matches_with_contributions/total_stats['matches']*100:.1f}%)" if total_stats['matches'] > 0 else "0"],
+        ]
+        
+        # Convert to Paragraph objects
+        wrapped_overview_data = []
+        for row_idx, row in enumerate(overview_data):
+            wrapped_row = []
+            for col_idx, cell in enumerate(row):
+                if row_idx == 0:
+                    wrapped_row.append(Paragraph(str(cell), self.styles['TableHeader']))
+                else:
+                    if col_idx == 0:
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
+                    else:
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableCellCenter']))
+            wrapped_overview_data.append(wrapped_row)
+        
+        overview_table = Table(wrapped_overview_data, colWidths=[3.5*inch, 3.5*inch])
+        overview_style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+            ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.light_grey]),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ])
+        overview_table.setStyle(overview_style)
+        elements.append(overview_table)
+        
+        # Generate textual summary
+        elements.append(Spacer(1, 12))
+        summary_text = self._generate_contribution_summary_text(total_stats, advanced_stats, goal_involvement_rate, matches_with_contributions, total_stats['matches'])
+        summary_para = Paragraph(summary_text, ParagraphStyle(
+            name='ContributionSummary',
+            parent=self.styles['Normal'],
+            fontSize=10,
+            alignment=TA_LEFT,
+            spaceAfter=0,
+            leading=14
+        ))
+        elements.append(summary_para)
+        
+        return elements
+    
+    def _generate_contribution_summary_text(self, total_stats: Dict, advanced_stats: Dict, goal_involvement_rate: float, matches_with_contributions: int, total_matches: int) -> str:
+        """Generate textual summary of match contributions"""
+        if total_matches == 0:
+            return "No match data available."
+        
+        contribution_rate = advanced_stats.get('contribution_per_60', 0)
+        goals_per_60 = advanced_stats.get('goals_per_60', 0)
+        assists_per_60 = advanced_stats.get('assists_per_60', 0)
+        
+        # Build summary text
+        summary_parts = []
+        
+        # Consistency
+        if matches_with_contributions >= total_matches * 0.7:
+            summary_parts.append("Consistent attacking contributor across the season")
+        elif matches_with_contributions >= total_matches * 0.5:
+            summary_parts.append("Regular contributor to team attacking play")
+        else:
+            summary_parts.append("Contributing player with selective impact")
+        
+        # Rate-based description
+        if contribution_rate >= 1.5:
+            summary_parts.append("with high goal contribution rate")
+        elif contribution_rate >= 1.0:
+            summary_parts.append("with solid goal contribution rate")
+        else:
+            summary_parts.append("with developing contribution rate")
+        
+        # Goals vs assists balance
+        if goals_per_60 > assists_per_60 * 1.5:
+            summary_parts.append("primarily through goal scoring")
+        elif assists_per_60 > goals_per_60 * 1.5:
+            summary_parts.append("primarily through assists")
+        else:
+            summary_parts.append("through balanced goals and assists")
+        
+        return ". ".join(summary_parts) + "."
+    
+    def _create_resume_achievements_section(self, achievements: List[Achievement]) -> List:
+        """Create achievements section grouped by season and achievement type"""
+        elements = []
+        
+        elements.append(Paragraph("Achievements", self.styles['SectionHeader']))
+        elements.append(Spacer(1, 12))
+        
+        if not achievements:
+            elements.append(Paragraph("No achievements recorded.", self.styles['TableCell']))
+            return elements
+        
+        # Group by season
+        achievements_by_season = {}
+        for achievement in achievements:
+            season = achievement.season or "Unknown Season"
+            if season not in achievements_by_season:
+                achievements_by_season[season] = []
+            achievements_by_season[season].append(achievement)
+        
+        # Sort seasons (most recent first)
+        sorted_seasons = sorted(achievements_by_season.keys(), reverse=True)
+        
+        # Group by achievement type (category)
+        for season in sorted_seasons:
+            season_achievements = achievements_by_season[season]
+            
+            # Group by category
+            by_category = {}
+            for achievement in season_achievements:
+                category = achievement.category or "Other"
+                if category not in by_category:
+                    by_category[category] = []
+                by_category[category].append(achievement)
+            
+            # Create table for this season
+            season_data = [['Date', 'Achievement', 'Category', 'Description']]
+            for category in sorted(by_category.keys()):
+                for achievement in sorted(by_category[category], key=lambda x: datetime.strptime(x.date, "%d %b %Y"), reverse=True):
+                    season_data.append([
+                        achievement.date,
+                        achievement.title,
+                        achievement.category,
+                        achievement.description or '-'
+                    ])
+            
+            # Add season header
+            season_header = Paragraph(f"<b>Season: {season}</b>", ParagraphStyle(
+                name='SeasonHeader',
+                parent=self.styles['Normal'],
+                fontSize=11,
+                fontName='Helvetica-Bold',
+                textColor=self.header_color,
+                spaceAfter=6
+            ))
+            elements.append(season_header)
+            
+            # Convert to Paragraph objects
+            wrapped_season_data = []
+            for row_idx, row in enumerate(season_data):
+                wrapped_row = []
+                for col_idx, cell in enumerate(row):
+                    if row_idx == 0:
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableHeader']))
+                    else:
+                        if col_idx == 1 or col_idx == 3:  # Achievement title and description - left align
+                            wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
+                        else:  # Date and Category - center align
+                            wrapped_row.append(Paragraph(str(cell), self.styles['TableCellCenter']))
+                wrapped_season_data.append(wrapped_row)
+            
+            season_table = Table(wrapped_season_data, colWidths=[1.2*inch, 2.5*inch, 1*inch, 2.3*inch])
+            season_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('ALIGN', (0, 1), (0, -1), 'CENTER'),  # Date
+                ('ALIGN', (1, 1), (1, -1), 'LEFT'),  # Achievement
+                ('ALIGN', (2, 1), (2, -1), 'CENTER'),  # Category
+                ('ALIGN', (3, 1), (3, -1), 'LEFT'),  # Description
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.light_grey]),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ])
+            season_table.setStyle(season_style)
+            elements.append(season_table)
+            elements.append(Spacer(1, 12))
+        
+        return elements
+    
+    def _create_resume_physical_development_section(self, physical_measurements: List[PhysicalMeasurement], physical_metrics: List[PhysicalMetrics] = None) -> List:
+        """Create comprehensive physical development and growth analysis section"""
+        elements = []
+        
+        elements.append(Paragraph("Physical Development and Growth Analysis", self.styles['SectionHeader']))
+        elements.append(Spacer(1, 12))
+        
+        # PHV Details
+        if self.settings.phv_date and self.settings.phv_age:
+            phv_data = [
+                ['PHV Metric', 'Value'],
+                ['PHV Date', self.settings.phv_date],
+                ['PHV Age', f"{self.settings.phv_age:.1f} years"],
+            ]
+            
+            # Get PHV velocity if available from calculations
+            if physical_measurements and self.settings.date_of_birth:
+                try:
+                    from .phv_calculator import calculate_phv
+                    phv_result = calculate_phv(physical_measurements, self.settings.date_of_birth)
+                    if phv_result and phv_result.get('phv_velocity_cm_per_year'):
+                        phv_data.append(['Peak Growth Velocity', f"{phv_result['phv_velocity_cm_per_year']:.2f} cm/year"])
+                except:
+                    pass
+            
+            # Determine PHV status
+            try:
+                phv_date_obj = datetime.strptime(self.settings.phv_date, "%d %b %Y")
+                current_date = datetime.now()
+                days_diff = (current_date - phv_date_obj).days
+                
+                if days_diff < 0:
+                    phv_status = "Pre-PHV"
+                elif days_diff < 180:
+                    phv_status = "At PHV"
+                else:
+                    phv_status = "Post-PHV"
+                
+                phv_data.append(['Current PHV Status', phv_status])
+            except:
+                pass
+            
+            # Create PHV table
+            wrapped_phv_data = []
+            for row_idx, row in enumerate(phv_data):
+                wrapped_row = []
+                for col_idx, cell in enumerate(row):
+                    if row_idx == 0:
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableHeader']))
+                    else:
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
+                wrapped_phv_data.append(wrapped_row)
+            
+            phv_table = Table(wrapped_phv_data, colWidths=[3.5*inch, 3.5*inch])
+            phv_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 10),
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 1), (1, -1), 'LEFT'),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.light_grey]),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ])
+            phv_table.setStyle(phv_style)
+            elements.append(phv_table)
+            elements.append(Spacer(1, 12))
+        
+        # Elite benchmark comparisons
+        if physical_measurements and self.settings.date_of_birth:
+            try:
+                from .phv_calculator import calculate_age_at_date
+                from .elite_benchmarks import get_elite_benchmarks_for_age, compare_to_elite
+                
+                # Get latest measurement for current age
+                valid_measurements = [m for m in physical_measurements if m.height_cm is not None]
+                if valid_measurements:
+                    latest_measurement = max(valid_measurements, key=lambda m: datetime.strptime(m.date, "%d %b %Y"))
+                    current_age = calculate_age_at_date(self.settings.date_of_birth, latest_measurement.date)
+                    current_height = latest_measurement.height_cm
+                    current_weight = latest_measurement.weight_kg
+                    
+                    benchmarks = get_elite_benchmarks_for_age(current_age)
+                    
+                    # Height percentile
+                    height_comparison = compare_to_elite(current_height, benchmarks['metrics']['height'], 'higher_is_better')
+                    
+                    # BMI calculation and comparison
+                    bmi = None
+                    if current_height and current_weight:
+                        bmi = current_weight / ((current_height / 100) ** 2)
+                        bmi_benchmark = benchmarks['metrics']['body_composition']
+                    
+                    # Create elite benchmarks table
+                    benchmark_data = [
+                        ['Metric', 'Player Value', 'Elite Percentile', 'Rating'],
+                        ['Height', f"{current_height:.1f} cm", f"{height_comparison['percentile']}th", height_comparison['rating']],
+                    ]
+                    
+                    if bmi:
+                        if bmi_benchmark['optimal_bmi_min'] <= bmi <= bmi_benchmark['optimal_bmi_max']:
+                            bmi_rating = "Optimal"
+                        elif bmi_benchmark['elite_bmi_min'] <= bmi <= bmi_benchmark['elite_bmi_max']:
+                            bmi_rating = "Elite Range"
+                        else:
+                            bmi_rating = "Outside Range"
+                        
+                        benchmark_data.append(['BMI', f"{bmi:.1f}", f"Range: {bmi_benchmark['optimal_bmi_min']:.1f}-{bmi_benchmark['optimal_bmi_max']:.1f}", bmi_rating])
+                    
+                    # Convert to Paragraph objects
+                    wrapped_benchmark_data = []
+                    for row_idx, row in enumerate(benchmark_data):
+                        wrapped_row = []
+                        for col_idx, cell in enumerate(row):
+                            if row_idx == 0:
+                                wrapped_row.append(Paragraph(str(cell), self.styles['TableHeader']))
+                            else:
+                                wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
+                        wrapped_benchmark_data.append(wrapped_row)
+                    
+                    benchmark_table = Table(wrapped_benchmark_data, colWidths=[1.5*inch, 1.5*inch, 1.5*inch, 2.5*inch])
+                    benchmark_style = TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, 0), 10),
+                        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                        ('FONTSIZE', (0, 1), (-1, -1), 9),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.light_grey]),
+                        ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                        ('TOPPADDING', (0, 0), (-1, -1), 6),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                    ])
+                    benchmark_table.setStyle(benchmark_style)
+                    elements.append(benchmark_table)
+                    elements.append(Spacer(1, 12))
+            except Exception as e:
+                print(f"Error calculating elite benchmarks: {e}")
+        
+        # Historical height and weight measurements (respecting include_in_report flags)
+        report_measurements = [
+            m for m in physical_measurements 
+            if m.height_cm is not None and (m.include_in_report if hasattr(m, 'include_in_report') else True)
+        ]
+        
+        if report_measurements:
+            sorted_measurements = sorted(report_measurements, key=lambda m: datetime.strptime(m.date, "%d %b %Y"))
+            
+            measurements_data = [['Date', 'Height (cm)', 'Weight (kg)', 'Notes']]
+            for m in sorted_measurements:
+                measurements_data.append([
+                    m.date,
+                    f"{m.height_cm:.1f}" if m.height_cm else '-',
+                    f"{m.weight_kg:.1f}" if m.weight_kg else '-',
+                    m.notes or '-'
+                ])
+            
+            # Convert to Paragraph objects
+            wrapped_measurements_data = []
+            for row_idx, row in enumerate(measurements_data):
+                wrapped_row = []
+                for col_idx, cell in enumerate(row):
+                    if row_idx == 0:
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableHeader']))
+                    else:
+                        if col_idx == 3:  # Notes - left align
+                            wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
+                        else:  # Date, Height, Weight - center align
+                            wrapped_row.append(Paragraph(str(cell), self.styles['TableCellCenter']))
+                wrapped_measurements_data.append(wrapped_row)
+            
+            measurements_table = Table(wrapped_measurements_data, colWidths=[1.5*inch, 1.2*inch, 1.2*inch, 3.1*inch])
+            measurements_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('ALIGN', (0, 1), (2, -1), 'CENTER'),  # Date, Height, Weight
+                ('ALIGN', (3, 1), (3, -1), 'LEFT'),  # Notes
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.light_grey]),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ])
+            measurements_table.setStyle(measurements_style)
+            elements.append(measurements_table)
+        
+        return elements
+    
+    def _create_resume_club_history_section(self, club_history: List[ClubHistory]) -> List:
+        """Create club history section"""
+        elements = []
+        
+        elements.append(Paragraph("Club History", self.styles['SectionHeader']))
+        elements.append(Spacer(1, 12))
+        
+        if not club_history:
+            elements.append(Paragraph("No club history recorded.", self.styles['TableCell']))
+            return elements
+        
+        # Sort by season (most recent first)
+        sorted_history = sorted(club_history, key=lambda x: x.season, reverse=True)
+        
+        history_data = [['Club Name', 'Season', 'Age Group', 'Position', 'Achievements/Notes']]
+        for entry in sorted_history:
+            history_data.append([
+                entry.club_name,
+                entry.season,
+                entry.age_group or '-',
+                entry.position or '-',
+                entry.achievements or entry.notes or '-'
+            ])
+        
+        # Convert to Paragraph objects
+        wrapped_history_data = []
+        for row_idx, row in enumerate(history_data):
+            wrapped_row = []
+            for col_idx, cell in enumerate(row):
+                if row_idx == 0:
+                    wrapped_row.append(Paragraph(str(cell), self.styles['TableHeader']))
+                else:
+                    if col_idx in [1, 2]:  # Season, Age Group - center align
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableCellCenter']))
+                    else:  # Club, Position, Achievements - left align
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
+            wrapped_history_data.append(wrapped_row)
+        
+        history_table = Table(wrapped_history_data, colWidths=[1.8*inch, 1.2*inch, 0.9*inch, 1*inch, 2.1*inch])
+        history_style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('ALIGN', (0, 1), (0, -1), 'LEFT'),  # Club
+            ('ALIGN', (1, 1), (1, -1), 'CENTER'),  # Season
+            ('ALIGN', (2, 1), (2, -1), 'CENTER'),  # Age Group
+            ('ALIGN', (3, 1), (3, -1), 'LEFT'),  # Position
+            ('ALIGN', (4, 1), (4, -1), 'LEFT'),  # Achievements
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.light_grey]),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ])
+        history_table.setStyle(history_style)
+        elements.append(history_table)
+        
+        return elements
+    
+    def _create_resume_training_camps_section(self, training_camps: List[TrainingCamp]) -> List:
+        """Create training camps section"""
+        elements = []
+        
+        elements.append(Paragraph("Training and Development Exposure", self.styles['SectionHeader']))
+        elements.append(Spacer(1, 12))
+        
+        if not training_camps:
+            elements.append(Paragraph("No training camps recorded.", self.styles['TableCell']))
+            return elements
+        
+        # Sort by start date (most recent first)
+        sorted_camps = sorted(
+            training_camps, 
+            key=lambda x: datetime.strptime(x.start_date, "%d %b %Y"), 
+            reverse=True
+        )
+        
+        camps_data = [['Camp Name', 'Organizer', 'Location', 'Date Range', 'Age Group', 'Focus Area']]
+        for camp in sorted_camps:
+            date_str = camp.start_date
+            if camp.end_date:
+                date_str += f" - {camp.end_date}"
+            
+            camps_data.append([
+                camp.camp_name,
+                camp.organizer,
+                camp.location,
+                date_str,
+                camp.age_group or '-',
+                camp.focus_area or '-'
+            ])
+        
+        # Convert to Paragraph objects
+        wrapped_camps_data = []
+        for row_idx, row in enumerate(camps_data):
+            wrapped_row = []
+            for col_idx, cell in enumerate(row):
+                if row_idx == 0:
+                    wrapped_row.append(Paragraph(str(cell), self.styles['TableHeader']))
+                else:
+                    if col_idx in [1, 2, 3]:  # Organizer, Location, Date - left align with wrapping
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
+                    else:  # Camp Name, Age Group, Focus Area - left align
+                        wrapped_row.append(Paragraph(str(cell), self.styles['TableCell']))
+            wrapped_camps_data.append(wrapped_row)
+        
+        camps_table = Table(wrapped_camps_data, colWidths=[1.5*inch, 1.5*inch, 1.2*inch, 1.5*inch, 0.8*inch, 1.5*inch])
+        camps_style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), self.primary_color),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, self.light_grey]),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ])
+        camps_table.setStyle(camps_style)
+        elements.append(camps_table)
+        
+        return elements
+    
+    def _create_resume_references_section(self, references: List[Reference]) -> List:
+        """Create references section"""
+        elements = []
+        
+        elements.append(Paragraph("References", self.styles['SectionHeader']))
+        elements.append(Spacer(1, 12))
+        
+        if not references or len(references) == 0:
+            elements.append(Paragraph("No references recorded.", self.styles['TableCell']))
+            return elements
+        
+        # Create references list
+        for ref in references:
+            ref_elements = []
+            
+            # Name and position
+            name_text = f"<b>{ref.name}</b>"
+            if ref.position:
+                name_text += f" - {ref.position}"
+            if ref.organization:
+                name_text += f" ({ref.organization})"
+            
+            ref_elements.append(Paragraph(name_text, self.styles['TableCell']))
+            
+            # Contact info
+            contact_parts = []
+            if ref.email:
+                contact_parts.append(f"Email: {ref.email}")
+            if ref.phone:
+                contact_parts.append(f"Phone: {ref.phone}")
+            if contact_parts:
+                ref_elements.append(Paragraph(" | ".join(contact_parts), self.styles['TableCell']))
+            
+            # Relationship
+            if ref.relationship:
+                ref_elements.append(Paragraph(f"<i>{ref.relationship}</i>", self.styles['TableCell']))
+            
+            # Notes
+            if ref.notes:
+                ref_elements.append(Paragraph(ref.notes, self.styles['TableCell']))
+            
+            # Add spacing between references
+            ref_elements.append(Spacer(1, 8))
+            
+            elements.extend(ref_elements)
+        
+        return elements
