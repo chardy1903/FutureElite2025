@@ -655,14 +655,88 @@ window.apiCall = async function(url, options = {}) {
                 const id = url.split('/api/training-camps/')[1];
                 return await clientAPI.deleteTrainingCamp(id);
             } else if (url === '/api/physical-metrics' && method === 'GET') {
+                // GET should go to server first, then sync to client storage
+                if (originalApiCall) {
+                    const result = await originalApiCall(url, options);
+                    if (result.success && result.metrics) {
+                        // Sync to client storage
+                        for (const metric of result.metrics) {
+                            try {
+                                await clientAPI.savePhysicalMetric(metric);
+                            } catch (e) {
+                                console.warn('Failed to sync metric to client storage:', e);
+                            }
+                        }
+                    }
+                    return result;
+                }
                 return await clientAPI.getPhysicalMetrics();
             } else if (url === '/api/physical-metrics' && method === 'POST') {
+                // POST should go to server first, then sync to client storage
+                if (originalApiCall) {
+                    const result = await originalApiCall(url, options);
+                    if (result.success) {
+                        try {
+                            // Use the metric from server response (has converted date format)
+                            if (result.metric) {
+                                await clientAPI.savePhysicalMetric(result.metric);
+                            } else if (result.metric_id) {
+                                // If no metric in response, reload all to get the new one with correct format
+                                const getAllResult = await originalApiCall('/api/physical-metrics', {method: 'GET'});
+                                if (getAllResult.success && getAllResult.metrics) {
+                                    // Sync all metrics to client storage
+                                    for (const m of getAllResult.metrics) {
+                                        await clientAPI.savePhysicalMetric(m);
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('Failed to sync metric to client storage:', e);
+                        }
+                    }
+                    return result;
+                }
                 return await clientAPI.savePhysicalMetric(body);
             } else if (url.startsWith('/api/physical-metrics/') && method === 'PUT') {
                 const id = url.split('/api/physical-metrics/')[1];
+                // PUT should go to server first, then sync to client storage
+                if (originalApiCall) {
+                    const result = await originalApiCall(url, options);
+                    if (result.success) {
+                        try {
+                            // Use the metric from server response (has converted date format)
+                            if (result.metric) {
+                                await clientAPI.savePhysicalMetric(result.metric);
+                            } else {
+                                // Fallback: reload all metrics
+                                const getAllResult = await originalApiCall('/api/physical-metrics', {method: 'GET'});
+                                if (getAllResult.success && getAllResult.metrics) {
+                                    for (const m of getAllResult.metrics) {
+                                        await clientAPI.savePhysicalMetric(m);
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('Failed to sync metric to client storage:', e);
+                        }
+                    }
+                    return result;
+                }
                 return await clientAPI.updatePhysicalMetric(id, body);
             } else if (url.startsWith('/api/physical-metrics/') && method === 'DELETE') {
                 const id = url.split('/api/physical-metrics/')[1];
+                // DELETE should go to server first, then sync to client storage
+                if (originalApiCall) {
+                    const result = await originalApiCall(url, options);
+                    if (result.success) {
+                        try {
+                            await clientAPI.deletePhysicalMetric(id);
+                        } catch (e) {
+                            console.warn('Failed to sync metric deletion to client storage:', e);
+                        }
+                    }
+                    return result;
+                }
                 return await clientAPI.deletePhysicalMetric(id);
             } else if (url.startsWith('/stats')) {
                 const params = new URLSearchParams(url.split('?')[1] || '');

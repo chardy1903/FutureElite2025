@@ -505,17 +505,22 @@ async function savePhysicalMetric(event) {
         const url = currentPhysicalMetricId ? `/api/physical-metrics/${currentPhysicalMetricId}` : '/api/physical-metrics';
         const method = currentPhysicalMetricId ? 'PUT' : 'POST';
         
-        await apiCall(url, {
+        const result = await apiCall(url, {
             method: method,
             body: JSON.stringify(data)
         });
         
         hideLoading();
-        showToast('Physical metrics saved successfully!');
-        closePhysicalMetricModal();
         
-        // Reload data to show updated metrics
-        await loadPhysicalMetricsData();
+        if (result.success) {
+            showToast('Physical metrics saved successfully!');
+            closePhysicalMetricModal();
+            
+            // Reload data to show updated metrics (apiCall handles server sync automatically)
+            await loadPhysicalMetricsData();
+        } else {
+            showToast('Error saving physical metrics: ' + (result.errors?.join(', ') || 'Unknown error'), 'error');
+        }
         
     } catch (error) {
         hideLoading();
@@ -616,8 +621,9 @@ async function loadPhysicalMetricsData() {
         document.getElementById('physicalMetricsHeader').textContent = 
             `${settings.club_name || 'Club'} - ${settings.player_name || 'Player'}`;
         
-        // Load physical metrics
-        const metrics = await clientStorage.getAllPhysicalMetrics();
+        // Load physical metrics - apiCall will fetch from server and sync to IndexedDB
+        const response = await apiCall('/api/physical-metrics', { method: 'GET' });
+        const metrics = response.success && response.metrics ? response.metrics : [];
         
         // Sort by date (most recent first)
         metrics.sort((a, b) => {

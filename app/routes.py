@@ -3967,9 +3967,13 @@ def create_physical_metric():
         # Save metric entry
         metric_id = storage.save_physical_metric(metric, user_id)
         
+        # Get the saved metric to return full object
+        saved_metric = storage.get_physical_metric(metric_id, user_id)
+        
         return jsonify({
             'success': True,
-            'metric_id': metric_id
+            'metric_id': metric_id,
+            'metric': saved_metric.model_dump() if saved_metric else None
         })
         
     except (ValueError, TypeError, KeyError) as e:
@@ -4059,7 +4063,13 @@ def update_physical_metric(metric_id):
         # Save updated metric
         storage.save_physical_metric(metric, user_id)
         
-        return jsonify({'success': True})
+        # Get the saved metric to return full object
+        saved_metric = storage.get_physical_metric(metric_id, user_id)
+        
+        return jsonify({
+            'success': True,
+            'metric': saved_metric.model_dump() if saved_metric else None
+        })
         
     except (ValueError, TypeError, KeyError) as e:
         return jsonify({'success': False, 'errors': [f'Invalid physical metric data: {str(e)}']}), 400
