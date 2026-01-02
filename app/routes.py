@@ -2191,6 +2191,9 @@ def create_physical_measurement():
         # Save measurement
         measurement_id = storage.save_physical_measurement(measurement, user_id)
         
+        # Get the saved measurement to return full object
+        saved_measurement = storage.get_physical_measurement(measurement_id, user_id)
+        
         # Calculate PHV if possible
         settings = storage.load_settings(user_id)
         measurements = storage.get_all_physical_measurements(user_id)
@@ -2622,21 +2625,25 @@ def physical_data_analysis():
                     try:
                         date_str = str(m.date).strip()
                         # Try parsing in "dd MMM yyyy" format
-                        return datetime.strptime(date_str, "%d %b %Y")
-                    except (ValueError, AttributeError):
+                        parsed_date = datetime.strptime(date_str, "%d %b %Y")
+                        return parsed_date
+                    except (ValueError, AttributeError) as e:
                         # If date parsing fails, use a very old date so it's sorted last
-                        current_app.logger.warning(f"Could not parse date for measurement: {getattr(m, 'date', 'N/A')}")
+                        current_app.logger.warning(f"Could not parse date '{date_str}' for measurement: {e}")
                         return datetime.min
                 
+                # Sort by date descending (most recent first)
                 sorted_measurements = sorted(valid_measurements, key=get_date_key, reverse=True)
+                
+                # Log all measurements for debugging
+                current_app.logger.info(f"Height comparison: Found {len(valid_measurements)} measurements with height")
+                for i, m in enumerate(sorted_measurements[:5]):  # Log top 5
+                    current_app.logger.info(f"  {i+1}. Date: {m.date}, Height: {m.height_cm} cm, ID: {getattr(m, 'id', 'N/A')}")
+                
                 latest_measurement = sorted_measurements[0]
                 height_for_comparison = latest_measurement.height_cm
                 
-                # Log for debugging
-                current_app.logger.info(f"Height comparison: Found {len(valid_measurements)} measurements with height")
-                current_app.logger.info(f"Height comparison: Using {height_for_comparison} cm from measurement dated {latest_measurement.date}")
-                if len(sorted_measurements) > 1:
-                    current_app.logger.info(f"Height comparison: Second most recent was {sorted_measurements[1].height_cm} cm from {sorted_measurements[1].date}")
+                current_app.logger.info(f"Height comparison: SELECTED {height_for_comparison} cm from measurement dated {latest_measurement.date}")
         
         # Fall back to settings if no measurements available
         if not height_for_comparison:
