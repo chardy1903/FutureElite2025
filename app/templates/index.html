@@ -12,10 +12,6 @@
 
     <!-- Action Buttons -->
     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-        <!-- PLAYER RESUME BUTTON - TESTING VISIBILITY -->
-        <button id="playerResumeButton" onclick="generatePlayerResumePDF()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors border-4 border-yellow-400" style="font-weight: bold; font-size: 16px;">
-            🎯 Player Resume
-        </button>
         <button onclick="openMatchModal()" class="bg-qadsiah-red text-white px-6 py-3 rounded-lg font-medium hover:bg-red-700 transition-colors">
             Log Match
         </button>
@@ -24,6 +20,9 @@
         </button>
         <button onclick="generateScoutPDF()" class="bg-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-700 transition-colors">
             Scout Report
+        </button>
+        <button id="playerResumeButton" onclick="generatePlayerResumePDF()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+            Player Resume
         </button>
         <button onclick="openExportModal()" class="bg-gray-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-700 transition-colors">
             Export/Import
@@ -1553,45 +1552,8 @@ async function loadPerformanceReport(settings) {
     }
 }
 
-// Immediate debug check (runs as soon as script loads)
-(function() {
-    setTimeout(function() {
-        const playerResumeBtn = document.getElementById('playerResumeButton');
-        const allButtons = document.querySelectorAll('button');
-        console.log('=== PLAYER RESUME BUTTON DEBUG ===');
-        console.log('Total buttons found:', allButtons.length);
-        console.log('Player Resume button by ID:', playerResumeBtn ? 'FOUND ✅' : 'NOT FOUND ❌');
-        
-        // Check all buttons for "Player Resume" text
-        allButtons.forEach((btn, idx) => {
-            if (btn.textContent && btn.textContent.trim().includes('Player Resume')) {
-                console.log(`✅ Found "Player Resume" button at index ${idx}:`, btn);
-                console.log('Button classes:', btn.className);
-                console.log('Button onclick:', btn.getAttribute('onclick'));
-            }
-        });
-        
-        // Check if button exists in HTML source
-        const htmlContent = document.documentElement.innerHTML;
-        if (htmlContent.includes('Player Resume')) {
-            console.log('✅ "Player Resume" text found in HTML source');
-        } else {
-            console.error('❌ "Player Resume" text NOT found in HTML source!');
-        }
-        console.log('================================');
-    }, 1000);
-})();
-
 // Load dashboard data on page load
 document.addEventListener('DOMContentLoaded', function() {
-    // Debug: Check if Player Resume button exists
-    const playerResumeBtn = document.getElementById('playerResumeButton');
-    if (playerResumeBtn) {
-        console.log('✅ Player Resume button found in DOM (on DOMContentLoaded)');
-    } else {
-        console.error('❌ Player Resume button NOT found in DOM (on DOMContentLoaded)!');
-    }
-    
     loadDashboardData();
 });
 </script>
