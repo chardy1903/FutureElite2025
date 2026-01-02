@@ -186,13 +186,18 @@ async function loadAnalysis() {
             console.warn('Could not load settings from server, using client storage:', e);
         }
         
-        // Try to get latest measurements from server
+        // Load measurements from both server and client storage, then merge
+        // This ensures we include new measurements that haven't been synced to server yet
+        let serverMeasurements = [];
+        let clientMeasurements = [];
+        
+        // Try to get measurements from server
         try {
-            const serverMeasurements = await apiCall('/api/physical-measurements');
-            if (serverMeasurements.success && serverMeasurements.measurements) {
-                measurements = serverMeasurements.measurements;
+            const serverResponse = await apiCall('/api/physical-measurements');
+            if (serverResponse.success && serverResponse.measurements) {
+                serverMeasurements = serverResponse.measurements;
                 // Sync to client storage
-                for (const m of measurements) {
+                for (const m of serverResponse.measurements) {
                     try {
                         await clientStorage.savePhysicalMeasurement(m);
                     } catch (e) {
@@ -201,9 +206,92 @@ async function loadAnalysis() {
                 }
             }
         } catch (e) {
-            console.warn('Could not load measurements from server, using client storage:', e);
-            measurements = await clientStorage.getAllPhysicalMeasurements();
+            console.warn('Could not load measurements from server:', e);
         }
+        
+        // Also load from client storage (may have newer unsaved measurements)
+        try {
+            clientMeasurements = await clientStorage.getAllPhysicalMeasurements();
+        } catch (e) {
+            console.warn('Could not load measurements from client storage:', e);
+        }
+        
+        // Merge measurements: combine server and client, prioritizing by date (most recent wins)
+        const measurementsMap = new Map();
+        
+        // Helper to parse date for comparison
+        const parseDate = (dateStr) => {
+            if (!dateStr) return new Date(0);
+            try {
+                // Try "dd MMM yyyy" format first
+                const months = {
+                    'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+                    'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+                };
+                const parts = dateStr.split(' ');
+                if (parts.length === 3 && months[parts[1]] !== undefined) {
+                    return new Date(parseInt(parts[2]), months[parts[1]], parseInt(parts[0]));
+                }
+                // Fallback to standard Date parsing
+                return new Date(dateStr);
+            } catch {
+                return new Date(0);
+            }
+        };
+        
+        // Add server measurements first
+        for (const m of serverMeasurements) {
+            if (m && m.id) {
+                measurementsMap.set(m.id, m);
+            }
+        }
+        
+        // Add/update with client measurements (may have newer data)
+        for (const m of clientMeasurements) {
+            if (!m) continue;
+            
+            // If it has an ID and exists in server data, compare dates
+            if (m.id && measurementsMap.has(m.id)) {
+                try {
+                    const serverM = measurementsMap.get(m.id);
+                    const serverDate = parseDate(serverM.date);
+                    const clientDate = parseDate(m.date);
+                    // Keep the one with the most recent date
+                    if (clientDate > serverDate && !isNaN(clientDate.getTime())) {
+                        measurementsMap.set(m.id, m);
+                    }
+                } catch (e) {
+                    // If date comparison fails, keep server version
+                }
+            } else if (m.id) {
+                // New measurement with ID not in server - add it
+                measurementsMap.set(m.id, m);
+            } else {
+                // Measurement without ID (new, unsaved) - add with temporary key based on date and values
+                const tempKey = `temp_${m.date || ''}_${m.height_cm || 0}_${m.weight_kg || 0}`;
+                // Only add if we don't already have a measurement with this date and values
+                let exists = false;
+                for (const existing of measurementsMap.values()) {
+                    if (existing.date === m.date && 
+                        existing.height_cm === m.height_cm && 
+                        existing.weight_kg === m.weight_kg) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists) {
+                    measurementsMap.set(tempKey, m);
+                }
+            }
+        }
+        
+        // Convert map to array and sort by date descending (most recent first)
+        measurements = Array.from(measurementsMap.values());
+        measurements.sort((a, b) => {
+            const dateA = parseDate(a.date);
+            const dateB = parseDate(b.date);
+            return dateB - dateA;
+        });
         
         // Load physical metrics from client storage (no server endpoint yet)
         physical_metrics = await clientStorage.getAllPhysicalMetrics();
