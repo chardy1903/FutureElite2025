@@ -1351,6 +1351,70 @@ async function loadDashboardData() {
             achievements = await clientStorage.getAllAchievements();
         }
         
+        // Load club history from server and sync to client storage
+        try {
+            const serverClubHistory = await apiCall('/api/club-history');
+            if (serverClubHistory.success && serverClubHistory.club_history) {
+                // Get all client storage club history to find deleted ones
+                const clientClubHistory = await clientStorage.getAllClubHistory();
+                const serverClubHistoryIds = new Set(serverClubHistory.club_history.map(ch => ch.id));
+                
+                // Remove deleted club history from client storage
+                for (const clientCh of clientClubHistory) {
+                    if (!serverClubHistoryIds.has(clientCh.id)) {
+                        try {
+                            await clientStorage.deleteClubHistory(clientCh.id);
+                        } catch (e) {
+                            console.warn('Failed to delete club history from client storage:', e);
+                        }
+                    }
+                }
+                
+                // Sync server club history to client storage
+                for (const ch of serverClubHistory.club_history) {
+                    try {
+                        await clientStorage.saveClubHistory(ch);
+                    } catch (e) {
+                        console.warn('Failed to sync club history to client storage:', e);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Could not load club history from server:', e);
+        }
+        
+        // Load training camps from server and sync to client storage
+        try {
+            const serverTrainingCamps = await apiCall('/api/training-camps');
+            if (serverTrainingCamps.success && serverTrainingCamps.training_camps) {
+                // Get all client storage training camps to find deleted ones
+                const clientTrainingCamps = await clientStorage.getAllTrainingCamps();
+                const serverTrainingCampIds = new Set(serverTrainingCamps.training_camps.map(tc => tc.id));
+                
+                // Remove deleted training camps from client storage
+                for (const clientTc of clientTrainingCamps) {
+                    if (!serverTrainingCampIds.has(clientTc.id)) {
+                        try {
+                            await clientStorage.deleteTrainingCamp(clientTc.id);
+                        } catch (e) {
+                            console.warn('Failed to delete training camp from client storage:', e);
+                        }
+                    }
+                }
+                
+                // Sync server training camps to client storage
+                for (const tc of serverTrainingCamps.training_camps) {
+                    try {
+                        await clientStorage.saveTrainingCamp(tc);
+                    } catch (e) {
+                        console.warn('Failed to sync training camp to client storage:', e);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Could not load training camps from server:', e);
+        }
+        
         const recentAchievements = achievements
             .sort((a, b) => {
                 try {
