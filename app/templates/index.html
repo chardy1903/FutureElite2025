@@ -805,6 +805,50 @@ async function generatePlayerResumePDF() {
         await ensureStorageReady();
         let data = await clientStorage.exportData();
         
+        // Load club history from server first (most up-to-date)
+        try {
+            const serverClubHistory = await apiCall('/api/club-history');
+            if (serverClubHistory.success && serverClubHistory.club_history) {
+                data.club_history = serverClubHistory.club_history;
+                // Sync to client storage
+                for (const ch of data.club_history) {
+                    try {
+                        await clientStorage.saveClubHistory(ch);
+                    } catch (e) {
+                        console.warn('Failed to sync club history to client storage:', e);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Could not load club history from server, using client storage:', e);
+            // Fallback to client storage if server fails
+            if (!data.club_history || data.club_history.length === 0) {
+                data.club_history = await clientStorage.getAllClubHistory();
+            }
+        }
+        
+        // Load training camps from server first (most up-to-date)
+        try {
+            const serverTrainingCamps = await apiCall('/api/training-camps');
+            if (serverTrainingCamps.success && serverTrainingCamps.training_camps) {
+                data.training_camps = serverTrainingCamps.training_camps;
+                // Sync to client storage
+                for (const tc of data.training_camps) {
+                    try {
+                        await clientStorage.saveTrainingCamp(tc);
+                    } catch (e) {
+                        console.warn('Failed to sync training camp to client storage:', e);
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('Could not load training camps from server, using client storage:', e);
+            // Fallback to client storage if server fails
+            if (!data.training_camps || data.training_camps.length === 0) {
+                data.training_camps = await clientStorage.getAllTrainingCamps();
+            }
+        }
+        
         // Debug: Log data being sent
         console.log('Player Resume PDF - Data being sent:', {
             matches: data.matches?.length || 0,
