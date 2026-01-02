@@ -2420,14 +2420,80 @@ def physical_data_analysis():
         # Get data from request (client-side storage for measurements and metrics)
         data = request.get_json() if request.is_json else {}
         
-        # Load measurements from server first (most up-to-date), fall back to client data
+        # Load measurements from server and merge with client data
+        # Prioritize most recent measurements regardless of source
         server_measurements = storage.get_all_physical_measurements(user_id)
-        if server_measurements:
-            # Use server measurements (most accurate)
-            measurements_data = [m.model_dump() for m in server_measurements]
-        else:
-            # Fall back to client-provided measurements
-            measurements_data = data.get('measurements', [])
+        server_measurements_dict = {m.id: m.model_dump() for m in server_measurements} if server_measurements else {}
+        
+        # Get client measurements
+        client_measurements = data.get('measurements', [])
+        
+        # Merge: combine server and client measurements, prioritizing by date (most recent wins)
+        # This ensures we have the most up-to-date data from both sources, including unsaved client data
+        all_measurements = []
+        
+        # Add server measurements
+        all_measurements.extend(server_measurements_dict.values())
+        
+        # Add client measurements (including new ones that haven't been saved to server)
+        for client_m in client_measurements:
+            if client_m and isinstance(client_m, dict):
+                # Ensure user_id is set
+                if 'user_id' not in client_m:
+                    client_m['user_id'] = user_id
+                all_measurements.append(client_m)
+        
+        # Remove duplicates by ID, keeping the most recent version by date
+        measurements_by_id = {}
+        for m in all_measurements:
+            if not m or not isinstance(m, dict):
+                continue
+                
+            m_id = m.get('id')
+            if not m_id:
+                # If no ID, treat as new measurement and add it (will get ID when saved)
+                # Use date as temporary key for new measurements
+                try:
+                    date_str = m.get('date', '')
+                    if date_str:
+                        # Try to parse date to use as key
+                        date_obj = datetime.strptime(date_str, "%d %b %Y")
+                        temp_key = f"new_{date_obj.timestamp()}_{m.get('height_cm', 0)}"
+                        if temp_key not in measurements_by_id:
+                            measurements_by_id[temp_key] = m
+                        else:
+                            # Compare to see if this is more recent
+                            existing = measurements_by_id[temp_key]
+                            try:
+                                existing_date = datetime.strptime(existing.get('date', ''), "%d %b %Y")
+                                if date_obj > existing_date:
+                                    measurements_by_id[temp_key] = m
+                            except (ValueError, AttributeError):
+                                pass
+                except (ValueError, AttributeError):
+                    # If date parsing fails, just add it
+                    measurements_by_id[f"new_{len(measurements_by_id)}"] = m
+                continue
+            
+            # Existing measurement with ID
+            if m_id not in measurements_by_id:
+                measurements_by_id[m_id] = m
+            else:
+                # Compare dates to keep the most recent version
+                try:
+                    existing_date_str = measurements_by_id[m_id].get('date', '')
+                    new_date_str = m.get('date', '')
+                    if existing_date_str and new_date_str:
+                        existing_date = datetime.strptime(existing_date_str, "%d %b %Y")
+                        new_date = datetime.strptime(new_date_str, "%d %b %Y")
+                        if new_date > existing_date:
+                            measurements_by_id[m_id] = m
+                except (ValueError, AttributeError):
+                    # If date parsing fails, prefer the one with more complete data
+                    if m.get('height_cm') and not measurements_by_id[m_id].get('height_cm'):
+                        measurements_by_id[m_id] = m
+        
+        measurements_data = list(measurements_by_id.values())
         
         physical_metrics_data = data.get('physical_metrics', [])
         
@@ -2551,9 +2617,20 @@ def physical_data_analysis():
             valid_measurements = [m for m in measurements if m.height_cm is not None]
             if valid_measurements:
                 # Sort by date descending to get most recent
-                sorted_measurements = sorted(valid_measurements, key=lambda m: datetime.strptime(m.date, "%d %b %Y"), reverse=True)
+                # Handle date parsing more robustly
+                def get_date_key(m):
+                    try:
+                        return datetime.strptime(m.date, "%d %b %Y")
+                    except (ValueError, AttributeError):
+                        # If date parsing fails, use a very old date so it's sorted last
+                        return datetime.min
+                
+                sorted_measurements = sorted(valid_measurements, key=get_date_key, reverse=True)
                 latest_measurement = sorted_measurements[0]
                 height_for_comparison = latest_measurement.height_cm
+                
+                # Log for debugging (can be removed later)
+                current_app.logger.debug(f"Height comparison: Using {height_for_comparison} cm from measurement dated {latest_measurement.date}")
         
         # Fall back to settings if no measurements available
         if not height_for_comparison:
