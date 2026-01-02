@@ -297,15 +297,40 @@ async function loadAnalysis() {
         physical_metrics = await clientStorage.getAllPhysicalMetrics();
         
         // Debug: Log measurements before sending
+        console.log('=== PHYSICAL DATA ANALYSIS DEBUG ===');
         console.log('Measurements being sent to server:', measurements.length, 'total');
         if (measurements.length > 0) {
+            // Sort by date to find most recent
             const sorted = [...measurements].sort((a, b) => {
-                const dateA = new Date(a.date || '');
-                const dateB = new Date(b.date || '');
-                return dateB - dateA;
+                try {
+                    // Parse "dd MMM yyyy" format
+                    const months = {
+                        'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+                        'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11
+                    };
+                    const parseDate = (dateStr) => {
+                        if (!dateStr) return new Date(0);
+                        const parts = dateStr.split(' ');
+                        if (parts.length === 3 && months[parts[1]] !== undefined) {
+                            return new Date(parseInt(parts[2]), months[parts[1]], parseInt(parts[0]));
+                        }
+                        return new Date(dateStr);
+                    };
+                    const dateA = parseDate(a.date);
+                    const dateB = parseDate(b.date);
+                    return dateB - dateA;
+                } catch {
+                    return 0;
+                }
             });
-            console.log('Most recent measurement:', sorted[0]);
-            console.log('Most recent height:', sorted[0]?.height_cm);
+            
+            console.log('Top 3 measurements by date:');
+            sorted.slice(0, 3).forEach((m, i) => {
+                console.log(`  ${i+1}. Date: ${m.date}, Height: ${m.height_cm} cm, Weight: ${m.weight_kg} kg, ID: ${m.id || 'no ID'}`);
+            });
+            console.log('Most recent height being sent:', sorted[0]?.height_cm, 'cm from', sorted[0]?.date);
+        } else {
+            console.warn('No measurements found!');
         }
         
         // Send data to server for analysis
@@ -322,7 +347,12 @@ async function loadAnalysis() {
         // Debug: Log what server returned
         if (data.success && data.comparisons && data.comparisons.height) {
             console.log('Server returned height comparison:', data.comparisons.height.player_value, 'cm');
+            console.log('Server percentile:', data.comparisons.height.percentile + 'th');
+            console.log('Server rating:', data.comparisons.height.rating);
+        } else {
+            console.warn('Server did not return height comparison:', data);
         }
+        console.log('=== END DEBUG ===');
         
         if (data.success) {
             renderPHVSection(data.phv, measurements, data.current_age, data.predicted_height);
