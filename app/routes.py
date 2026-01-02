@@ -3317,6 +3317,13 @@ def generate_player_resume_pdf_route():
         references_data = data.get('references', [])
         period = data.get('period', 'season')  # Default to 'season' for Player Resume
         
+        # Debug logging
+        current_app.logger.info(f"Player Resume PDF - Received data: matches={len(matches_data)}, club_history={len(club_history_data)}, training_camps={len(training_camps_data)}")
+        if club_history_data:
+            current_app.logger.info(f"Club history data sample: {club_history_data[0] if club_history_data else 'None'}")
+        if training_camps_data:
+            current_app.logger.info(f"Training camps data sample: {training_camps_data[0] if training_camps_data else 'None'}")
+        
         # Validate period
         valid_periods = ['all_time', 'season', '12_months', '6_months', '3_months', 'last_month']
         if period not in valid_periods:

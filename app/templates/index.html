@@ -805,6 +805,16 @@ async function generatePlayerResumePDF() {
         await ensureStorageReady();
         let data = await clientStorage.exportData();
         
+        // Debug: Log data being sent
+        console.log('Player Resume PDF - Data being sent:', {
+            matches: data.matches?.length || 0,
+            club_history: data.club_history?.length || 0,
+            training_camps: data.training_camps?.length || 0,
+            achievements: data.achievements?.length || 0,
+            club_history_data: data.club_history,
+            training_camps_data: data.training_camps
+        });
+        
         // Load latest settings from server to ensure we have player profile data
         try {
             const serverSettings = await apiCall('/api/settings');
