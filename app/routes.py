@@ -3406,7 +3406,9 @@ def generate_player_resume_pdf_route():
         for ch in club_history_data:
             if ch and isinstance(ch, dict):
                 try:
-                    club_history.append(ClubHistory(**ch))
+                    # Remove user_id if present (not part of ClubHistory model)
+                    ch_clean = {k: v for k, v in ch.items() if k != 'user_id'}
+                    club_history.append(ClubHistory(**ch_clean))
                 except Exception as e:
                     current_app.logger.warning(f"Error converting club history entry: {e}, data: {ch}")
                     continue
@@ -3418,7 +3420,9 @@ def generate_player_resume_pdf_route():
         for tc in training_camps_data:
             if tc and isinstance(tc, dict):
                 try:
-                    training_camps.append(TrainingCamp(**tc))
+                    # Remove user_id if present (not part of TrainingCamp model)
+                    tc_clean = {k: v for k, v in tc.items() if k != 'user_id'}
+                    training_camps.append(TrainingCamp(**tc_clean))
                 except Exception as e:
                     current_app.logger.warning(f"Error converting training camp entry: {e}, data: {tc}")
                     continue
