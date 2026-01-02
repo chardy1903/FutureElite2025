@@ -2149,17 +2149,15 @@ class PlayerResumePDFGenerator(PDFGenerator):
             story.extend(physical_elements)
             story.append(PageBreak())
         
-        # PAGE 6: Club History
-        club_history_elements = self._create_resume_club_history_section(club_history)
-        if club_history_elements:
-            story.extend(club_history_elements)
-            story.append(PageBreak())
+        # PAGE 6: Club History (always include, even if empty)
+        club_history_elements = self._create_resume_club_history_section(club_history or [])
+        story.extend(club_history_elements)
+        story.append(PageBreak())
         
-        # PAGE 7: Training and Development Exposure
+        # PAGE 7: Training and Development Exposure (always include, even if empty)
         training_elements = self._create_resume_training_camps_section(training_camps or [])
-        if training_elements:
-            story.extend(training_elements)
-            story.append(PageBreak())
+        story.extend(training_elements)
+        story.append(PageBreak())
         
         # PAGE 8: References
         references_elements = self._create_resume_references_section(references or [])

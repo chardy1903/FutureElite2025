@@ -3392,8 +3392,30 @@ def generate_player_resume_pdf_route():
             cleaned_achievements_data.append(cleaned_a)
         
         achievements = [Achievement(**a) for a in cleaned_achievements_data]
-        club_history = [ClubHistory(**ch) for ch in club_history_data]
-        training_camps = [TrainingCamp(**tc) for tc in training_camps_data]
+        
+        # Convert club history with error handling
+        club_history = []
+        current_app.logger.info(f"Converting {len(club_history_data)} club history entries")
+        for ch in club_history_data:
+            if ch and isinstance(ch, dict):
+                try:
+                    club_history.append(ClubHistory(**ch))
+                except Exception as e:
+                    current_app.logger.warning(f"Error converting club history entry: {e}, data: {ch}")
+                    continue
+        current_app.logger.info(f"Successfully converted {len(club_history)} club history entries")
+        
+        # Convert training camps with error handling
+        training_camps = []
+        current_app.logger.info(f"Converting {len(training_camps_data)} training camp entries")
+        for tc in training_camps_data:
+            if tc and isinstance(tc, dict):
+                try:
+                    training_camps.append(TrainingCamp(**tc))
+                except Exception as e:
+                    current_app.logger.warning(f"Error converting training camp entry: {e}, data: {tc}")
+                    continue
+        current_app.logger.info(f"Successfully converted {len(training_camps)} training camp entries")
         
         # Convert physical metrics dates and clean numeric fields
         cleaned_metrics_data = []
