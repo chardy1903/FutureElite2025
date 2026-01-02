@@ -2620,17 +2620,23 @@ def physical_data_analysis():
                 # Handle date parsing more robustly
                 def get_date_key(m):
                     try:
-                        return datetime.strptime(m.date, "%d %b %Y")
+                        date_str = str(m.date).strip()
+                        # Try parsing in "dd MMM yyyy" format
+                        return datetime.strptime(date_str, "%d %b %Y")
                     except (ValueError, AttributeError):
                         # If date parsing fails, use a very old date so it's sorted last
+                        current_app.logger.warning(f"Could not parse date for measurement: {getattr(m, 'date', 'N/A')}")
                         return datetime.min
                 
                 sorted_measurements = sorted(valid_measurements, key=get_date_key, reverse=True)
                 latest_measurement = sorted_measurements[0]
                 height_for_comparison = latest_measurement.height_cm
                 
-                # Log for debugging (can be removed later)
-                current_app.logger.debug(f"Height comparison: Using {height_for_comparison} cm from measurement dated {latest_measurement.date}")
+                # Log for debugging
+                current_app.logger.info(f"Height comparison: Found {len(valid_measurements)} measurements with height")
+                current_app.logger.info(f"Height comparison: Using {height_for_comparison} cm from measurement dated {latest_measurement.date}")
+                if len(sorted_measurements) > 1:
+                    current_app.logger.info(f"Height comparison: Second most recent was {sorted_measurements[1].height_cm} cm from {sorted_measurements[1].date}")
         
         # Fall back to settings if no measurements available
         if not height_for_comparison:

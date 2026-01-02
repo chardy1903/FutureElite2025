@@ -296,6 +296,18 @@ async function loadAnalysis() {
         // Load physical metrics from client storage (no server endpoint yet)
         physical_metrics = await clientStorage.getAllPhysicalMetrics();
         
+        // Debug: Log measurements before sending
+        console.log('Measurements being sent to server:', measurements.length, 'total');
+        if (measurements.length > 0) {
+            const sorted = [...measurements].sort((a, b) => {
+                const dateA = new Date(a.date || '');
+                const dateB = new Date(b.date || '');
+                return dateB - dateA;
+            });
+            console.log('Most recent measurement:', sorted[0]);
+            console.log('Most recent height:', sorted[0]?.height_cm);
+        }
+        
         // Send data to server for analysis
         // Server will load settings from server storage, but we send client settings as fallback
         const data = await apiCall('/api/physical-data/analysis', {
@@ -306,6 +318,11 @@ async function loadAnalysis() {
                 physical_metrics: physical_metrics
             })
         });
+        
+        // Debug: Log what server returned
+        if (data.success && data.comparisons && data.comparisons.height) {
+            console.log('Server returned height comparison:', data.comparisons.height.player_value, 'cm');
+        }
         
         if (data.success) {
             renderPHVSection(data.phv, measurements, data.current_age, data.predicted_height);
