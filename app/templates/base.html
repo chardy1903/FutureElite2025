@@ -152,7 +152,7 @@
 
     <script>
         // Toast notification functions
-        function showToast(message, type = 'success') {
+        function showToast(message, type = 'success', duration = 3000) {
             const toast = document.getElementById('toast');
             const toastMessage = document.getElementById('toast-message');
             
@@ -176,7 +176,7 @@
             setTimeout(() => {
                 toast.classList.remove('show');
                 setTimeout(() => toast.classList.add('hidden'), 300);
-            }, 3000);
+            }, duration);
         }
 
         function showLoading(message = 'Please wait...') {
@@ -251,12 +251,12 @@
                 
                 const data = await response.json();
                 
-                // If CSRF error, try to refresh token and retry once
+                // If CSRF error, try to refresh token and retry once (silently)
                 if (response.status === 400 && data.errors && 
                     data.errors.some(e => e.toLowerCase().includes('csrf'))) {
-                    console.warn('CSRF token expired, refreshing...');
-                    csrfManager.clearToken();
-                    const newToken = await csrfManager.getToken();
+                    // Silently refresh token and retry - don't log the initial error
+                    // Use forceRefresh to ensure we get a fresh token
+                    const newToken = await csrfManager.getToken(true);
                     if (newToken) {
                         mergedOptions.headers['X-CSRFToken'] = newToken;
                         const retryResponse = await fetch(url, mergedOptions);
@@ -268,8 +268,11 @@
                         if (!retryResponse.ok) {
                             throw new Error(retryData.errors ? retryData.errors.join(', ') : 'Request failed');
                         }
+                        // Retry succeeded - return data without logging the initial error
+                        // The browser will still log the initial 400, but that's expected behavior
                         return retryData;
                     }
+                    // If we couldn't get a new token, fall through to error handling
                 }
                 
                 if (!response.ok) {

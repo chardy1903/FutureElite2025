@@ -13,7 +13,12 @@ const csrfManager = {
      * Get CSRF token, fetching if necessary
      * @returns {Promise<string>} CSRF token
      */
-    async getToken() {
+    async getToken(forceRefresh = false) {
+        // If force refresh, clear cached token
+        if (forceRefresh) {
+            this._token = null;
+        }
+        
         // Return cached token if available
         if (this._token) {
             return this._token;
