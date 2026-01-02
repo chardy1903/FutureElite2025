@@ -1554,8 +1554,21 @@ async function loadPerformanceReport(settings) {
             document.getElementById('playerHeight').textContent = latestMeasurement.height_cm ? `${latestMeasurement.height_cm} cm` : '-';
             document.getElementById('playerWeight').textContent = latestMeasurement.weight_kg ? `${latestMeasurement.weight_kg} kg` : '-';
         } else {
-            document.getElementById('playerHeight').textContent = settings.height_cm ? `${settings.height_cm} cm` : '-';
-            document.getElementById('playerWeight').textContent = settings.weight_kg ? `${settings.weight_kg} kg` : '-';
+            // Get latest height and weight from measurements (most accurate)
+            let displayHeight = settings.height_cm;
+            let displayWeight = settings.weight_kg;
+            
+            if (latestMeasurement) {
+                if (latestMeasurement.height_cm !== null && latestMeasurement.height_cm !== undefined) {
+                    displayHeight = latestMeasurement.height_cm;
+                }
+                if (latestMeasurement.weight_kg !== null && latestMeasurement.weight_kg !== undefined) {
+                    displayWeight = latestMeasurement.weight_kg;
+                }
+            }
+            
+            document.getElementById('playerHeight').textContent = displayHeight ? `${displayHeight} cm` : '-';
+            document.getElementById('playerWeight').textContent = displayWeight ? `${displayWeight} kg` : '-';
         }
         
         // Calculate age group from date of birth

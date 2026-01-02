@@ -2543,12 +2543,16 @@ def physical_data_analysis():
         # Compare player metrics to elite benchmarks
         comparisons = {}
         
-        # Height comparison - use latest measurement (most accurate) or fall back to settings
+        # Height comparison - ALWAYS use latest measurement (most accurate), regardless of include_in_report flag
+        # The include_in_report flag only affects PDF reports, not current analysis
         height_for_comparison = None
         if measurements:
+            # Get ALL measurements with height (don't filter by include_in_report for current analysis)
             valid_measurements = [m for m in measurements if m.height_cm is not None]
             if valid_measurements:
-                latest_measurement = max(valid_measurements, key=lambda m: datetime.strptime(m.date, "%d %b %Y"))
+                # Sort by date descending to get most recent
+                sorted_measurements = sorted(valid_measurements, key=lambda m: datetime.strptime(m.date, "%d %b %Y"), reverse=True)
+                latest_measurement = sorted_measurements[0]
                 height_for_comparison = latest_measurement.height_cm
         
         # Fall back to settings if no measurements available
@@ -2607,14 +2611,21 @@ def physical_data_analysis():
                 'lower_is_better'
             )
         
-        # BMI calculation and comparison - use settings or latest measurement
+        # BMI calculation and comparison - ALWAYS use latest measurement (most accurate), regardless of include_in_report flag
         bmi = None
-        weight_for_bmi = settings.weight_kg
-        if not weight_for_bmi and measurements:
+        weight_for_bmi = None
+        if measurements:
+            # Get ALL measurements with weight (don't filter by include_in_report for current analysis)
             valid_measurements = [m for m in measurements if m.weight_kg is not None]
             if valid_measurements:
-                latest_measurement = max(valid_measurements, key=lambda m: datetime.strptime(m.date, "%d %b %Y"))
+                # Sort by date descending to get most recent
+                sorted_measurements = sorted(valid_measurements, key=lambda m: datetime.strptime(m.date, "%d %b %Y"), reverse=True)
+                latest_measurement = sorted_measurements[0]
                 weight_for_bmi = latest_measurement.weight_kg
+        
+        # Fall back to settings if no measurements available
+        if not weight_for_bmi:
+            weight_for_bmi = settings.weight_kg
         
         if height_for_comparison and weight_for_bmi:
             bmi = weight_for_bmi / ((height_for_comparison / 100) ** 2)

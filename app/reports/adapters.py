@@ -244,10 +244,28 @@ def build_player_from_data(
                 notes=ref.notes
             ))
     
+    # Get latest height and weight from physical measurements (most accurate)
+    latest_height = None
+    latest_weight = None
+    if physical_measurements:
+        # Get the most recent measurement with height/weight
+        valid_measurements = [m for m in physical_measurements if m.height_cm is not None or m.weight_kg is not None]
+        if valid_measurements:
+            from datetime import datetime
+            latest_measurement = max(valid_measurements, key=lambda m: datetime.strptime(m.date, "%d %b %Y"))
+            latest_height = latest_measurement.height_cm
+            latest_weight = latest_measurement.weight_kg
+    
+    # Fall back to settings if no measurements available
+    if latest_height is None:
+        latest_height = settings.height_cm
+    if latest_weight is None:
+        latest_weight = settings.weight_kg
+    
     # Calculate BMI if height and weight available
     bmi = None
-    if settings.height_cm and settings.weight_kg:
-        bmi = round(settings.weight_kg / ((settings.height_cm / 100) ** 2), 1)
+    if latest_height and latest_weight:
+        bmi = round(latest_weight / ((latest_height / 100) ** 2), 1)
     
     # Parse position secondary if it's a comma-separated string
     position_secondary = None
@@ -267,8 +285,8 @@ def build_player_from_data(
         seasonLabel=settings.season_year,
         contactEmail=settings.contact_email,
         socialLinks=social_links,
-        heightCm=settings.height_cm,
-        weightKg=settings.weight_kg,
+        heightCm=latest_height,
+        weightKg=latest_weight,
         bmi=bmi,
         phv=phv_data,
         growthHistory=growth_history,
