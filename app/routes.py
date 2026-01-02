@@ -2287,6 +2287,15 @@ def update_physical_measurement(measurement_id):
 def delete_physical_measurement(measurement_id):
     """Delete a physical measurement"""
     user_id = current_user.id
+    
+    # Check if measurement exists before trying to delete
+    existing_measurement = storage.get_physical_measurement(measurement_id, user_id)
+    if not existing_measurement:
+        # Measurement doesn't exist on server - might only exist in client storage
+        # Return success anyway since client will handle deletion from IndexedDB
+        current_app.logger.info(f"Measurement {measurement_id} not found on server for user {user_id}, but allowing deletion (may exist only in client storage)")
+        return jsonify({'success': True, 'message': 'Measurement not found on server (may have been deleted already or only exists in client storage)'})
+    
     success = storage.delete_physical_measurement(measurement_id, user_id)
     if success:
         # Recalculate PHV after deletion
