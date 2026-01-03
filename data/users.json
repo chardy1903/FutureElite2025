@@ -8,14 +8,6 @@
     "is_active": true
   },
   {
-    "id": "20251115_222002",
-    "username": "chris1903",
-    "password_hash": "scrypt:32768:8:1$Tjr9YypzaHo3Vgkr$4aa9a8c16b0f64abc479c03a556840f9a904a6d05396156e7e590c777b4d53abeba026fcbd4b40a62338e6178e6b33542964b58f339302175993223936070d91",
-    "email": "chris@reserva-group.co.uk",
-    "created_at": "15 Nov 2025",
-    "is_active": true
-  },
-  {
     "id": "20251228_201954",
     "username": "Admin_Chris1903_FutureElite",
     "password_hash": "pbkdf2:sha256:600000$EWrmTBQCpcQxK0jv$f41c25a70cb1355aa1ea81e785cfc05e9261ce68e2ce1238d95f9b0fafc1cf35",
