@@ -228,10 +228,7 @@ def create_app():
         )
         app.extensions['limiter'] = limiter
         
-        # P0 FIX: Exempt Stripe webhook from global rate limiting (verified by signature instead)
-        limiter.exempt('subscription.stripe_webhook')
-        
-        app.logger.info("Rate limiting enabled (memory storage with auto-cleanup, webhook exempted)")
+        app.logger.info("Rate limiting enabled (memory storage with auto-cleanup)")
     else:
         app.logger.warning("flask-limiter not installed - rate limiting disabled")
         limiter = None
@@ -491,6 +488,22 @@ def create_app():
     app.register_blueprint(bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(subscription_bp)
+    
+    # P0 FIX: Exempt Stripe webhook from global rate limiting (verified by signature instead)
+    # Must be done AFTER blueprint registration so the function can be imported
+    if LIMITER_AVAILABLE and limiter:
+        try:
+            from .subscription_routes import stripe_webhook
+            limiter.exempt(stripe_webhook)
+            app.logger.info("Stripe webhook exempted from rate limiting")
+        except Exception as e:
+            app.logger.warning(f"Could not exempt Stripe webhook from rate limiting: {e}")
+            # Try endpoint name as fallback
+            try:
+                limiter.exempt('subscription.stripe_webhook')
+                app.logger.info("Stripe webhook exempted from rate limiting (by endpoint name)")
+            except Exception as e2:
+                app.logger.error(f"Failed to exempt Stripe webhook by endpoint name: {e2}")
     
     # Add context processor for global template variables
     @app.context_processor
