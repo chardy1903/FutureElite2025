@@ -155,7 +155,7 @@ def create_app():
                     def __init__(self, original_set):
                         self._original = original_set
                         self._auth_endpoints = {
-                            'auth.login', 'auth.register', 'auth.forgot_password',
+                            'auth.login', 'auth.register', 'auth.forgot_password', 'auth.reset_password',
                             'main.import_excel', 'main.import_data', 'main.scout_pdf', 'main.generate_pdf',
                             'subscription.get_subscription_status', 'main.physical_data_analysis',
                             'main.cancel_user_subscription', 'main.delete_user',
@@ -544,6 +544,7 @@ def create_app():
             csrf.exempt('auth.login')
             csrf.exempt('auth.register')
             csrf.exempt('auth.forgot_password')
+            csrf.exempt('auth.reset_password')
             csrf.exempt('subscription.stripe_webhook')
             csrf.exempt('subscription.create_checkout_session')
             csrf.exempt('main.import_excel')
@@ -557,12 +558,13 @@ def create_app():
             
             # Also try function reference as backup (may not work if wrapped by rate limiter)
             try:
-                from .auth_routes import login, register, forgot_password
+                from .auth_routes import login, register, forgot_password, reset_password
                 from .subscription_routes import stripe_webhook, get_subscription_status, create_checkout_session
                 from .routes import import_excel, import_data, generate_scout_pdf_route, generate_pdf, cancel_user_subscription, check_overdue_subscriptions, sync_all_subscriptions, send_contact_email
                 csrf.exempt(login)
                 csrf.exempt(register)
                 csrf.exempt(forgot_password)
+                csrf.exempt(reset_password)
                 csrf.exempt(stripe_webhook)
                 csrf.exempt(get_subscription_status)
                 csrf.exempt(create_checkout_session)
@@ -703,8 +705,8 @@ def create_app():
     @app.errorhandler(400)
     def handle_400_error(e):
         """Return JSON for 400 errors on JSON requests (including CSRF)"""
-        # Skip CSRF errors for exempted routes (login/register should be exempt)
-        if request.endpoint in ['auth.login', 'auth.register']:
+        # Skip CSRF errors for exempted routes (login/register/reset_password should be exempt)
+        if request.endpoint in ['auth.login', 'auth.register', 'auth.reset_password', 'auth.forgot_password']:
             # These routes should be exempt - if we get here, something is wrong
             # But don't return CSRF error, return generic error instead
             error_description = str(e.description) if hasattr(e, 'description') else str(e)
@@ -721,7 +723,9 @@ def create_app():
         is_json_request = (
             'application/json' in content_type or
             request.path.startswith('/api/') or
-            request.path in ['/login', '/register']
+            request.path in ['/login', '/register'] or
+            request.path.startswith('/reset-password/') or
+            request.path == '/forgot-password'
         )
         
         if is_json_request:
