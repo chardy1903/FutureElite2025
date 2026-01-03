@@ -227,7 +227,11 @@ def create_app():
             # but for high-traffic sites, consider Redis: storage_uri=os.environ.get('REDIS_URL', 'memory://')
         )
         app.extensions['limiter'] = limiter
-        app.logger.info("Rate limiting enabled (memory storage with auto-cleanup)")
+        
+        # P0 FIX: Exempt Stripe webhook from global rate limiting (verified by signature instead)
+        limiter.exempt('subscription.stripe_webhook')
+        
+        app.logger.info("Rate limiting enabled (memory storage with auto-cleanup, webhook exempted)")
     else:
         app.logger.warning("flask-limiter not installed - rate limiting disabled")
         limiter = None
@@ -326,7 +330,8 @@ def create_app():
         user_agent = request.headers.get('User-Agent', 'unknown')
         
         # Allow legitimate paths (must be exact matches to prevent bypass)
-        if path in ['/robots.txt', '/health', '/favicon.ico']:
+        # P0 FIX: Stripe webhook must bypass security blocking - verified by signature instead
+        if path in ['/robots.txt', '/health', '/favicon.ico', '/stripe/webhook', '/api/subscription/webhook']:
             return None  # Let Flask handle these normally
         
         # ========================================================================
@@ -385,7 +390,8 @@ def create_app():
         ]
         
         # Check if IP is temporarily blocked
-        if client_ip in _blocked_ips:
+        # P0 FIX: Allow Stripe webhook even if IP is blocked (verified by signature)
+        if client_ip in _blocked_ips and path not in ['/stripe/webhook', '/api/subscription/webhook']:
             _log_security_block(client_ip, path, user_agent, 'RATE_LIMIT_BLOCKED')
             return _security_block_response(status_code=429)
         

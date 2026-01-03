@@ -327,17 +327,17 @@ def create_portal_session():
 @subscription_bp.route('/stripe/webhook', methods=['POST'])  # Alias for Render/Stripe configuration
 @csrf_exempt  # Exempt from CSRF - verified by Stripe signature instead
 def stripe_webhook():
-    # Security: Basic rate limiting for webhook endpoint (if limiter available)
-    # Note: Stripe webhooks should be verified by signature, but rate limiting adds defense in depth
-    try:
-        from flask import current_app
-        limiter = current_app.extensions.get('limiter')
-        if limiter:
-            # Allow higher rate for webhooks (Stripe may send multiple events)
-            limiter.limit("100 per hour", key_func=lambda: request.remote_addr)
-    except Exception:
-        pass  # Continue if rate limiting not available
-    """Handle Stripe webhook events"""
+    """
+    Handle Stripe webhook events.
+    
+    SECURITY: This endpoint bypasses:
+    - CSRF protection (verified by Stripe signature instead)
+    - Rate limiting (exempted globally, verified by signature instead)
+    - Request blocking middleware (allowlisted in p0_security_blocking)
+    
+    All requests are verified using Stripe-Signature header and STRIPE_WEBHOOK_SECRET.
+    Invalid signatures are rejected with HTTP 400.
+    """
     if not STRIPE_AVAILABLE:
         return jsonify({'error': 'Stripe is not installed'}), 500
     
