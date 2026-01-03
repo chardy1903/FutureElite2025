@@ -545,24 +545,31 @@ def reset_password(token):
     
     if request.method == 'POST':
         try:
-            data = request.get_json() if request.is_json else request.form.to_dict()
+            # Check if this is a JSON request (API call from JavaScript)
+            is_json_request = request.is_json or (request.content_type and 'application/json' in request.content_type)
+            
+            if is_json_request:
+                data = request.get_json() or {}
+            else:
+                data = request.form.to_dict()
+            
             new_password = data.get('password', '')
             confirm_password = data.get('confirm_password', '')
             
             if not new_password:
-                if request.is_json:
+                if is_json_request:
                     return jsonify({'success': False, 'errors': ['Password is required']}), 400
                 flash('Password is required', 'error')
                 return render_template('reset_password.html', token=token)
             
             if len(new_password) < 8:
-                if request.is_json:
+                if is_json_request:
                     return jsonify({'success': False, 'errors': ['Password must be at least 8 characters']}), 400
                 flash('Password must be at least 8 characters', 'error')
                 return render_template('reset_password.html', token=token)
             
             if new_password != confirm_password:
-                if request.is_json:
+                if is_json_request:
                     return jsonify({'success': False, 'errors': ['Passwords do not match']}), 400
                 flash('Passwords do not match', 'error')
                 return render_template('reset_password.html', token=token)
@@ -573,7 +580,7 @@ def reset_password(token):
                 # Delete used token
                 storage.delete_reset_token(token)
                 
-                if request.is_json:
+                if is_json_request:
                     return jsonify({
                         'success': True,
                         'message': 'Password reset successfully. You can now log in with your new password.',
@@ -582,14 +589,16 @@ def reset_password(token):
                 flash('Password reset successfully. You can now log in with your new password.', 'success')
                 return redirect(url_for('auth.login'))
             else:
-                if request.is_json:
+                if is_json_request:
                     return jsonify({'success': False, 'errors': ['Failed to update password. Please try again.']}), 500
                 flash('Failed to update password. Please try again.', 'error')
                 return render_template('reset_password.html', token=token)
                 
         except Exception as e:
             current_app.logger.error(f"Error in reset_password: {e}", exc_info=True)
-            if request.is_json:
+            # Check JSON request status again in exception handler
+            is_json_request = request.is_json or (request.content_type and 'application/json' in request.content_type)
+            if is_json_request:
                 return jsonify({'success': False, 'errors': ['An error occurred. Please try again.']}), 500
             flash('An error occurred. Please try again.', 'error')
             return render_template('reset_password.html', token=token)
