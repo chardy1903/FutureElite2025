@@ -427,12 +427,17 @@ def create_app():
     def track_reconnaissance(response):
         """Track 404 responses for reconnaissance detection"""
         if response.status_code == 404:
+            path = request.path
+            
+            # P0 FIX: Exempt Stripe webhook paths from 404 tracking (verified by signature instead)
+            if path in ['/stripe/webhook', '/api/subscription/webhook']:
+                return response  # Don't track webhook 404s
+            
             client_ip = request.headers.get('X-Forwarded-For', '').split(',')[0].strip() if request.headers.get('X-Forwarded-For') else \
                        request.headers.get('X-Real-IP', '') or \
                        (request.remote_addr if hasattr(request, 'remote_addr') else 'unknown')
             
             current_time = time.time()
-            path = request.path
             
             # Add to tracker
             _reconnaissance_tracker[client_ip].append((current_time, path))
