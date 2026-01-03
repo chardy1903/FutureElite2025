@@ -14,7 +14,11 @@ bind = f"0.0.0.0:{port}"
 backlog = 2048
 
 # Worker processes
-workers = int(os.environ.get('GUNICORN_WORKERS', multiprocessing.cpu_count() * 2 + 1))
+# Default: Use CPU count, but cap at 4 workers for memory efficiency
+# Can be overridden with GUNICORN_WORKERS env var
+cpu_count = multiprocessing.cpu_count()
+default_workers = min(cpu_count * 2 + 1, 4)  # Cap at 4 to save memory
+workers = int(os.environ.get('GUNICORN_WORKERS', default_workers))
 worker_class = 'sync'
 worker_connections = 1000
 timeout = 30

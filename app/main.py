@@ -6,7 +6,7 @@ This software is proprietary and confidential. Unauthorized copying, modificatio
 distribution, or use of this software, via any medium, is strictly prohibited.
 """
 
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, Response
 from flask_login import LoginManager
 import os
 import sys
@@ -14,7 +14,9 @@ import webbrowser
 import threading
 import time
 from pathlib import Path
-from datetime import timedelta
+from datetime import timedelta, datetime
+from collections import defaultdict
+from functools import wraps
 
 # Load environment variables from .env file
 try:
@@ -59,6 +61,10 @@ except ImportError:
 def create_app():
     """Create and configure the Flask application"""
     app = Flask(__name__)
+    
+    # P0 SECURITY: Configure static file serving to never serve dotfiles
+    # This prevents any hidden files from being accessible via HTTP
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000  # 1 year cache for static files
     
     # Configuration
     # SECRET_KEY must be set via environment variable - no default fallback
@@ -208,26 +214,33 @@ def create_app():
     
     # Security: Initialize rate limiting
     if LIMITER_AVAILABLE:
+        # Use memory storage with automatic cleanup
+        # Flask-Limiter's memory storage automatically expires old entries
+        # but we set conservative limits to prevent memory growth
         limiter = Limiter(
             app=app,
             key_func=get_remote_address,
             default_limits=["200 per day", "50 per hour"],
-            storage_uri="memory://"  # In-memory storage (TODO: Use Redis in production)
+            storage_uri="memory://",  # In-memory storage (auto-expires old entries)
+            strategy="fixed-window",  # More memory-efficient than moving-window
+            # Note: Flask-Limiter memory storage automatically cleans up expired entries
+            # but for high-traffic sites, consider Redis: storage_uri=os.environ.get('REDIS_URL', 'memory://')
         )
         app.extensions['limiter'] = limiter
-        app.logger.info("Rate limiting enabled")
+        app.logger.info("Rate limiting enabled (memory storage with auto-cleanup)")
     else:
         app.logger.warning("flask-limiter not installed - rate limiting disabled")
         limiter = None
     
-    # Security: Initialize security headers
+    # P0 SECURITY: Mandatory Security Headers
+    # Ensure all required security headers are present on every response
     if TALISMAN_AVAILABLE:
         is_production = os.environ.get('FLASK_ENV') == 'production'
         Talisman(
             app,
             force_https=is_production,
             strict_transport_security=is_production,
-            strict_transport_security_max_age=31536000,
+            strict_transport_security_max_age=15768000,  # 6 months minimum (182.5 days)
             strict_transport_security_include_subdomains=True,
             strict_transport_security_preload=False,  # Set True after HSTS preload approval
             content_security_policy={
@@ -243,12 +256,34 @@ def create_app():
                 # Allow Stripe Checkout iframes
                 'frame-src': "'self' https://js.stripe.com https://hooks.stripe.com",
             },
-            frame_options='SAMEORIGIN',  # Allow same-origin frames (needed for Stripe Checkout)
+            frame_options='DENY',  # Changed to DENY per requirements (was SAMEORIGIN for Stripe)
             referrer_policy='strict-origin-when-cross-origin'
         )
-        app.logger.info("Security headers enabled")
+        app.logger.info("Security headers enabled (P0 hardened)")
     else:
         app.logger.warning("flask-talisman not installed - security headers disabled")
+        # Fallback: Add headers manually if Talisman not available
+        @app.after_request
+        def add_security_headers_fallback(response):
+            """Fallback security headers if Talisman not available"""
+            is_production = os.environ.get('FLASK_ENV') == 'production'
+            if is_production:
+                response.headers['Strict-Transport-Security'] = 'max-age=15768000; includeSubDomains'
+            response.headers['X-Content-Type-Options'] = 'nosniff'
+            response.headers['X-Frame-Options'] = 'DENY'
+            response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+            # Remove framework identification
+            response.headers.pop('X-Powered-By', None)
+            response.headers.pop('Server', None)
+            return response
+    
+    # P0 SECURITY: Remove framework identification headers
+    @app.after_request
+    def remove_framework_headers(response):
+        """Remove X-Powered-By and other framework identification headers"""
+        response.headers.pop('X-Powered-By', None)
+        response.headers.pop('Server', None)  # Gunicorn sets this, but try to remove
+        return response
     
     # Security: Handle reverse proxy headers (X-Forwarded-*)
     # Required when deployed behind nginx, Apache, or load balancer
@@ -262,6 +297,189 @@ def create_app():
         app.logger.warning("werkzeug ProxyFix not available - proxy headers may not be handled correctly")
     except Exception as e:
         app.logger.warning(f"ProxyFix configuration error: {e}")
+    
+    # ============================================================================
+    # P0 SECURITY: Production Security Hardening - Mandatory Request Blocking
+    # ============================================================================
+    # This runs BEFORE routing, static file handling, or any other processing
+    # to ensure malicious requests are blocked at the earliest possible point
+    
+    # Rate limiting storage for reconnaissance detection
+    _reconnaissance_tracker = defaultdict(list)  # IP -> list of (timestamp, path)
+    _blocked_ips = set()  # IPs temporarily blocked for excessive 404s
+    
+    @app.before_request
+    def p0_security_blocking():
+        """
+        P0 Security: Block malicious reconnaissance requests before any processing.
+        This is the first line of defense and runs before routing, static files, etc.
+        """
+        path = request.path
+        path_lower = path.lower()
+        
+        # Get client IP (handles proxy headers)
+        client_ip = request.headers.get('X-Forwarded-For', '').split(',')[0].strip() if request.headers.get('X-Forwarded-For') else \
+                   request.headers.get('X-Real-IP', '') or \
+                   (request.remote_addr if hasattr(request, 'remote_addr') else 'unknown')
+        
+        # Get user agent
+        user_agent = request.headers.get('User-Agent', 'unknown')
+        
+        # Allow legitimate paths (must be exact matches to prevent bypass)
+        if path in ['/robots.txt', '/health', '/favicon.ico']:
+            return None  # Let Flask handle these normally
+        
+        # ========================================================================
+        # MANDATORY BLOCKING PATTERNS - Exact matches as specified
+        # ========================================================================
+        
+        # Block .env files (all variations)
+        if '/.env' in path_lower or path_lower.startswith('.env') or path_lower.endswith('.env'):
+            _log_security_block(client_ip, path, user_agent, 'ENV_FILE_ACCESS')
+            return _security_block_response()
+        
+        # Block .git access
+        if '/.git' in path_lower or path_lower.startswith('.git') or '/.git/' in path_lower:
+            _log_security_block(client_ip, path, user_agent, 'GIT_METADATA_ACCESS')
+            return _security_block_response()
+        
+        # Block wp-config.php
+        if 'wp-config.php' in path_lower:
+            _log_security_block(client_ip, path, user_agent, 'WP_CONFIG_ACCESS')
+            return _security_block_response()
+        
+        # Block config.php
+        if 'config.php' in path_lower:
+            _log_security_block(client_ip, path, user_agent, 'CONFIG_PHP_ACCESS')
+            return _security_block_response()
+        
+        # Block aws-config files
+        if 'aws-config' in path_lower or 'aws.config' in path_lower:
+            _log_security_block(client_ip, path, user_agent, 'AWS_CONFIG_ACCESS')
+            return _security_block_response()
+        
+        # Block backup extensions: .bak, .old, .save, .orig
+        backup_extensions = ['.bak', '.old', '.save', '.orig']
+        for ext in backup_extensions:
+            if path_lower.endswith(ext):
+                _log_security_block(client_ip, path, user_agent, f'BACKUP_FILE_ACCESS_{ext.upper()}')
+                return _security_block_response()
+        
+        # Block admin/backend .env files
+        if '/admin/.env' in path_lower or '/backend/.env' in path_lower:
+            _log_security_block(client_ip, path, user_agent, 'ADMIN_ENV_ACCESS')
+            return _security_block_response()
+        
+        # ========================================================================
+        # RATE LIMITING: Detect reconnaissance via repeated 404s
+        # ========================================================================
+        
+        # Track requests to non-existent paths (will be 404s)
+        # This detects reconnaissance scanning patterns
+        current_time = time.time()
+        
+        # Clean old entries (older than 5 minutes)
+        cutoff_time = current_time - 300
+        _reconnaissance_tracker[client_ip] = [
+            (ts, p) for ts, p in _reconnaissance_tracker[client_ip] if ts > cutoff_time
+        ]
+        
+        # Check if IP is temporarily blocked
+        if client_ip in _blocked_ips:
+            _log_security_block(client_ip, path, user_agent, 'RATE_LIMIT_BLOCKED')
+            return _security_block_response(status_code=429)
+        
+        # Track this request (will check after routing if it's a 404)
+        # Store for later analysis
+        
+        return None  # Continue processing
+    
+    def _log_security_block(client_ip, path, user_agent, block_reason):
+        """Log security block with full details"""
+        timestamp = datetime.now().isoformat()
+        app.logger.warning(
+            f"SECURITY_BLOCK [{timestamp}] IP={client_ip} PATH={path} "
+            f"REASON={block_reason} UA={user_agent}"
+        )
+    
+    def _security_block_response(status_code=404):
+        """Return consistent security block response"""
+        # Return minimal response - no stack traces, no debug info
+        if request.path.startswith('/api/'):
+            return jsonify({
+                'success': False,
+                'errors': ['Not found']
+            }), status_code
+        else:
+            # Minimal HTML response
+            return Response(
+                '<!DOCTYPE html><html><head><title>404 Not Found</title></head>'
+                '<body><h1>404 Not Found</h1></body></html>',
+                status=status_code,
+                mimetype='text/html'
+            )
+    
+    # Track 404s for rate limiting (runs after routing)
+    @app.after_request
+    def track_reconnaissance(response):
+        """Track 404 responses for reconnaissance detection"""
+        if response.status_code == 404:
+            client_ip = request.headers.get('X-Forwarded-For', '').split(',')[0].strip() if request.headers.get('X-Forwarded-For') else \
+                       request.headers.get('X-Real-IP', '') or \
+                       (request.remote_addr if hasattr(request, 'remote_addr') else 'unknown')
+            
+            current_time = time.time()
+            path = request.path
+            
+            # Add to tracker
+            _reconnaissance_tracker[client_ip].append((current_time, path))
+            
+            # Check threshold: 20+ 404s in 5 minutes = reconnaissance
+            recent_404s = [
+                (ts, p) for ts, p in _reconnaissance_tracker[client_ip]
+                if current_time - ts < 300  # Last 5 minutes
+            ]
+            
+            if len(recent_404s) >= 20:
+                # Block this IP temporarily (15 minutes)
+                _blocked_ips.add(client_ip)
+                app.logger.error(
+                    f"SECURITY_ALERT: IP {client_ip} blocked for reconnaissance "
+                    f"({len(recent_404s)} 404s in 5 minutes)"
+                )
+                
+                # Schedule unblock after 15 minutes
+                def unblock_ip():
+                    time.sleep(900)  # 15 minutes
+                    _blocked_ips.discard(client_ip)
+                    app.logger.info(f"IP {client_ip} unblocked after rate limit cooldown")
+                
+                threading.Thread(target=unblock_ip, daemon=True).start()
+        
+        return response
+    
+    # P0 SECURITY: Block dotfiles in static file requests
+    # Flask serves static files via /static/ URL prefix, check in before_request
+    @app.before_request
+    def block_static_dotfiles():
+        """Block access to dotfiles in static file serving"""
+        path = request.path
+        
+        # Check if this is a static file request
+        if path.startswith('/static/'):
+            # Extract filename from path
+            filename = path.replace('/static/', '')
+            
+            # Block any dotfiles or hidden files
+            if filename.startswith('.') or '/.' in filename or '\\.' in filename:
+                client_ip = request.headers.get('X-Forwarded-For', '').split(',')[0].strip() if request.headers.get('X-Forwarded-For') else \
+                           request.headers.get('X-Real-IP', '') or \
+                           (request.remote_addr if hasattr(request, 'remote_addr') else 'unknown')
+                user_agent = request.headers.get('User-Agent', 'unknown')
+                _log_security_block(client_ip, path, user_agent, 'STATIC_DOTFILE_ACCESS')
+                return _security_block_response()
+        
+        return None
     
     # Register blueprints
     app.register_blueprint(bp)

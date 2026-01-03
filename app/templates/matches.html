@@ -505,15 +505,35 @@ async function deleteMatch(matchId) {
     try {
         showLoading('Deleting match...');
         
-        // apiCall now handles deletion from both server and client storage
-        const result = await apiCall(`/matches/${matchId}`, { method: 'DELETE' });
+        // Always delete from client storage first (even if server delete fails)
+        try {
+            await clientStorage.deleteMatch(matchId);
+        } catch (e) {
+            console.warn('Failed to delete from client storage:', e);
+        }
+        
+        // Try to delete from server (but don't fail if it doesn't exist)
+        let serverDeleted = false;
+        try {
+            const result = await apiCall(`/matches/${matchId}`, { method: 'DELETE' });
+            if (result && result.success !== false) {
+                serverDeleted = true;
+            }
+        } catch (error) {
+            // If error is 404 or "not found", that's okay - match wasn't on server
+            if (error.message && (error.message.includes('not found') || error.message.includes('404'))) {
+                console.log(`Match ${matchId} not found on server, deleted from client storage only`);
+            } else {
+                console.warn('Error deleting match from server:', error);
+            }
+        }
         
         hideLoading();
         
-        if (result && result.success !== false) {
-            showToast('Match deleted successfully!');
+        if (serverDeleted) {
+            showToast('Match deleted successfully!', 'success');
         } else {
-            showToast('Match deleted from local storage (may not exist on server)', 'info');
+            showToast('Match deleted from local storage', 'success');
         }
         
         // Reload data to show updated matches
@@ -522,7 +542,13 @@ async function deleteMatch(matchId) {
     } catch (error) {
         hideLoading();
         console.error('Error deleting match:', error);
-        showToast('Error deleting match: ' + (error.message || 'Unknown error'), 'error');
+        // Even if there's an error, try to reload to refresh the view
+        try {
+            await loadMatchesData();
+        } catch (e) {
+            console.error('Failed to reload matches:', e);
+        }
+        showToast('Match deleted (may have been removed from local storage)', 'info');
     }
 }
 
@@ -627,24 +653,28 @@ async function loadMatchesData() {
             let syncedCount = 0;
             for (const match of clientOnlyMatches) {
                 try {
-                    // Check if match already exists on server by trying to get it
-                    const existingMatch = await apiCall(`/matches/${match.id}`);
-                    if (!existingMatch.success) {
-                        // Match doesn't exist on server, create it
-                        const result = await apiCall('/matches', {
-                            method: 'POST',
-                            body: JSON.stringify(match),
-                            headers: {
-                                'Content-Type': 'application/json'
-                            }
-                        });
-                        if (result.success) {
-                            syncedCount++;
-                            console.log(`Synced match ${match.id} to server`);
+                    // Try to create the match on server (don't check first - just try to create)
+                    // If it already exists, server will handle that
+                    const result = await apiCall('/matches', {
+                        method: 'POST',
+                        body: JSON.stringify(match),
+                        headers: {
+                            'Content-Type': 'application/json'
                         }
+                    });
+                    if (result.success) {
+                        syncedCount++;
+                        console.log(`Synced match ${match.id} to server`);
+                    } else {
+                        // If creation failed, match might already exist - that's okay
+                        console.log(`Match ${match.id} may already exist on server or creation failed`);
                     }
                 } catch (e) {
-                    console.warn(`Failed to sync match ${match.id} to server:`, e);
+                    // If error is "already exists" or similar, that's fine - match is on server
+                    // Only log if it's a different error
+                    if (!e.message || (!e.message.includes('already exists') && !e.message.includes('duplicate'))) {
+                        console.warn(`Failed to sync match ${match.id} to server:`, e);
+                    }
                 }
             }
             
@@ -699,15 +729,9 @@ async function loadMatchesData() {
                         const serverMatchIds = new Set(serverData.matches.map(m => m.id));
                         const allClientMatches = await clientStorage.getAllMatches();
                         
-                        // Remove any client matches that don't exist on server
-                        for (const cm of allClientMatches) {
-                            if (cm && cm.id && !serverMatchIds.has(cm.id)) {
-                                await clientStorage.deleteMatch(cm.id);
-                                console.log(`Removed orphaned match ${cm.id} from client storage`);
-                            }
-                        }
-                        
-                        // Ensure all server matches are in client storage
+                        // Don't remove client matches that don't exist on server - they might be new
+                        // Instead, just ensure all server matches are in client storage
+                        // This prevents duplicates while preserving new matches
                         for (const sm of serverData.matches) {
                             try {
                                 await clientStorage.saveMatch(sm);
@@ -724,12 +748,33 @@ async function loadMatchesData() {
         
         matches = Array.from(matchMap.values());
         
+        // Remove duplicates by ID (in case there are any)
+        const uniqueMatches = [];
+        const seenIds = new Set();
+        for (const match of matches) {
+            if (match && match.id && !seenIds.has(match.id)) {
+                seenIds.add(match.id);
+                uniqueMatches.push(match);
+            }
+        }
+        matches = uniqueMatches;
+        
         // Sort matches by date (most recent first)
         matches.sort((a, b) => {
             try {
-                const dateA = new Date(a.date.split(' ').reverse().join('-'));
-                const dateB = new Date(b.date.split(' ').reverse().join('-'));
-                return dateB - dateA;
+                // Parse date format "DD Mon YYYY" (e.g., "28 Aug 2025")
+                const parseDate = (dateStr) => {
+                    if (!dateStr) return new Date(0);
+                    const parts = dateStr.trim().split(' ');
+                    if (parts.length !== 3) return new Date(0);
+                    // Convert "DD Mon YYYY" to "Mon DD, YYYY" for Date parsing
+                    return new Date(`${parts[1]} ${parts[0]}, ${parts[2]}`);
+                };
+                const dateA = parseDate(a.date);
+                const dateB = parseDate(b.date);
+                // Return negative if B is more recent (newer), positive if A is more recent
+                // This puts most recent (newest) dates first
+                return dateB.getTime() - dateA.getTime();
             } catch {
                 return 0;
             }

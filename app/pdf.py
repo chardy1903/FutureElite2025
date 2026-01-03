@@ -982,8 +982,8 @@ class ScoutPDFGenerator(PDFGenerator):
         page2_elements.extend(profile_elements)
         page2_elements.append(Spacer(1, 12))
         
-        # Add player photo, media, and references
-        media_elements = self._create_player_media_section(references or [])
+        # Add player photo and media (references moved to page 3)
+        media_elements = self._create_player_media_section()
         if media_elements:
             page2_elements.extend(media_elements)
         
@@ -991,17 +991,20 @@ class ScoutPDFGenerator(PDFGenerator):
         story.append(PageBreak())
         story.append(KeepTogether(page2_elements))
         
-        # PAGE 3: Club history and training camps
+        # PAGE 3: Club history, training camps, and references
         club_history_elements = []
         training_camps_elements = []
+        references_elements = []
         
         if club_history:
             club_history_elements = self._create_club_history_section(club_history)
         if training_camps:
             training_camps_elements = self._create_training_camps_section(training_camps)
+        if references:
+            references_elements = self._create_references_section(references)
         
-        # Combine both sections and keep them together on same page
-        if club_history_elements or training_camps_elements:
+        # Combine all sections and keep them together on same page
+        if club_history_elements or training_camps_elements or references_elements:
             story.append(PageBreak())
             combined_elements = []
             if club_history_elements:
@@ -1009,7 +1012,10 @@ class ScoutPDFGenerator(PDFGenerator):
                 combined_elements.append(Spacer(1, 12))
             if training_camps_elements:
                 combined_elements.extend(training_camps_elements)
-            # Use KeepTogether to ensure both sections stay on same page
+                combined_elements.append(Spacer(1, 12))
+            if references_elements:
+                combined_elements.extend(references_elements)
+            # Use KeepTogether to ensure all sections stay on same page
             story.append(KeepTogether(combined_elements))
         
         # PAGE 4: Playing Profile, Key achievements, physical development, physical performance metrics
@@ -1142,13 +1148,31 @@ class ScoutPDFGenerator(PDFGenerator):
             profile_data.append(["Dominant Foot", self.settings.dominant_foot])
         profile_data.append(["Current Club", self.settings.club_name or "N/A"])
         
-        # Physical Attributes
-        if self.settings.height_cm:
-            profile_data.append(["Height", f"{self.settings.height_cm:.1f} cm"])
-        if self.settings.weight_kg:
-            profile_data.append(["Weight", f"{self.settings.weight_kg:.1f} kg"])
-        if self.settings.height_cm and self.settings.weight_kg:
-            bmi = self.settings.weight_kg / ((self.settings.height_cm / 100) ** 2)
+        # Physical Attributes - use latest physical measurement first, then fall back to settings
+        latest_height = None
+        latest_weight = None
+        if physical_measurements:
+            valid_measurements = [m for m in physical_measurements if m.height_cm is not None or m.weight_kg is not None]
+            if valid_measurements:
+                sorted_measurements = sorted(valid_measurements, key=lambda x: datetime.strptime(x.date, "%d %b %Y"), reverse=True)
+                latest_measurement = sorted_measurements[0]
+                if latest_measurement.height_cm:
+                    latest_height = latest_measurement.height_cm
+                if latest_measurement.weight_kg:
+                    latest_weight = latest_measurement.weight_kg
+        
+        # Fallback to settings if no measurements
+        if latest_height is None and self.settings.height_cm:
+            latest_height = self.settings.height_cm
+        if latest_weight is None and self.settings.weight_kg:
+            latest_weight = self.settings.weight_kg
+        
+        if latest_height:
+            profile_data.append(["Height", f"{latest_height:.1f} cm"])
+        if latest_weight:
+            profile_data.append(["Weight", f"{latest_weight:.1f} kg"])
+        if latest_height and latest_weight:
+            bmi = latest_weight / ((latest_height / 100) ** 2)
             profile_data.append(["BMI", f"{bmi:.1f}"])
         
         # Performance Metrics - use latest physical metric if available, otherwise fall back to settings
@@ -1241,7 +1265,7 @@ class ScoutPDFGenerator(PDFGenerator):
         
         return elements
     
-    def _create_player_media_section(self, references: List[Reference] = None) -> List:
+    def _create_player_media_section(self) -> List:
         """Create player photo and links section"""
         elements = []
         
@@ -1312,33 +1336,6 @@ class ScoutPDFGenerator(PDFGenerator):
                 )
                 elements.append(link_para)
             elements.append(Spacer(1, 8))
-        
-        # Add references section (below social media links)
-        if references and len(references) > 0:
-            elements.append(Paragraph("<b>References:</b>", self.styles['TableCell']))
-            elements.append(Spacer(1, 4))
-            
-            for ref in references:
-                ref_text = f"<b>{ref.name}</b>"
-                if ref.position:
-                    ref_text += f" - {ref.position}"
-                if ref.organization:
-                    ref_text += f" ({ref.organization})"
-                elements.append(Paragraph(ref_text, self.styles['TableCell']))
-                
-                # Add contact info if available
-                contact_parts = []
-                if ref.email:
-                    contact_parts.append(f'<a href="mailto:{ref.email}" color="blue"><u>{ref.email}</u></a>')
-                if ref.phone:
-                    contact_parts.append(ref.phone)
-                if contact_parts:
-                    elements.append(Paragraph(" | ".join(contact_parts), self.styles['TableCell']))
-                
-                if ref.relationship:
-                    elements.append(Paragraph(f"<i>{ref.relationship}</i>", self.styles['TableCell']))
-                
-                elements.append(Spacer(1, 6))
         
         return elements
     
@@ -1567,6 +1564,50 @@ class ScoutPDFGenerator(PDFGenerator):
         header_para = Paragraph("Training Camps Attended", self.styles['SectionHeader'])
         spacer = Spacer(1, 12)
         elements.append(KeepTogether([header_para, spacer, camps_table]))
+        
+        return elements
+    
+    def _create_references_section(self, references: List[Reference] = None) -> List:
+        """Create references section"""
+        elements = []
+        
+        elements.append(Paragraph("References", self.styles['SectionHeader']))
+        elements.append(Spacer(1, 12))
+        
+        if not references or len(references) == 0:
+            elements.append(Paragraph("No references recorded.", self.styles['TableCell']))
+            return elements
+        
+        # Create references list
+        for ref in references:
+            # Name and position
+            name_text = f"<b>{ref.name}</b>"
+            if ref.position:
+                name_text += f" - {ref.position}"
+            if ref.organization:
+                name_text += f" ({ref.organization})"
+            
+            elements.append(Paragraph(name_text, self.styles['TableCell']))
+            
+            # Contact info
+            contact_parts = []
+            if ref.email:
+                contact_parts.append(f'<a href="mailto:{ref.email}" color="blue"><u>{ref.email}</u></a>')
+            if ref.phone:
+                contact_parts.append(ref.phone)
+            if contact_parts:
+                elements.append(Paragraph(" | ".join(contact_parts), self.styles['TableCell']))
+            
+            # Relationship
+            if ref.relationship:
+                elements.append(Paragraph(f"<i>{ref.relationship}</i>", self.styles['TableCell']))
+            
+            # Notes
+            if ref.notes:
+                elements.append(Paragraph(ref.notes, self.styles['TableCell']))
+            
+            # Add spacing between references
+            elements.append(Spacer(1, 8))
         
         return elements
     
